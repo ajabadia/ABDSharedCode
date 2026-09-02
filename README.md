@@ -2,6 +2,8 @@
 
 Librería de código compartido entre proyectos ABDSynths.
 
+Repositorio: https://github.com/ajabadia/ABDSharedCode.git
+
 ## Módulos disponibles
 
 | Módulo | Descripción | Target CMake |
@@ -20,13 +22,27 @@ else()
     FetchContent_Declare(
       ABDSharedCode
       GIT_REPOSITORY https://github.com/ajabadia/ABDSharedCode.git
-      GIT_TAG        main
+      GIT_TAG        master
     )
     FetchContent_MakeAvailable(ABDSharedCode)
 endif()
 
 target_link_libraries(TuPlugin PRIVATE ABDShared::AutoUpdater)
 ```
+
+> **Nota:** El `GIT_TAG` puede ser una rama (`master`), un tag de versión (`v1.0.0`) o un hash. En producción es recomendable fijarlo a un tag de versión concreto (`vX.Y.Z`), no a `master`, para evitar cambios inesperados.
+
+## Publicación y versionado
+
+Este repo se publica en GitHub. Para releases estables:
+
+1. Nueva funcionalidad → `git add`, `git commit`, `git push`
+2. Crear tag de versión:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+3. Los consumidores fijan el tag en el `GIT_TAG` de `FetchContent`
 
 ## Documentación
 

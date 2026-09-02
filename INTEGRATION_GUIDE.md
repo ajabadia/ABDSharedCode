@@ -52,7 +52,7 @@ include(FetchContent)
 FetchContent_Declare(
   ABDSharedCode
   GIT_REPOSITORY https://github.com/ajabadia/ABDSharedCode.git
-  GIT_TAG        main    # o una versión específica: v1.0.0
+  GIT_TAG        master  # o una versión específica: v1.0.0
 )
 FetchContent_MakeAvailable(ABDSharedCode)
 ```
@@ -104,7 +104,7 @@ else()
     FetchContent_Declare(
       ABDSharedCode
       GIT_REPOSITORY https://github.com/ajabadia/ABDSharedCode.git
-      GIT_TAG        main
+      GIT_TAG        master
     )
     FetchContent_MakeAvailable(ABDSharedCode)
 endif()
