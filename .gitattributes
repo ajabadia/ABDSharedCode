@@ -1,0 +1,21 @@
+# Normalizar line endings. C++ cross-platform.
+* text=auto
+
+# Todos los archivos de texto
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+
+# Binarios
+*.lib binary
+*.a binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.exe binary
+*.pdb binary
+*.ilk binary

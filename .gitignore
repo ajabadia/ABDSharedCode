@@ -1,0 +1,53 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+out/
+dist/
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CMakeUserPresets.json
+*.cmake.in
+
+# FetchContent dependencies (descargadas durante configuración)
+_builds/
+_deps/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Compiled / build artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+*.app
+*.pdb
+*.ilk
+*.pch
+
+# Generated
+Generated/
+*.gen.h
+*.gen.cpp
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
