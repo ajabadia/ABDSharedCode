@@ -45,7 +45,6 @@ std::vector<uint8_t> HardwareMidiDetector::parseHexBytes(const std::string& hexS
 
 juce::MidiMessage HardwareMidiDetector::makeIdentityRequest(uint8_t deviceId)
 {
-    // Standard MIDI Universal Non-Real Time Identity Request: F0 7E <devId> 06 01 F7
     const uint8_t sysexBytes[] = { 0x7E, deviceId, 0x06, 0x01 };
     return juce::MidiMessage::createSysExMessage(sysexBytes, sizeof(sysexBytes));
 }
@@ -54,11 +53,8 @@ std::vector<juce::MidiMessage> HardwareMidiDetector::buildDetectionQueries(const
 {
     std::vector<juce::MidiMessage> queries;
 
-    // 1. Always: Universal broadcast identity inquiry.
     queries.push_back(makeIdentityRequest(0x7F));
 
-    // 2. Each unique contract-declared autoDetectSysEx (captures manufacturer
-    //    specificity, e.g. Roland deviceId 0x10). Deduplicated by raw bytes.
     std::vector<std::string> seen;
     auto alreadySeen = [&seen](const std::string& hex) {
         for (const auto& s : seen)
@@ -69,9 +65,8 @@ std::vector<juce::MidiMessage> HardwareMidiDetector::buildDetectionQueries(const
     for (const auto& c : contracts)
     {
         auto sysexHex = c.autoDetectSysEx;
-        // Fall back to midiIdentity autoDetect if the top-level field is missing.
         if (sysexHex.empty())
-            sysexHex = c.midiIdentity.sysexHeaderHex; // proprietary header doubles as a possible query
+            sysexHex = c.midiIdentity.sysexHeaderHex;
 
         if (sysexHex.empty() || alreadySeen(sysexHex))
             continue;
@@ -105,7 +100,6 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
 
     for (const auto& c : contracts)
     {
-        // 1. Check custom / proprietary SysEx header declared in contract
         if (!c.midiIdentity.sysexHeaderHex.empty())
         {
             auto headerBytes = parseHexBytes(c.midiIdentity.sysexHeaderHex);
@@ -132,8 +126,6 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
             }
         }
 
-        // 2. Check MMA Universal Non-Real Time Identity Reply:
-        // data[0] = 0x7E, data[1] = devId, data[2] = 0x06, data[3] = 0x02
         if (data[0] == 0x7E && data[2] == 0x06 && data[3] == 0x02 && size >= 5)
         {
             if (c.midiIdentity.manufacturerIdHex.empty())
@@ -155,15 +147,12 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
             if (!mfgMatches)
                 continue;
 
-            // firmware version lives after model, at offset 4 + mfg + 2(model bytes) + 2(family?) ...
-            // The representative layout: F0 7E devId 06 02 mfg.. [family:2] [model:2] [rev:4] F7
             int familyOffset = 4 + static_cast<int>(mfgBytes.size());
 
-            // If contract declares modelIdHex, verify it
             if (!c.midiIdentity.modelIdHex.empty())
             {
                 auto modelBytes = parseHexBytes(c.midiIdentity.modelIdHex);
-                int modelOffset = familyOffset + 2; // after family code
+                int modelOffset = familyOffset + 2;
 
                 bool modelMatches = false;
                 if (size >= modelOffset + static_cast<int>(modelBytes.size()))
@@ -179,7 +168,6 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                     }
                 }
 
-                // Also allow matching at family offset if model was placed there (e.g. Roland Juno 32H)
                 if (!modelMatches)
                 {
                     if (size >= familyOffset + static_cast<int>(modelBytes.size()))
@@ -206,7 +194,6 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                     bestDev.model = c.midiIdentity.model;
                     bestDev.isSysExVerified = true;
 
-                    // Try to capture firmware revision (4 bytes after model offset).
                     int revOffset = modelOffset + static_cast<int>(modelBytes.size());
                     if (size >= revOffset + 4)
                     {
@@ -220,7 +207,6 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
             }
             else if (bestScore < 1)
             {
-                // No model ID constraint, fallback manufacturer-only match
                 bestScore = 1;
                 bestDev.deviceId = data[1];
                 bestDev.hardwareId = c.id;
@@ -242,8 +228,8 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
 }
 
 std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const juce::MidiDeviceInfo& inDev,
-                                                                         const juce::MidiDeviceInfo& outDev,
-                                                                         const std::vector<HardwareContract>& contracts)
+                                                                          const juce::MidiDeviceInfo& outDev,
+                                                                          const std::vector<HardwareContract>& contracts)
 {
     juce::String combined = inDev.name + " " + outDev.name;
     int bestMatchLength = 0;
@@ -251,7 +237,6 @@ std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const j
 
     for (const auto& c : contracts)
     {
-        // 1. Check explicit port name matches declared in contract JSON
         for (const auto& kw : c.midiIdentity.portNameMatches)
         {
             if (kw.empty()) continue;
@@ -273,7 +258,6 @@ std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const j
             }
         }
 
-        // 2. Check model designation if >= 4 characters
         if (c.midiIdentity.model.length() >= 4 && combined.containsIgnoreCase(juce::String(c.midiIdentity.model)))
         {
             if (static_cast<int>(c.midiIdentity.model.length()) > bestMatchLength)
@@ -305,7 +289,7 @@ void HardwareMidiDetector::handleIncomingMidiMessage(juce::MidiInput* /*source*/
     }
 }
 
-std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(int timeoutMs)
+std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const DetectionConfig& config, int timeoutMs)
 {
     std::vector<DiscoveredDevice> discovered;
 
@@ -317,10 +301,12 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(int timeoutMs)
 
     auto queries = buildDetectionQueries(registeredContracts);
 
-    for (const auto& outDevInfo : midiOutputs)
+    for (int outIdx = 0; outIdx < midiOutputs.size(); ++outIdx)
     {
+        const auto& outDevInfo = midiOutputs[outIdx];
         juce::MidiDeviceInfo inDevInfo;
         bool hasInput = false;
+
         for (const auto& inCandidate : midiInputs)
         {
             if (inCandidate.name == outDevInfo.name || inCandidate.identifier == outDevInfo.identifier)
@@ -353,7 +339,6 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(int timeoutMs)
             }
         }
 
-        // Send the contract-driven detection queries.
         for (const auto& q : queries)
             outPort->sendMessageNow(q);
 
@@ -368,6 +353,7 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(int timeoutMs)
                 {
                     item.inDevice = inDevInfo;
                     item.outDevice = outDevInfo;
+                    item.portIndex = outIdx;
                     discovered.push_back(item);
                 }
                 foundSysEx = true;
@@ -380,14 +366,64 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(int timeoutMs)
             inPort.reset();
         }
 
-        if (!foundSysEx && hasInput)
+        if (!foundSysEx && hasInput && config.includeHeuristic)
         {
             auto heuristicDev = matchFromPortNames(inDevInfo, outDevInfo, registeredContracts);
             if (heuristicDev.has_value())
             {
-                discovered.push_back(heuristicDev.value());
+                auto dev = heuristicDev.value();
+                dev.portIndex = outIdx;
+                discovered.push_back(dev);
             }
         }
+    }
+
+    // Apply whitelist filter (allowedHardwareIds)
+    if (!config.allowedHardwareIds.empty())
+    {
+        std::vector<DiscoveredDevice> filtered;
+        filtered.reserve(discovered.size());
+        for (auto& dev : discovered)
+        {
+            if (std::find(config.allowedHardwareIds.begin(), config.allowedHardwareIds.end(), dev.hardwareId) != config.allowedHardwareIds.end())
+            {
+                filtered.push_back(dev);
+            }
+        }
+        discovered = std::move(filtered);
+    }
+
+    // Filter by SysEx verification requirement
+    if (config.requireSysExVerified)
+    {
+        std::vector<DiscoveredDevice> filtered;
+        filtered.reserve(discovered.size());
+        for (auto& dev : discovered)
+        {
+            if (dev.isSysExVerified)
+                filtered.push_back(dev);
+        }
+        discovered = std::move(filtered);
+    }
+
+    // Enrich with contract data (modelImage, brandLogo)
+    for (auto& dev : discovered)
+    {
+        for (const auto& c : registeredContracts)
+        {
+            if (c.id == dev.hardwareId)
+            {
+                dev.modelImage = c.midiIdentity.modelIdHex.empty() ? "" : ("models/" + dev.hardwareId + ".png");
+                dev.brandLogo = c.midiIdentity.manufacturer.empty() ? "" : ("brands/" + dev.manufacturer + "-logo.svg");
+                break;
+            }
+        }
+    }
+
+    // Apply maxResults limit
+    if (config.maxResults > 0 && static_cast<int>(discovered.size()) > config.maxResults)
+    {
+        discovered.resize(config.maxResults);
     }
 
     return discovered;

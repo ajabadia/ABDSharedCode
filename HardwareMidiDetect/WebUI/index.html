@@ -4,131 +4,186 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Detect Hardware</title>
+  <link rel="stylesheet" href="styles/index.css">
   <style>
-    :root {
-      --bg: #12141c;
-      --panel: #1b1f2b;
-      --panel-2: #232836;
-      --border: #2c3345;
-      --text: #e6e9f2;
-      --muted: #98a0b3;
-      --accent: #4f8cff;
-      --ok: #2ecc71;
-      --warn: #f39c12;
-      --danger: #e74c3c;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-      padding: 20px;
+    .hmd-root {
+      padding: var(--space-6);
       height: 100vh;
       display: flex;
       flex-direction: column;
+      background: var(--color-bg-base);
+      color: var(--color-text-main);
+      font-family: var(--font-sans);
     }
-    h2 { font-size: 16px; margin-bottom: 4px; }
-    .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 12px;
+    .hmd-title {
+      font-size: var(--text-xl);
+      margin-bottom: var(--space-1);
     }
-    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    button {
-      background: var(--accent);
-      color: #fff; border: none; border-radius: 6px;
-      padding: 8px 14px; font-size: 13px; cursor: pointer;
+    .hmd-subtitle {
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
+      margin-bottom: var(--space-5);
     }
-    button:disabled { opacity: .5; cursor: default; }
-    button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-    #status { margin-top: 10px; font-size: 13px; color: var(--muted); white-space: pre-wrap; }
-    #result { margin-top: 10px; font-size: 13px; }
-    .ok { color: var(--ok); }
-    .warn { color: var(--warn); }
-    .err { color: var(--danger); }
-    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-    .dot.on { background: var(--ok); animation: blink 1s infinite; }
-    .dot.off { background: var(--muted); }
-    .device-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
-    .device-item {
-      background: var(--panel-2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 12px;
+    .hmd-panel {
+      background: var(--color-panel-bg);
+      border: 1px solid var(--color-panel-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      margin-bottom: var(--space-4);
+    }
+    .hmd-status-row {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .hmd-status {
+      margin-top: var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+    }
+    .hmd-device-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .hmd-device-item {
+      background: var(--color-panel-surface);
+      border: 1px solid var(--color-panel-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-4) var(--space-5);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
       cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
     }
-    .device-item:hover { border-color: var(--accent); background: #2a3042; }
-    .device-item.selected { border-color: var(--accent); background: #1e283f; }
-    .device-item input[type="radio"] { accent-color: var(--accent); }
-    .device-info { flex: 1; min-width: 0; }
-    .device-name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .device-meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .device-badge {
-      font-size: 10px;
+    .hmd-device-item:hover {
+      border-color: var(--color-accent);
+      background: var(--color-panel-surface-elevated);
+    }
+    .hmd-device-item.selected {
+      border-color: var(--color-accent);
+      background: var(--color-panel-surface-elevated);
+    }
+    .hmd-device-item input[type="radio"],
+    .hmd-device-item input[type="checkbox"] {
+      accent-color: var(--color-accent);
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .hmd-device-image {
+      width: 64px;
+      height: 48px;
+      object-fit: contain;
+      border-radius: var(--radius-sm);
+      background: var(--color-panel-bg);
+      border: 1px solid var(--color-panel-border-dim);
+      flex-shrink: 0;
+    }
+    .hmd-device-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .hmd-device-name {
+      font-weight: 500;
+      font-size: var(--text-md);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hmd-device-meta {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hmd-device-badge {
+      font-size: var(--text-2xs);
       padding: 2px 6px;
-      border-radius: 4px;
-      background: var(--bg);
-      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--color-panel-bg);
+      border: 1px solid var(--color-panel-border);
     }
-    .device-badge.verified { background: rgba(46, 204, 113, 0.15); border-color: var(--ok); color: var(--ok); }
-    .device-badge.heuristic { background: rgba(243, 156, 18, 0.15); border-color: var(--warn); color: var(--warn); }
-    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
-    .spinner {
-      display: inline-block; width: 16px; height: 16px;
-      border: 2px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin 0.8s linear infinite;
-      margin-right: 8px;
+    .hmd-device-badge.verified {
+      background: rgba(var(--color-success-rgb), 0.15);
+      border-color: var(--color-success);
+      color: var(--color-success);
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes blink { 50% { opacity: .3; } }
+    .hmd-device-badge.heuristic {
+      background: rgba(var(--color-warning-rgb), 0.15);
+      border-color: var(--color-warning);
+      color: var(--color-warning);
+    }
+    .hmd-empty {
+      text-align: center;
+      padding: var(--space-12) var(--space-6);
+      color: var(--color-text-muted);
+    }
+    .hmd-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+    }
+    .hmd-counter {
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+      align-self: center;
+    }
   </style>
 </head>
-<body>
-  <h2>Hardware Detection</h2>
-  <div class="sub">Scans MIDI ports for known synthesizer hardware and matches against shared contracts.</div>
+<body data-theme="audiolab">
+  <div class="hmd-root">
+    <h2 class="hmd-title">Hardware Detection</h2>
+    <p class="hmd-subtitle">Scans MIDI ports for known synthesizer hardware and matches against shared contracts.</p>
 
-  <div class="panel row">
-    <button id="rescan" class="ghost">Rescan Ports</button>
-    <button id="detect">Detect Hardware</button>
-  </div>
-
-  <div class="panel">
-    <div class="row">
-      <span class="dot off" id="dot"></span>
-      <span id="listenLabel" class="sub" style="margin:0">Ready</span>
+    <div class="hmd-panel">
+      <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+        <button id="rescan" class="btn btn-ghost">Rescan Ports</button>
+        <button id="detect" class="btn btn-primary">Detect Hardware</button>
+      </div>
     </div>
-    <div id="status">Click Detect to probe connected hardware.</div>
-  </div>
 
-  <div id="devicePanel" class="panel" style="display:none">
-    <h3 style="font-size:13px;margin-bottom:8px">Detected Devices</h3>
-    <div id="deviceList" class="device-list"></div>
-    <div class="row" style="margin-top:12px;justify-content:flex-end">
-      <button id="selectBtn" disabled>Select</button>
-      <button id="cancelBtn" class="ghost">Cancel</button>
+    <div class="hmd-panel">
+      <div class="hmd-status-row">
+        <span id="dot" class="led-indicator" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-dim);"></span>
+        <span id="listenLabel" style="font-size: var(--text-sm); color: var(--color-text-muted);">Ready</span>
+      </div>
+      <div id="status" class="hmd-status">Click Detect to probe connected hardware.</div>
+    </div>
+
+    <div id="devicePanel" class="hmd-panel" style="display:none">
+      <h3 style="font-size: var(--text-lg); margin-bottom: var(--space-4);">Detected Devices</h3>
+      <div id="deviceList" class="hmd-device-list"></div>
+      <div id="deviceFooter" class="hmd-footer">
+        <span id="counter" class="hmd-counter" style="display:none"></span>
+        <button id="selectBtn" class="btn btn-primary" disabled>Select</button>
+        <button id="cancelBtn" class="btn btn-ghost">Cancel</button>
+      </div>
     </div>
   </div>
 
   <script>
     // --- State ---
     let detectedDevices = [];
-    let selectedIndex = -1;
+    let selectedIndices = new Set();
+    let maxResults = 1;
 
     // --- UI Helpers ---
     function setStatus(text, cls) {
-      document.getElementById('status').className = cls || '';
-      document.getElementById('status').textContent = text;
+      const el = document.getElementById('status');
+      el.className = 'hmd-status ' + (cls || '');
+      el.textContent = text;
     }
     function setListening(on) {
       const dot = document.getElementById('dot');
-      dot.className = 'dot ' + (on ? 'on' : 'off');
+      dot.style.background = on ? 'var(--color-success)' : 'var(--color-text-dim)';
+      dot.classList.toggle('led-indicator', on);
       document.getElementById('listenLabel').textContent = on ? 'Scanning ports...' : 'Ready';
     }
     function showDevicePanel(show) {
@@ -137,17 +192,26 @@
     function setSelectEnabled(enabled) {
       document.getElementById('selectBtn').disabled = !enabled;
     }
+    function updateCounter() {
+      const counter = document.getElementById('counter');
+      if (maxResults > 1) {
+        counter.style.display = 'inline';
+        counter.textContent = `${selectedIndices.size}/${maxResults} selected`;
+      } else {
+        counter.style.display = 'none';
+      }
+    }
 
     // --- Called from C++ with scan results ---
     window.__setDetectedDevices = function(devices) {
       detectedDevices = devices || [];
       const list = document.getElementById('deviceList');
       list.innerHTML = '';
-      selectedIndex = -1;
+      selectedIndices.clear();
       setSelectEnabled(false);
 
       if (detectedDevices.length === 0) {
-        list.innerHTML = '<div class="empty-state">No known hardware detected.\nTry connecting your synth and rescanning.</div>';
+        list.innerHTML = '<div class="hmd-empty">No known hardware detected.\nTry connecting your synth and rescanning.</div>';
         setStatus('No matching devices found.', 'warn');
         setListening(false);
         showDevicePanel(true);
@@ -156,26 +220,43 @@
 
       detectedDevices.forEach((d, i) => {
         const el = document.createElement('div');
-        el.className = 'device-item';
+        el.className = 'hmd-device-item';
+        el.dataset.index = i;
+
+        const imgSrc = d.modelImage || 'models/placeholder-synth.svg';
+        const badgeClass = d.isSysExVerified ? 'verified' : 'heuristic';
+        const badgeText = d.isSysExVerified ? 'Verified' : 'Name match';
+        const portInfo = d.outPortName ? ` · ${d.outPortName}` : '';
+        const deviceIdInfo = d.deviceId ? ` · DevID 0x${d.deviceId.toString(16).toUpperCase().padStart(2, '0')}` : '';
+
         el.innerHTML = `
-          <input type="radio" name="device" ${i === 0 ? 'checked' : ''}>
-          <div class="device-info">
-            <div class="device-name">${escapeHtml(d.displayName)}</div>
-            <div class="device-meta">${escapeHtml(d.manufacturer)} &bull; ${escapeHtml(d.model)} ${d.firmwareVersion ? '&bull; FW ' + escapeHtml(d.firmwareVersion) : ''}</div>
+          <input type="${maxResults === 1 ? 'radio' : 'checkbox'}" name="device" ${i === 0 && maxResults === 1 ? 'checked' : ''}>
+          <img class="hmd-device-image" src="${imgSrc}" alt="${d.displayName}" onerror="this.src='models/placeholder-synth.svg'">
+          <div class="hmd-device-info">
+            <div class="hmd-device-name">${escapeHtml(d.displayName)}</div>
+            <div class="hmd-device-meta">${escapeHtml(d.manufacturer)} · ${escapeHtml(d.model)}${portInfo}${deviceIdInfo}</div>
           </div>
-          <span class="device-badge ${d.isSysExVerified ? 'verified' : 'heuristic'}">
-            ${d.isSysExVerified ? 'Verified' : 'Name match'}
-          </span>
+          <span class="hmd-device-badge ${badgeClass}">${badgeText}</span>
         `;
-        el.onclick = () => selectDevice(i);
+
+        el.onclick = (e) => {
+          if (e.target.type === 'radio' || e.target.type === 'checkbox') return;
+          selectDevice(i);
+        };
+        el.querySelector('input').onchange = () => selectDevice(i);
+
         list.appendChild(el);
       });
 
-      // Auto-select first
-      selectDevice(0);
+      // Auto-select first for single mode
+      if (maxResults === 1) {
+        selectDevice(0);
+      }
+
       setStatus(`Found ${detectedDevices.length} device${detectedDevices.length > 1 ? 's' : ''}.`, 'ok');
       setListening(false);
       showDevicePanel(true);
+      updateCounter();
     };
 
     function escapeHtml(str) {
@@ -183,32 +264,59 @@
     }
 
     function selectDevice(i) {
-      selectedIndex = i;
-      document.querySelectorAll('.device-item').forEach((el, idx) => {
-        el.classList.toggle('selected', idx === i);
-        el.querySelector('input[type="radio"]').checked = idx === i;
+      if (maxResults === 1) {
+        selectedIndices.clear();
+        selectedIndices.add(i);
+      } else {
+        if (selectedIndices.has(i)) {
+          selectedIndices.delete(i);
+        } else if (selectedIndices.size < maxResults) {
+          selectedIndices.add(i);
+        }
+      }
+
+      document.querySelectorAll('.hmd-device-item').forEach((el, idx) => {
+        const input = el.querySelector('input');
+        const isSelected = selectedIndices.has(idx);
+        el.classList.toggle('selected', isSelected);
+        input.checked = isSelected;
       });
-      setSelectEnabled(true);
+
+      setSelectEnabled(selectedIndices.size > 0);
+      updateCounter();
     }
 
     function emitResult(cancelled) {
       const payload = {
         action: 'hardware.result',
-        cancelled: cancelled,
-        hardwareId: '',
-        displayName: '',
-        manufacturer: '',
-        model: '',
-        firmwareVersion: ''
+        cancelled: cancelled
       };
-      if (!cancelled && selectedIndex >= 0) {
-        const d = detectedDevices[selectedIndex];
-        payload.hardwareId = d.id;
-        payload.displayName = d.displayName;
-        payload.manufacturer = d.manufacturer;
-        payload.model = d.model;
-        payload.firmwareVersion = d.firmwareVersion;
+
+      if (!cancelled && selectedIndices.size > 0) {
+        if (maxResults === 1) {
+          const d = detectedDevices[Array.from(selectedIndices)[0]];
+          payload.hardwareId = d.id;
+          payload.displayName = d.displayName;
+          payload.manufacturer = d.manufacturer;
+          payload.model = d.model;
+          payload.firmwareVersion = d.firmwareVersion;
+        } else {
+          payload.hardwareIds = [];
+          payload.displayNames = [];
+          Array.from(selectedIndices).sort((a, b) => a - b).forEach(i => {
+            const d = detectedDevices[i];
+            payload.hardwareIds.push(d.id);
+            payload.displayNames.push(d.displayName);
+            // Use first selected for common metadata
+            if (payload.manufacturer === undefined) {
+              payload.manufacturer = d.manufacturer;
+              payload.model = d.model;
+              payload.firmwareVersion = d.firmwareVersion;
+            }
+          });
+        }
       }
+
       if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent) {
         window.__JUCE__.backend.emitEvent('nativeEvent', payload);
       }
@@ -228,12 +336,16 @@
       if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent) {
         window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.refreshPorts' });
       }
-      // Re-trigger detection after a brief moment
       setTimeout(() => document.getElementById('detect').click(), 200);
     };
 
     document.getElementById('selectBtn').onclick = () => emitResult(false);
     document.getElementById('cancelBtn').onclick = () => emitResult(true);
+
+    // --- Receive config from C++ ---
+    window.__setConfig = function(config) {
+      maxResults = config.maxResults || 1;
+    };
 
     // Initial state
     setStatus('Ready. Click Detect to probe your hardware.', '');

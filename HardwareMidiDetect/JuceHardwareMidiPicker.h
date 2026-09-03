@@ -29,11 +29,22 @@ namespace abd::hwid
 struct HardwarePickResult
 {
     bool cancelled { true };
-    std::string hardwareId;        /**< contract id, e.g. "korg_ms2000" */
-    std::string displayName;       /**< human name, e.g. "Korg MS2000 / MS2000R" */
+
+    // Single selection (maxResults == 1)
+    std::string hardwareId;
+    std::string displayName;
+
+    // Multi selection (maxResults > 1)
+    std::vector<std::string> hardwareIds;
+    std::vector<std::string> displayNames;
+
+    // Common metadata
     std::string manufacturer;
     std::string model;
     std::string firmwareVersion;
+
+    // All detected devices (for debugging / context)
+    std::vector<DiscoveredDevice> allDetected;
 };
 
 using HardwarePickCallback = std::function<void(const HardwarePickResult&)>;
@@ -48,9 +59,11 @@ class JuceHardwareMidiPicker : public juce::Component
 public:
     JuceHardwareMidiPicker(MidiHardwareBackend& backend,
                            HardwarePickCallback onResult,
-                           const std::vector<HardwareContract>& contracts = {})
+                           const std::vector<HardwareContract>& contracts = {},
+                           const HardwareMidiDetector::DetectionConfig& config = {})
         : midiBackend(backend),
           detector(contracts),
+          currentConfig(config),
           resultCallback(std::move(onResult)),
           webBrowser(juce::WebBrowserComponent::Options{}
                          .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
@@ -76,15 +89,35 @@ public:
         detector.setContracts(contracts);
     }
 
+    /** @brief Update detection configuration. */
+    void setConfig(const HardwareMidiDetector::DetectionConfig& config)
+    {
+        currentConfig = config;
+    }
+
+    /** @brief Set the visual theme (ms2000, cz101, deepmind, juno, audiolab, or custom). */
+    void setTheme(const std::string& themeName)
+    {
+        juce::String js = "document.body.dataset.theme = '" + juce::String(themeName) + "';";
+        juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
+    }
+
     void resized() override
     {
         webBrowser.setBounds(getLocalBounds());
     }
 
-    /** @brief Run a full scan and present results in the WebUI. */
+    /** @brief Run a full scan with current config and present results in the WebUI. */
     void startPick()
     {
-        auto results = detector.scanAllPorts(350);
+        auto results = detector.scanAllPorts(currentConfig, 350);
+        pushDevicesToWebUI(results);
+    }
+
+    /** @brief Run a scan with a specific config (temporarily overrides currentConfig). */
+    void startPick(const HardwareMidiDetector::DetectionConfig& config)
+    {
+        auto results = detector.scanAllPorts(config, 350);
         pushDevicesToWebUI(results);
     }
 
@@ -115,7 +148,11 @@ private:
             obj->setProperty("firmwareVersion", juce::String(d.firmwareVersion));
             obj->setProperty("inPortName", d.inDevice.name);
             obj->setProperty("outPortName", d.outDevice.name);
+            obj->setProperty("portIndex", d.portIndex);
+            obj->setProperty("deviceId", static_cast<int>(d.deviceId));
             obj->setProperty("isSysExVerified", d.isSysExVerified);
+            obj->setProperty("modelImage", juce::String(d.modelImage));
+            obj->setProperty("brandLogo", juce::String(d.brandLogo));
             list.add(juce::var(obj));
         }
         juce::String js = "if (window.__setDetectedDevices) window.__setDetectedDevices(" + juce::JSON::toString(juce::var(list)) + ");";
@@ -141,11 +178,36 @@ private:
         {
             HardwarePickResult result;
             result.cancelled = message.getProperty("cancelled", true);
-            result.hardwareId = message.getProperty("hardwareId", "").toString().toStdString();
-            result.displayName = message.getProperty("displayName", "").toString().toStdString();
-            result.manufacturer = message.getProperty("manufacturer", "").toString().toStdString();
-            result.model = message.getProperty("model", "").toString().toStdString();
-            result.firmwareVersion = message.getProperty("firmwareVersion", "").toString().toStdString();
+
+            if (!result.cancelled)
+            {
+                if (currentConfig.maxResults == 1)
+                {
+                    result.hardwareId = message.getProperty("hardwareId", "").toString().toStdString();
+                    result.displayName = message.getProperty("displayName", "").toString().toStdString();
+                }
+                else
+                {
+                    auto idsVar = message.getProperty("hardwareIds", juce::var());
+                    auto namesVar = message.getProperty("displayNames", juce::var());
+                    if (idsVar.isArray())
+                    {
+                        for (const auto& v : *idsVar.getArray())
+                            result.hardwareIds.push_back(v.toString().toStdString());
+                    }
+                    if (namesVar.isArray())
+                    {
+                        for (const auto& v : *namesVar.getArray())
+                            result.displayNames.push_back(v.toString().toStdString());
+                    }
+                }
+
+                result.manufacturer = message.getProperty("manufacturer", "").toString().toStdString();
+                result.model = message.getProperty("model", "").toString().toStdString();
+                result.firmwareVersion = message.getProperty("firmwareVersion", "").toString().toStdString();
+            }
+
+            result.allDetected = lastDetectedDevices;
 
             midiBackend.setReceiveCallback(nullptr);
             midiBackend.stopListening();
@@ -157,8 +219,10 @@ private:
 
     MidiHardwareBackend& midiBackend;
     HardwareMidiDetector detector;
+    HardwareMidiDetector::DetectionConfig currentConfig;
     HardwarePickCallback resultCallback;
     juce::WebBrowserComponent webBrowser;
+    std::vector<DiscoveredDevice> lastDetectedDevices;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(JuceHardwareMidiPicker)
 };

@@ -70,8 +70,11 @@ endif()
 # available in scope (i.e. when ABDSharedCode is consumed as a subdirectory
 # after JUCE is added, or via the helper below).
 if(COMMAND juce_add_binary_data)
+    # Only embed index.html and any JS files in WebUI root.
+    # Styles, models, brands are served from filesystem (ABDSharedAssets).
     file(GLOB HWD_WEB_ASSETS
-        "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/WebUI/*"
+        "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/WebUI/index.html"
+        "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/WebUI/*.js"
     )
     list(FILTER HWD_WEB_ASSETS EXCLUDE REGEX "/node_modules/")
     if(HWD_WEB_ASSETS)
@@ -81,8 +84,10 @@ if(COMMAND juce_add_binary_data)
             SOURCES ${HWD_WEB_ASSETS}
         )
 
+        target_include_directories(HardwareMidiPickerAssets INTERFACE
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/juce_binarydata_HardwareMidiPickerAssets/JuceLibraryCode>"
+        )
         target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE HardwareMidiPickerAssets)
         add_library(ABDShared::HardwareMidiPickerAssets ALIAS HardwareMidiPickerAssets)
     endif()
 endif()
-

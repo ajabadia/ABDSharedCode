@@ -29,7 +29,7 @@ ABDSharedCode/
     ├── HardwareMidiDetector.*      ← Detector C++ contract-driven (sin GUI)
     ├── MidiHardwareBackend.h       ← Interfaz de transporte inyectado por el host
     ├── JuceHardwareMidiPicker.h    ← Componente WebView2 (pick UX) estilo ABDScope
-    ├── HardwareMidiPickerResourceProvider.* ← Sirve el WebUI embebido
+    ├── HardwareMidiPickerResourceProvider.* ← Sirve el WebUI embebido + assets
     └── WebUI/index.html            ← WebUI de detección (queries por contrato)
 ```
 
@@ -203,11 +203,11 @@ El módulo ofrece **dos arquitecturas**, análogas a cómo se integra ABDScope:
 target_link_libraries(TuPlugin PRIVATE ABDShared::HardwareMidiDetect)
 ```
 
-> El WebUI del picker se embebe automáticamente (`juce_add_binary_data`) cuando JUCE y el comando estén en scope. Los hosts también pueden apuntar `HardwareMidiPickerResourceProvider` a su propia instalación de WebUI en disco.
+> El WebUI del picker embebe `index.html` + JS via `juce_add_binary_data`. Los assets de estilos (`styles/`), imágenes de modelos (`models/`) y logos de marcas (`brands/`) se sirven desde filesystem (`ABDSharedAssets/`) para permitir actualizaciones sin recompilar.
 
 ### Paso 2: Contratos desde ABDSharedAssets
 
-Cargá los contratos (single-source en `ABDSharedAssets/contracts`) con el registry compartido:
+Cargá los contratos (single-source en `ABDSharedAssets/contracts/hardware`) con el registry compartido:
 
 ```cpp
 #include <HardwareMidiDetect/HardwareContractRegistry.h>
@@ -230,12 +230,23 @@ Ideal para tests y detección programática:
 #include <HardwareMidiDetect/HardwareMidiDetector.h>
 using abd::hwid::HardwareMidiDetector, abd::hwid::DiscoveredDevice;
 
+HardwareMidiDetector::DetectionConfig config;
+config.allowedHardwareIds = {};           // vacío = todos los contratos
+config.maxResults = 1;                    // 1 = single, >1 = multi
+config.autoSelectIfSingle = true;         // auto-callback si 1 match
+config.includeHeuristic = true;           // incluir matches por nombre puerto
+config.requireSysExVerified = false;      // solo SysEx verificado
+
 HardwareMidiDetector detector(registry.getContracts());
-auto found = detector.scanAllPorts(/*timeoutMs=*/350);
+auto found = detector.scanAllPorts(config, /*timeoutMs=*/350);
 for (auto& dev : found) {
-    dev.hardwareId;      // e.g. "korg_ms2000"
-    dev.displayName;     // e.g. "Korg MS2000 / MS2000R"
-    dev.isSysExVerified; // true = confirmado por reply SysEx
+    dev.hardwareId;           // e.g. "korg_ms2000"
+    dev.displayName;          // e.g. "Korg MS2000 / MS2000R"
+    dev.portIndex;            // índice del puerto de salida
+    dev.deviceId;             // deviceId del Identity Reply (0x00-0x7F)
+    dev.isSysExVerified;      // true = confirmado por SysEx
+    dev.modelImage;           // "models/korg-ms2000.png"
+    dev.brandLogo;            // "brands/korg-logo.svg"
 }
 
 // Queries derivadas de contratos (sin hardcoding):
@@ -250,9 +261,11 @@ auto queries = HardwareMidiDetector::buildDetectionQueries(registry.getContracts
 ```cpp
 #include <HardwareMidiDetect/MidiHardwareBackend.h>
 #include <HardwareMidiDetect/JuceHardwareMidiPicker.h>
+#include <HardwareMidiDetect/HardwareMidiDetector.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 
-using abd::hwid::MidiHardwareBackend, abd::hwid::JuceHardwareMidiPicker;
+using abd::hwid::MidiHardwareBackend, abd::hwid::JuceHardwareMidiPicker,
+     abd::hwid::HardwareMidiDetector;
 
 class MySynthMidiBackend : public MidiHardwareBackend
 {
@@ -292,22 +305,99 @@ private:
     std::unique_ptr<juce::MidiInput> inPort;  // + juce::MidiInputCallback
 };
 
+// Configuración de detección
+HardwareMidiDetector::DetectionConfig config;
+config.allowedHardwareIds = {};           // whitelist (ej. {"korg_ms2000", "korg_ms2000r"})
+config.maxResults = 1;                    // 1 = single, >1 = multi-select
+config.autoSelectIfSingle = true;         // auto-callback si 1 match
+config.includeHeuristic = true;
+config.requireSysExVerified = false;
+
 // En tu editor/UI:
 auto backend = std::make_unique<MySynthMidiBackend>();
 picker = std::make_unique<JuceHardwareMidiPicker>(*backend,
-    [](const abd::hwid::HardwarePickResult& res) {
+    [this](const HardwarePickResult& res) {
         if (res.cancelled) return;
-        DBG("Detected: " + res.displayName + " (" + res.hardwareId + ")");
-    });
+        if (config.maxResults == 1) {
+            DBG("Detected: " + res.displayName + " (" + res.hardwareId + ")");
+        } else {
+            for (size_t i = 0; i < res.hardwareIds.size(); ++i) {
+                DBG("Selected: " + res.displayNames[i] + " (" + res.hardwareIds[i] + ")");
+            }
+        }
+        applySelection(res);
+    },
+    registry.getContracts(),
+    config);
+
+// Tema visual (ms2000, cz101, deepmind, juno, audiolab)
+picker->setTheme("audiolab");
+
 addAndMakeVisible(picker.get());
+picker->setBounds(getLocalBounds());
+picker->startPick(); // lanza la UI de detección
 ```
 
 **Contrato con el WebUI (canal `nativeEvent`):**
-- `hardware.send` `{payload: <base64>}` → host descodifica y envía bytes a `MidiOutput`.
-- `hardware.listen` → host arma el listener e instala el callback.
-- `hardware.stop` → host detiene la escucha.
-- `hardware.result` `{cancelled, hardwareId, displayName, ...}` → resultado al host.
-- **Entrada al WebUI:** el host empuja bytes entrantes vía `__pushMidiBytes(base64)` (ya cableado en `JuceHardwareMidiPicker::onNativeEvent`).
+
+| Evento | Dirección | Payload | Propósito |
+|--------|-----------|---------|-----------|
+| `hardware.detect` | WebUI → Host | `{}` | Usuario clicó "Detect" → C++ ejecuta scan |
+| `hardware.refreshPorts` | WebUI → Host | `{}` | Usuario clicó "Rescan" → refresca puertos y re-escanea |
+| `hardware.result` | WebUI → Host | Ver abajo | Usuario seleccionó dispositivo(s) o canceló |
+| `hardware.send` | Host → WebUI | `{payload: <base64>}` | WebUI pide enviar SysEx (legacy, no usado en v2) |
+| `hardware.listen` | Host → WebUI | `{}` | WebUI pide armar listener (legacy) |
+| `hardware.stop` | Host → WebUI | `{}` | WebUI pide detener listener (legacy) |
+
+**`hardware.result` payload (single / multi):**
+
+```json
+// Single (maxResults=1):
+{
+  "action": "hardware.result",
+  "cancelled": false,
+  "hardwareId": "korg_ms2000",
+  "displayName": "Korg MS2000 / MS2000R",
+  "manufacturer": "42",
+  "model": "58",
+  "firmwareVersion": "01020304"
+}
+
+// Multi (maxResults>1):
+{
+  "action": "hardware.result",
+  "cancelled": false,
+  "hardwareIds": ["korg_ms2000", "roland_juno106"],
+  "displayNames": ["Korg MS2000 / MS2000R", "Roland JUNO-106"],
+  "manufacturer": "42",
+  "model": "58",
+  "firmwareVersion": "01020304"
+}
+```
+
+**Entrada al WebUI (host → WebUI):**
+El C++ empuja la lista de dispositivos detectados via `__setDetectedDevices(devices[])` donde cada item incluye:
+`id`, `displayName`, `manufacturer`, `model`, `firmwareVersion`, `inPortName`, `outPortName`, `portIndex`, `deviceId`, `isSysExVerified`, `modelImage`, `brandLogo`.
+
+### Theme System (estilo ABDScope)
+
+El WebUI usa el sistema universal de estilos de `ABDSharedAssets/styles/`:
+
+```cpp
+// Temas disponibles: "ms2000", "cz101", "deepmind", "juno", "audiolab"
+picker->setTheme("audiolab"); // cambia colores, bordes, scrollbars automáticamente
+```
+
+El WebUI importa `<link rel="stylesheet" href="styles/index.css">` que carga tokens + temas + componentes. Las barras de scroll son coherentes con el tema activo.
+
+### Asset Serving (Filesystem)
+
+| Tipo | Origen | Servido por |
+|------|--------|-------------|
+| `index.html`, JS | Embedded binary data | `HardwareMidiPickerAssets` (juce_add_binary_data) |
+| `styles/**/*` | `ABDSharedAssets/styles/` | `HardwareMidiPickerResourceProvider` (filesystem) |
+| `models/**/*` | `ABDSharedAssets/models/` | `HardwareMidiPickerResourceProvider` (filesystem) |
+| `brands/**/*` | `ABDSharedAssets/brands/` | `HardwareMidiPickerResourceProvider` (filesystem) |
 
 ### Notas de migración (desde ABDAudioLab local)
 

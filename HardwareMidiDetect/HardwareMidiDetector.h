@@ -23,6 +23,28 @@ namespace abd::hwid
 {
 
 /**
+ * @struct DetectionConfig
+ * @brief Configuration for hardware detection scan.
+ */
+struct DetectionConfig
+{
+    /** Whitelist of hardware IDs to detect. Empty = all allowed contracts. */
+    std::vector<std::string> allowedHardwareIds;
+
+    /** Maximum number of results to return. 1 = single selection, >1 = multi-selection. */
+    int maxResults = 1;
+
+    /** If true and maxResults==1 with exactly 1 match, auto-return without UI interaction. */
+    bool autoSelectIfSingle = true;
+
+    /** Include heuristic (port-name) matches in addition to SysEx-verified matches. */
+    bool includeHeuristic = true;
+
+    /** If true, only return devices verified via SysEx response (ignore heuristic). */
+    bool requireSysExVerified = false;
+};
+
+/**
  * @struct DiscoveredDevice
  * @brief Metadata for a hardware device identified via MIDI SysEx inquiry.
  */
@@ -36,8 +58,24 @@ struct DiscoveredDevice
 
     juce::MidiDeviceInfo inDevice;      /**< JUCE MIDI input port info. */
     juce::MidiDeviceInfo outDevice;     /**< JUCE MIDI output port info. */
-    uint8_t deviceId { 0x10 };          /**< Device ID or MIDI channel. */
-    bool isSysExVerified { false };     /**< True if verified via SysEx response; false if name heuristic. */
+
+    /** Index of this port in the output device array (for distinguishing multiple ports). */
+    int portIndex { -1 };
+
+    /** Device ID from Identity Reply (byte 1 of F0 7E devId 06 02 ...). 0 = unknown. */
+    uint8_t deviceId { 0 };
+
+    /** MIDI channel (1-16) if determinable. 0 = unknown. */
+    uint8_t midiChannel { 0 };
+
+    /** True if verified via SysEx response; false if name heuristic only. */
+    bool isSysExVerified { false };
+
+    /** Relative path to model image (e.g. "models/korg-ms2000.png"). */
+    std::string modelImage;
+
+    /** Relative path to brand logo (e.g. "brands/korg-logo.svg"). */
+    std::string brandLogo;
 };
 
 /**
@@ -47,6 +85,8 @@ struct DiscoveredDevice
 class HardwareMidiDetector : private juce::MidiInputCallback
 {
 public:
+    using DetectionConfig = abd::hwid::DetectionConfig;
+    using DiscoveredDevice = abd::hwid::DiscoveredDevice;
     explicit HardwareMidiDetector(std::vector<HardwareContract> contracts = {});
     ~HardwareMidiDetector() override;
 
@@ -57,10 +97,11 @@ public:
 
     /**
      * @brief Scans all physical MIDI ports using registered contracts.
+     * @param config Detection configuration (whitelist, max results, etc.).
      * @param timeoutMs Timeout in ms to wait for SysEx replies per port.
      * @return List of discovered and identified hardware devices matching contracts.
      */
-    std::vector<DiscoveredDevice> scanAllPorts(int timeoutMs = 350);
+    std::vector<DiscoveredDevice> scanAllPorts(const DetectionConfig& config = {}, int timeoutMs = 350);
 
     /**
      * @brief Parses an incoming MIDI SysEx message against a set of contracts.

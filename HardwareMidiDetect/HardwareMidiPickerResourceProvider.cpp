@@ -25,6 +25,49 @@ static juce::String getMimeTypeForFilename(const juce::String& filename)
     return "application/octet-stream";
 }
 
+static juce::File findSharedAssetsRoot()
+{
+    // Try to locate ABDSharedAssets relative to current executable
+    juce::File exeFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    juce::File dir = exeFile.getParentDirectory();
+
+    // Walk up to find ABDSharedAssets
+    for (int i = 0; i < 6 && dir.exists(); ++i)
+    {
+        juce::File candidate = dir.getChildFile("ABDSharedAssets");
+        if (candidate.isDirectory())
+            return candidate;
+        dir = dir.getParentDirectory();
+    }
+
+    // Fallback: check common monorepo locations
+    juce::File cwd = juce::File::getCurrentWorkingDirectory();
+    juce::File candidate = cwd.getChildFile("ABDSharedAssets");
+    if (candidate.isDirectory())
+        return candidate;
+
+    return {};
+}
+
+static std::optional<juce::WebBrowserComponent::Resource> loadFromSharedAssets(const juce::String& path)
+{
+    static juce::File assetsRoot = findSharedAssetsRoot();
+    if (!assetsRoot.isDirectory())
+        return std::nullopt;
+
+    juce::File file = assetsRoot.getChildFile(path);
+    if (!file.existsAsFile())
+        return std::nullopt;
+
+    juce::MemoryBlock data;
+    if (!file.loadFileAsData(data))
+        return std::nullopt;
+
+    std::vector<std::byte> bytes(static_cast<size_t>(data.getSize()));
+    std::memcpy(bytes.data(), data.getData(), static_cast<size_t>(data.getSize()));
+    return juce::WebBrowserComponent::Resource { std::move(bytes), getMimeTypeForFilename(file.getFileName()).toStdString() };
+}
+
 std::optional<juce::WebBrowserComponent::Resource> hardwareMidiPickerResourceProvider(const juce::String& url)
 {
     juce::String path = url;
@@ -47,8 +90,9 @@ std::optional<juce::WebBrowserComponent::Resource> hardwareMidiPickerResourcePro
     juce::String decodedPath = juce::URL::removeEscapeChars(path);
 
     if (decodedPath == "juce.js" || decodedPath.endsWith("/juce.js"))
-        return std::nullopt; // Let JUCE WebBrowserComponent serve its built-in frontend script
+        return std::nullopt;
 
+    // First: Try embedded binary assets (index.html, JS, etc.)
     int binSize = 0;
     const char* binData = nullptr;
 
@@ -56,7 +100,6 @@ std::optional<juce::WebBrowserComponent::Resource> hardwareMidiPickerResourcePro
     if (filename.isEmpty())
         filename = decodedPath;
 
-    // Pass 1: Direct match by filename against originalFilenames
     for (int i = 0; i < HardwareMidiPickerAssets::namedResourceListSize; ++i)
     {
         juce::String orig = juce::String::fromUTF8(HardwareMidiPickerAssets::originalFilenames[i]);
@@ -68,7 +111,6 @@ std::optional<juce::WebBrowserComponent::Resource> hardwareMidiPickerResourcePro
         }
     }
 
-    // Pass 2: Fallback to flattened resource identifier
     if (binData == nullptr)
     {
         juce::String flattenedName = filename.replace(".", "_").replace("-", "_").replace(" ", "_");
@@ -82,6 +124,13 @@ std::optional<juce::WebBrowserComponent::Resource> hardwareMidiPickerResourcePro
         std::vector<std::byte> bytes(static_cast<size_t>(binSize));
         std::memcpy(bytes.data(), binData, static_cast<size_t>(binSize));
         return juce::WebBrowserComponent::Resource { std::move(bytes), getMimeTypeForFilename(filename).toStdString() };
+    }
+
+    // Second: Try filesystem from ABDSharedAssets for styles/, models/, brands/
+    if (decodedPath.startsWith("styles/") || decodedPath.startsWith("models/") || decodedPath.startsWith("brands/"))
+    {
+        if (auto res = loadFromSharedAssets(decodedPath))
+            return res;
     }
 
     return std::nullopt;
