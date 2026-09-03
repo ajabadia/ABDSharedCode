@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -44,11 +44,6 @@
     }
     button:disabled { opacity: .5; cursor: default; }
     button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-    select {
-      background: var(--panel-2); color: var(--text);
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 8px; font-size: 13px; flex: 1; min-width: 180px;
-    }
     #status { margin-top: 10px; font-size: 13px; color: var(--muted); white-space: pre-wrap; }
     #result { margin-top: 10px; font-size: 13px; }
     .ok { color: var(--ok); }
@@ -57,225 +52,193 @@
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
     .dot.on { background: var(--ok); animation: blink 1s infinite; }
     .dot.off { background: var(--muted); }
-    @keyframes blink { 50% { opacity: .3; } }
-    .tag {
-      display: inline-block; background: var(--panel-2);
-      border: 1px solid var(--border); border-radius: 4px;
-      padding: 2px 6px; font-size: 11px; margin-right: 6px; margin-bottom: 6px;
+    .device-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+    .device-item {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
     }
+    .device-item:hover { border-color: var(--accent); background: #2a3042; }
+    .device-item.selected { border-color: var(--accent); background: #1e283f; }
+    .device-item input[type="radio"] { accent-color: var(--accent); }
+    .device-info { flex: 1; min-width: 0; }
+    .device-name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .device-meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .device-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .device-badge.verified { background: rgba(46, 204, 113, 0.15); border-color: var(--ok); color: var(--ok); }
+    .device-badge.heuristic { background: rgba(243, 156, 18, 0.15); border-color: var(--warn); color: var(--warn); }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes blink { 50% { opacity: .3; } }
   </style>
 </head>
 <body>
   <h2>Hardware Detection</h2>
-  <div class="sub">Probes connected synth hardware via MIDI Identity SysEx and matches it against known contracts.</div>
+  <div class="sub">Scans MIDI ports for known synthesizer hardware and matches against shared contracts.</div>
 
   <div class="panel row">
-    <label class="sub" style="margin:0;white-space:nowrap">Output port</label>
-    <select id="port"></select>
-    <button id="rescan">Rescan</button>
-    <button id="detect" class="ghost">Detect</button>
+    <button id="rescan" class="ghost">Rescan Ports</button>
+    <button id="detect">Detect Hardware</button>
   </div>
 
   <div class="panel">
     <div class="row">
       <span class="dot off" id="dot"></span>
-      <span id="listenLabel" class="sub" style="margin:0">Listening inactive</span>
+      <span id="listenLabel" class="sub" style="margin:0">Ready</span>
     </div>
-    <div id="status"></div>
+    <div id="status">Click Detect to probe connected hardware.</div>
   </div>
 
-  <div id="result" class="panel" style="display:none"></div>
+  <div id="devicePanel" class="panel" style="display:none">
+    <h3 style="font-size:13px;margin-bottom:8px">Detected Devices</h3>
+    <div id="deviceList" class="device-list"></div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end">
+      <button id="selectBtn" disabled>Select</button>
+      <button id="cancelBtn" class="ghost">Cancel</button>
+    </div>
+  </div>
 
   <script>
-    // Driver: chosen at load time. In a browser (demo) uses Web MIDI; inside a
-    // JUCE bridge, set window.__midiDriver = {send, listen, onBytes} beforehand.
-    window.__midiDriver = window.__midiDriver || null;
+    // --- State ---
+    let detectedDevices = [];
+    let selectedIndex = -1;
 
-    const portSel = document.getElementById('port');
-    const detectBtn = document.getElementById('detect');
-    const rescanBtn = document.getElementById('rescan');
-    const statusEl = document.getElementById('status');
-    const resultEl = document.getElementById('result');
-    const dotEl = document.getElementById('dot');
-    const listenLabel = document.getElementById('listenLabel');
-
-    // ---- Injected by C++ (JuceHardwareMidiPicker) or Web MIDI transport ------
+    // --- UI Helpers ---
     function setStatus(text, cls) {
-      statusEl.className = cls || '';
-      statusEl.textContent = text;
+      document.getElementById('status').className = cls || '';
+      document.getElementById('status').textContent = text;
     }
     function setListening(on) {
-      dotEl.className = 'dot ' + (on ? 'on' : 'off');
-      listenLabel.textContent = on ? 'Listening for Identity Reply...' : 'Listening inactive';
+      const dot = document.getElementById('dot');
+      dot.className = 'dot ' + (on ? 'on' : 'off');
+      document.getElementById('listenLabel').textContent = on ? 'Scanning ports...' : 'Ready';
+    }
+    function showDevicePanel(show) {
+      document.getElementById('devicePanel').style.display = show ? 'block' : 'none';
+    }
+    function setSelectEnabled(enabled) {
+      document.getElementById('selectBtn').disabled = !enabled;
     }
 
-    // ---- Transport abstraction -------------------------------------------------
-    const transports = {
-      // JUCE embedded: bytes go via nativeEvent; bytes come via __pushMidiBytes().
-      juce: {
-        available: () => document.getElementById('port').options.length > 0,
-        send: (bytes) => {
-          const b64 = btoa(String.fromCharCode.apply(null, bytes));
-          if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent)
-            window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.send', payload: b64 });
-        },
-        startListen: () => {
-          if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent)
-            window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.listen' });
-        },
-        stopListen: () => {
-          if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent)
-            window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.stop' });
-        },
-        // Inbound bytes arrive via window.__pushMidiBytes (set up below).
-      }
-    };
+    // --- Called from C++ with scan results ---
+    window.__setDetectedDevices = function(devices) {
+      detectedDevices = devices || [];
+      const list = document.getElementById('deviceList');
+      list.innerHTML = '';
+      selectedIndex = -1;
+      setSelectEnabled(false);
 
-    async function pushBytesHex(hex) {
-      const parts = hex.trim().split(/\s+/).map(x => parseInt(x, 16));
-      const bytes = new Uint8Array(parts);
-      handleIdentityBytes(Array.from(bytes));
-    }
-
-    function sendQuery(bytes) {
-      const driver = window.__midiDriver;
-      if (driver && driver.send) driver.send(bytes);
-      else if (transports.juce.available) transports.juce.send(bytes);
-    }
-
-    function armListening() {
-      const driver = window.__midiDriver;
-      if (driver && driver.onBytes)
-        driver.onBytes = (b) => handleIdentityBytes(b);
-      if (driver && driver.listen) driver.listen(true);
-      else transports.juce.startListen();
-      setListening(true);
-      setStatus('Querying identity on all ports. Play a note or press a MIDI button if no reply arrives.', 'warn');
-    }
-
-    // ---- Contract-driven queries ------------------------------------------------
-    const IDENTITY_QUERY = [0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]; // universal broadcast
-
-    // Contracts are populated from ABDSharedAssets (or minimal built-in fallback).
-    // Each entry: { id, displayName, manufacturerIdHex, modelIdHex, autoDetectSysEx }
-    let CONTRACTS = window.__midiContracts || [
-      { id: 'korg_ms2000', displayName: 'Korg MS2000 / MS2000R',
-        manufacturerIdHex: '42', modelIdHex: '58', autoDetectSysEx: 'F0 7E 7F 06 01 F7' }
-    ];
-    const byEndString = new Map();
-    CONTRACTS.forEach(c => {
-      byEndString.set(c.manufacturerIdHex + ' ' + c.modelIdHex, c);
-    });
-
-    // Build unique queries from contracts (universal + each unique autoDetectSysEx).
-    function buildDetectionQueries() {
-      const set = new Set();
-      const hexes = [];
-      const add = (h) => { if (h && !set.has(h)) { set.add(h); hexes.push(h); } };
-      add(IDENTITY_QUERY.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' '));
-      CONTRACTS.forEach(c => add(c.autoDetectSysEx));
-      return hexes.map(h => h.split(/\s+/).map(x => parseInt(x, 16)));
-    }
-
-    const pending = new Map(); // expiry timer per query -> shared handlers
-    function handleIdentityBytes(bytes) {
-      if (bytes.length < 9) return;
-      if (bytes[0] !== 0xF0 || bytes[1] !== 0x7E) return; // must be SysEx identity reply
-      const status = bytes[2];            // e.g. 0x06 reply
-      const dev = bytes[3];               // device id (usually 0x7F / 0x10)
-      const len = bytes[4];
-      const mfr = bytes.slice(5, 5 + (len === 1 ? 1 : len)).map(x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-      const family = bytes[5 + (len === 1 ? 1 : 0)];
-      const model = bytes[5 + (len === 1 ? 1 : 0) + 1];
-      const familyMajor = String(family).padStart(2, '0');
-      const modelStr = String(model).padStart(2, '0');
-      const key = mfr + ' ' + familyMajor + ' ' + modelStr;
-      const c = byEndString.get(mfr + ' ' + modelStr);
-      if (!c) {
-        setStatus('Unrecognized hardware: manufacturer ' + mfr + ' model ' + modelStr, 'warn');
+      if (detectedDevices.length === 0) {
+        list.innerHTML = '<div class="empty-state">No known hardware detected.\nTry connecting your synth and rescanning.</div>';
+        setStatus('No matching devices found.', 'warn');
+        setListening(false);
+        showDevicePanel(true);
         return;
       }
-      finishPick(c);
+
+      detectedDevices.forEach((d, i) => {
+        const el = document.createElement('div');
+        el.className = 'device-item';
+        el.innerHTML = `
+          <input type="radio" name="device" ${i === 0 ? 'checked' : ''}>
+          <div class="device-info">
+            <div class="device-name">${escapeHtml(d.displayName)}</div>
+            <div class="device-meta">${escapeHtml(d.manufacturer)} &bull; ${escapeHtml(d.model)} ${d.firmwareVersion ? '&bull; FW ' + escapeHtml(d.firmwareVersion) : ''}</div>
+          </div>
+          <span class="device-badge ${d.isSysExVerified ? 'verified' : 'heuristic'}">
+            ${d.isSysExVerified ? 'Verified' : 'Name match'}
+          </span>
+        `;
+        el.onclick = () => selectDevice(i);
+        list.appendChild(el);
+      });
+
+      // Auto-select first
+      selectDevice(0);
+      setStatus(`Found ${detectedDevices.length} device${detectedDevices.length > 1 ? 's' : ''}.`, 'ok');
+      setListening(false);
+      showDevicePanel(true);
+    };
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
     }
 
-    function finishPick(c) {
-      const aborted = pending.size === 0;
-      const bytes = (a) => a.map(x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    function selectDevice(i) {
+      selectedIndex = i;
+      document.querySelectorAll('.device-item').forEach((el, idx) => {
+        el.classList.toggle('selected', idx === i);
+        el.querySelector('input[type="radio"]').checked = idx === i;
+      });
+      setSelectEnabled(true);
+    }
+
+    function emitResult(cancelled) {
       const payload = {
         action: 'hardware.result',
-        cancelled: aborted,
-        hardwareId: c.id,
-        displayName: c.displayName,
-        manufacturer: c.manufacturerIdHex,
-        model: c.modelIdHex
+        cancelled: cancelled,
+        hardwareId: '',
+        displayName: '',
+        manufacturer: '',
+        model: '',
+        firmwareVersion: ''
       };
-      const b64 = btoa(JSON.stringify(payload));
+      if (!cancelled && selectedIndex >= 0) {
+        const d = detectedDevices[selectedIndex];
+        payload.hardwareId = d.id;
+        payload.displayName = d.displayName;
+        payload.manufacturer = d.manufacturer;
+        payload.model = d.model;
+        payload.firmwareVersion = d.firmwareVersion;
+      }
       if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent) {
-        window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.result',
-          cancelled: aborted, hardwareId: c.id, displayName: c.displayName,
-          manufacturer: c.manufacturerIdHex, model: c.modelIdHex, firmwareVersion: '' });
+        window.__JUCE__.backend.emitEvent('nativeEvent', payload);
       }
-      resultEl.style.display = 'block';
-      resultEl.innerHTML = '<h3>Detected</h3><div class="ok">' + c.displayName + '</div>'
-        + '<div class="tag">' + c.id + '</div>'
-        + '<div><button id="again" class="ghost">Detect again</button></div>';
-      document.getElementById('again').onclick = runDetection;
-      setListening(false);
-      transports.juce.stopListen();
     }
 
-    async function runDetection() {
-      resultEl.style.display = 'none';
-      setStatus('Sending identity inquiries...');
-      armListening();
-      const queries = buildDetectionQueries();
-      for (const q of queries) {
-        await new Promise(r => setTimeout(r, 60));
-        sendQuery(q);
+    // --- Event Handlers ---
+    document.getElementById('detect').onclick = () => {
+      setStatus('Scanning MIDI ports...');
+      setListening(true);
+      showDevicePanel(false);
+      if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent) {
+        window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.detect' });
       }
-      if (queries.length === 0) setStatus('No auto-detect contracts configured.', 'warn');
-    }
-
-    detectBtn.onclick = () => window.__midiDriver && window.__midiDriver.selectOutput
-      ? window.__midiDriver.selectOutput(portSel.value)
-      : runDetection();
-
-    rescanBtn.onclick = () => {
-      const driver = window.__midiDriver;
-      if (driver && driver.refreshPorts) driver.refreshPorts();
-      popPorts();
     };
 
-    function popPorts() {
-      const driver = window.__midiDriver;
-      portSel.innerHTML = '';
-      if (driver && driver.getPorts) {
-        driver.getPorts().forEach((p, i) => {
-          const o = document.createElement('option');
-          o.value = p.id || i; o.textContent = p.name || ('Port ' + i);
-          portSel.appendChild(o);
-        });
-      } else {
-        const o = document.createElement('option');
-        o.value = 'default'; o.textContent = 'Default output';
-        portSel.appendChild(o);
+    document.getElementById('rescan').onclick = () => {
+      if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent) {
+        window.__JUCE__.backend.emitEvent('nativeEvent', { action: 'hardware.refreshPorts' });
       }
-    }
+      // Re-trigger detection after a brief moment
+      setTimeout(() => document.getElementById('detect').click(), 200);
+    };
 
-    popPorts();
+    document.getElementById('selectBtn').onclick = () => emitResult(false);
+    document.getElementById('cancelBtn').onclick = () => emitResult(true);
+
+    // Initial state
     setStatus('Ready. Click Detect to probe your hardware.', '');
     setListening(false);
-
-    // Inbound bytes pushed from C++ or Web MIDI transport.
-    window.__pushMidiBytes = (b64) => {
-      try {
-        const raw = atob(b64);
-        const bytes = Array.from(raw, c => c.charCodeAt(0));
-        handleIdentityBytes(bytes);
-      } catch (e) { /* ignore malformed */ }
-    };
-    if (window.__midiDriver && window.__midiDriver.onBytes)
-      window.__midiDriver.onBytes.push = window.__pushMidiBytes;
+    showDevicePanel(false);
   </script>
 </body>
 </html>

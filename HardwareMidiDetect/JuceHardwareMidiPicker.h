@@ -1,12 +1,10 @@
-/**
+﻿/**
  * @file JuceHardwareMidiPicker.h
  * @brief Plug-and-play JUCE WebView2 component for MIDI hardware detection.
- * @details Modeled on ABDScope's JuceWebScopeComponent. The host prepares the
- *          bridge by injecting a MidiHardwareBackend (its own MidiOutput /
- *          MidiInput transport). The shared WebUI handles all detection logic and
- *          UX; this component serves the WebUI (embedded binary assets), forwards
- *          the inbound MIDI bytes to it, and relays the picked result (or cancel)
- *          back to the host via a callback.
+ * @details The host prepares the bridge by injecting a MidiHardwareBackend.
+ *          Detection is performed by the shared C++ HardwareMidiDetector;
+ *          the embedded WebUI is a pure view that renders the detected device list
+ *          and relays the user's selection back via callback.
  * @author ABDSynths
  * @date 2026
  */
@@ -18,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include "MidiHardwareBackend.h"
+#include "HardwareMidiDetector.h"
 #include "HardwareMidiPickerResourceProvider.h"
 
 namespace abd::hwid
@@ -41,14 +40,17 @@ using HardwarePickCallback = std::function<void(const HardwarePickResult&)>;
 
 /**
  * @class JuceHardwareMidiPicker
- * @brief JUCE Component that embeds the HardwareMidiPicker WebUI in WebView2 and
- *        bridges it to a host-provided MidiHardwareBackend.
+ * @brief JUCE Component that embeds the HardwareMidiPicker WebUI in WebView2,
+ *        runs detection via HardwareMidiDetector, and bridges to host MidiHardwareBackend.
  */
 class JuceHardwareMidiPicker : public juce::Component
 {
 public:
-    JuceHardwareMidiPicker(MidiHardwareBackend& backend, HardwarePickCallback onResult)
+    JuceHardwareMidiPicker(MidiHardwareBackend& backend,
+                           HardwarePickCallback onResult,
+                           const std::vector<HardwareContract>& contracts = {})
         : midiBackend(backend),
+          detector(contracts),
           resultCallback(std::move(onResult)),
           webBrowser(juce::WebBrowserComponent::Options{}
                          .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
@@ -68,9 +70,22 @@ public:
         midiBackend.stopListening();
     }
 
+    /** @brief Update the contracts used for detection (e.g. after late loading). */
+    void setContracts(const std::vector<HardwareContract>& contracts)
+    {
+        detector.setContracts(contracts);
+    }
+
     void resized() override
     {
         webBrowser.setBounds(getLocalBounds());
+    }
+
+    /** @brief Run a full scan and present results in the WebUI. */
+    void startPick()
+    {
+        auto results = detector.scanAllPorts(350);
+        pushDevicesToWebUI(results);
     }
 
     /** @brief Navigate back to the picker root (re-runs detection UI). */
@@ -80,56 +95,50 @@ public:
         webBrowser.goToURL(rootUrl);
     }
 
-    /** @brief Re-open / refresh the picker and re-enable listening. */
-    void startPick()
-    {
-        reload();
-    }
-
     /** @brief Access the underlying WebBrowserComponent (e.g. for sizing). */
     [[nodiscard]] juce::WebBrowserComponent& getWebBrowser() noexcept { return webBrowser; }
 
+    /** @brief Access the detector for advanced use (headless scans, etc.). */
+    [[nodiscard]] HardwareMidiDetector& getDetector() noexcept { return detector; }
+
 private:
+    void pushDevicesToWebUI(const std::vector<DiscoveredDevice>& devices)
+    {
+        juce::Array<juce::var> list;
+        for (const auto& d : devices)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty("id", juce::String(d.hardwareId));
+            obj->setProperty("displayName", juce::String(d.displayName));
+            obj->setProperty("manufacturer", juce::String(d.manufacturer));
+            obj->setProperty("model", juce::String(d.model));
+            obj->setProperty("firmwareVersion", juce::String(d.firmwareVersion));
+            obj->setProperty("inPortName", d.inDevice.name);
+            obj->setProperty("outPortName", d.outDevice.name);
+            obj->setProperty("isSysExVerified", d.isSysExVerified);
+            list.add(juce::var(obj));
+        }
+        juce::String js = "if (window.__setDetectedDevices) window.__setDetectedDevices(" + juce::JSON::toString(juce::var(list)) + ");";
+        juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
+    }
+
     void onNativeEvent(const juce::var& message)
     {
         if (!message.isObject()) return;
 
         auto action = message.getProperty("action", "").toString();
 
-        if (action == "hardware.send")
+        if (action == "hardware.detect")
         {
-            // WebUI asks to send raw SysEx bytes to the physical MIDI out.
-            auto b64 = message.getProperty("payload", "").toString();
-            juce::MemoryOutputStream mem;
-            if (juce::Base64::convertFromBase64(mem, b64))
-            {
-                const auto* data = static_cast<const uint8_t*>(mem.getData());
-                const size_t size = mem.getDataSize();
-                midiBackend.sendBytes(std::vector<uint8_t>(data, data + size));
-            }
+            startPick();
         }
-        else if (action == "hardware.listen")
+        else if (action == "hardware.refreshPorts")
         {
-            midiBackend.startListening();
-            midiBackend.setReceiveCallback([this](const std::vector<uint8_t>& bytes) {
-                // Forward inbound bytes to the WebUI on the message thread.
-                juce::MessageManager::callAsync([this, bytes]() {
-                    juce::MemoryBlock mb(bytes.data(), bytes.size());
-                    auto b64 = mb.toBase64Encoding();
-                    juce::String js = "if (window.__pushMidiBytes) { window.__pushMidiBytes("
-                                    + juce::String("'") + b64 + juce::String("'); }");
-                    webBrowser.evaluateJavascript(js);
-                });
-            });
-        }
-        else if (action == "hardware.stop")
-        {
-            midiBackend.setReceiveCallback(nullptr);
-            midiBackend.stopListening();
+            midiBackend.refreshPorts();
+            startPick();
         }
         else if (action == "hardware.result")
         {
-            // WebUI finished: either a matched device or a cancel.
             HardwarePickResult result;
             result.cancelled = message.getProperty("cancelled", true);
             result.hardwareId = message.getProperty("hardwareId", "").toString().toStdString();
@@ -139,12 +148,15 @@ private:
             result.firmwareVersion = message.getProperty("firmwareVersion", "").toString().toStdString();
 
             midiBackend.setReceiveCallback(nullptr);
+            midiBackend.stopListening();
+
             if (resultCallback)
                 resultCallback(result);
         }
     }
 
     MidiHardwareBackend& midiBackend;
+    HardwareMidiDetector detector;
     HardwarePickCallback resultCallback;
     juce::WebBrowserComponent webBrowser;
 
