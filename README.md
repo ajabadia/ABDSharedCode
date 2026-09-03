@@ -9,6 +9,9 @@ Repositorio: https://github.com/ajabadia/ABDSharedCode.git
 | Módulo | Descripción | Target CMake |
 |---|---|---|
 | AutoUpdater | Auto-actualización via GitHub Releases | `ABDShared::AutoUpdater` |
+| HardwareMidiDetect | Detección contract-driven de hardware MIDI (C++ puro + picker WebView2 estilo ABDScope) | `ABDShared::HardwareMidiDetect` |
+
+> **HardwareMidiDetect** consume los contratos single-source de `ABDSharedAssets/contracts`. Ninguna consulta SysEx ni mapeo fabricante/modelo está hardcodeado: todo se deriva de `midiIdentification` y `autoDetectSysEx` de cada contrato.
 
 ## Integración rápida
 
@@ -28,6 +31,7 @@ else()
 endif()
 
 target_link_libraries(TuPlugin PRIVATE ABDShared::AutoUpdater)
+target_link_libraries(TuPlugin PRIVATE ABDShared::HardwareMidiDetect)  # opcional
 ```
 
 > **Nota:** El `GIT_TAG` puede ser una rama (`master`), un tag de versión (`v1.0.0`) o un hash. En producción es recomendable fijarlo a un tag de versión concreto (`vX.Y.Z`), no a `master`, para evitar cambios inesperados.
