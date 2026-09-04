@@ -1,7 +1,7 @@
 ﻿# HardwareMidiDetect — Especificación Técnica y Arquitectura de Módulo Reutilizable
 
-**Versión:** 1.0.0  
-**Fecha:** 3 de Septiembre de 2026  
+**Versión:** 2.0.0  
+**Fecha:** 4 de Septiembre de 2026  
 **Autor:** Antigravity / ABDSynths Engineering Team  
 **Módulo:** `ABDSharedCode/HardwareMidiDetect`  
 **Target CMake:** `ABDShared::HardwareMidiDetect`  
@@ -19,8 +19,10 @@
 2. **Filosofía 100% Contract-Driven**: Ninguna consulta SysEx (Universal Identity Inquiry, Korg SysEx, Roland SysEx, etc.) ni mapeo de fabricante/modelo está hardcodeado en el código fuente C++ o JS. Todo se deriva dinámicamente de los contratos JSON centrales en `ABDSharedAssets/contracts/hardware/`.
 3. **Arquitectura en Dos Capas (Patrón ABDScope)**:
    - **Capa 1 (C++ Puro / Headless)**: `abd::hwid::HardwareMidiDetector` para escaneo programático en segundo plano, pruebas automatizadas y entornos sin interfaz gráfica.
-   - **Capa 2 (WebView2 + WebUI)**: `abd::hwid::JuceHardwareMidiPicker` para ofrecer una interfaz moderna de selección asistida, donde el host únicamente "prepara el puente" inyectando el transporte de audio/MIDI (`MidiHardwareBackend`).
+   - **Capa 2 (WebView2 + WebUI)**: `abd::hwid::JuceHardwareMidiPicker` para ofrecer una interfaz moderna de selección asistida, donde el host únicamente "prepara el puente" inyectando el transporte de audio/MIDI (`MidiHardwareBackend`). **El picker usa el detector C++ como motor**; el WebUI es una vista pura.
 4. **Zero-Copy & Single-Source**: Los contratos no se copian a los repositorios de cada plugin; se leen en tiempo de ejecución desde `ABDSharedAssets`.
+5. **Theme System**: Usa el sistema universal de estilos de `ABDSharedAssets/styles/` (tokens + 5 temas + 7 componentes). WebUI importa `styles/index.css`; host llama `picker->setTheme("audiolab")` → `document.body.dataset.theme`.
+6. **Asset Serving**: `index.html` + JS embebidos via `juce_add_binary_data`; `styles/`, `models/`, `brands/` servidos **filesystem** desde `ABDSharedAssets/`.
 
 ---
 
@@ -33,13 +35,14 @@ Siguiendo el estándar de arquitectura establecido en `ABDScope`:
 - `HardwareContractRegistry`: Responsable únicamente de la carga, deserialización JSON y búsqueda de contratos.
 - `HardwareMidiDetector`: Motor de escaneo C++ puro, timeouts de respuesta MIDI y parseo de tramas SysEx.
 - `MidiHardwareBackend.h`: Contrato abstracto puro que desacopla el transporte MIDI de la lógica de negocio.
-- `JuceHardwareMidiPicker.h`: Componente JUCE que aloja WebView2 y enruta eventos entre el backend y el frontend.
-- `HardwareMidiPickerResourceProvider`: Servidor MIME seguro de recursos embebidos (`juce://`).
-- `WebUI/index.html`: Interfaz de usuario interactiva y presentación visual de dispositivos detectados.
+- `JuceHardwareMidiPicker.h/.cpp`: Componente JUCE que aloja WebView2, posee `HardwareMidiDetector` como motor, y enruta eventos entre el backend y el frontend.
+- `HardwareMidiPickerResourceProvider`: Servidor MIME seguro de recursos embebidos (`juce://`) + filesystem (`ABDSharedAssets/`).
+- `WebUI/index.html`: Vista pura de presentación — renderiza lista de dispositivos con imágenes/badges, radio/checkbox según `maxResults`.
 
 ### B. Límites de Complejidad
 - Headers de interfaz limpios, sin dependencias innecesarias.
 - Separación estricta entre la capa de presentación (WebUI) y el driver de transporte (C++).
+- Configuración de detección vía `DetectionConfig` struct (whitelist, maxResults, auto-select, heurística).
 
 ---
 
@@ -55,8 +58,8 @@ graph TD
 
     subgraph ABDSharedCode ["Módulo ABDShared::HardwareMidiDetect"]
         Registry[HardwareContractRegistry]
-        DetectorCpp[HardwareMidiDetector - Capa C++]
-        PickerCpp[JuceHardwareMidiPicker - Capa UI]
+        DetectorCpp[HardwareMidiDetector - Capa C++ / Motor]
+        PickerCpp[JuceHardwareMidiPicker - Capa UI + Motor]
         ResProvider[HardwareMidiPickerResourceProvider]
         Assets[(HardwareMidiPickerAssets.lib)]
 
@@ -64,18 +67,25 @@ graph TD
         PickerCpp --> ResProvider
         ResProvider --> Assets
         Registry -->|std::vector HardwareContract| DetectorCpp
+        PickerCpp -.->|posee| DetectorCpp
     end
 
     subgraph WebUI ["WebUI Embebido (WebView2)"]
         PickerHTML[WebUI/index.html]
         Assets -->|juce://| PickerHTML
-        PickerHTML -->|nativeEvent: hardware.send| PickerCpp
-        PickerCpp -->|__pushMidiBytes| PickerHTML
+        PickerHTML -->|nativeEvent: hardware.detect / refreshPorts / result| PickerCpp
+        PickerCpp -->|__setDetectedDevices / __setConfig| PickerHTML
     end
 
     subgraph SingleSource ["ABDSharedAssets (Single-Source)"]
         ContractsJson[contracts/hardware/*.json]
+        Styles[styles/*.css]
+        Models[models/*.png]
+        Brands[brands/*.svg]
         ContractsJson -->|Runtime Load| Registry
+        Styles -->|Filesystem| ResProvider
+        Models -->|Filesystem| ResProvider
+        Brands -->|Filesystem| ResProvider
     end
 ```
 
@@ -97,7 +107,9 @@ Los contratos residen en `ABDSharedAssets/contracts/hardware/*.json` y contienen
     "modelIdHex": "58",
     "sysexHeaderHex": "42 30 58"
   },
-  "autoDetectSysEx": "F0 7E 7F 06 01 F7"
+  "autoDetectSysEx": "F0 7E 7F 06 01 F7",
+  "modelImage": "models/korg-ms2000.png",
+  "brandLogo": "brands/korg-logo.svg"
 }
 ```
 
@@ -106,6 +118,8 @@ Los contratos residen en `ABDSharedAssets/contracts/hardware/*.json` y contienen
 - `modelIdHex`: ID de modelo reportado en el payload del Identity Reply (`06 02`).
 - `sysexHeaderHex`: Cabecera SysEx propietaria para filtrado secundario.
 - `autoDetectSysEx`: Mensaje SysEx de sondeo específico si el modelo no responde al Identity Inquiry Universal broadcast.
+- `modelImage`: Ruta relativa a imagen del modelo en `ABDSharedAssets/models/`.
+- `brandLogo`: Ruta relativa a logo de marca en `ABDSharedAssets/brands/`.
 
 ---
 
@@ -113,26 +127,46 @@ Los contratos residen en `ABDSharedAssets/contracts/hardware/*.json` y contienen
 
 Diseñada para escaneos sin interfaz gráfica, diagnósticos de consola y tests automatizados.
 
+### DetectionConfig
+```cpp
+struct DetectionConfig {
+    std::vector<std::string> allowedHardwareIds;  // whitelist (vacío = todos)
+    int maxResults = 1;                            // 1 = single, >1 = multi
+    bool autoSelectIfSingle = true;                // auto-callback si 1 match
+    bool includeHeuristic = true;                  // incluir matches por nombre puerto
+    bool requireSysExVerified = false;             // solo SysEx verificado
+};
+```
+
+### DiscoveredDevice (enriquecido)
+```cpp
+struct DiscoveredDevice {
+    std::string hardwareId, displayName, manufacturer, model, firmwareVersion;
+    juce::MidiDeviceInfo inDevice, outDevice;
+    int portIndex { -1 };           // índice en array puertos salida
+    uint8_t deviceId { 0 };         // deviceId del Identity Reply (byte 1)
+    uint8_t midiChannel { 0 };      // canal MIDI 1-16 (0 = unknown)
+    bool isSysExVerified { false }; // true = verificado por SysEx
+    std::string modelImage;         // "models/korg-ms2000.png"
+    std::string brandLogo;          // "brands/korg-logo.svg"
+};
+```
+
 ### Protocolo de Detección:
-1. **Generación de Consultas**: `buildDetectionQueries()` recopila:
-   - Universal Non-Real Time Identity Request broadcast: `F0 7E 7F 06 01 F7`.
-   - Consultas `autoDetectSysEx` declaradas en los contratos (deduplicadas).
-2. **Apertura de Puertos**: Abre secuencialmente cada puerto de entrada/salida MIDI disponible.
-3. **Emisión y Escucha con Timeout**: Transmite las consultas y espera `timeoutMs` (por defecto 350 ms).
-4. **Decodificación de Respuestas**:
-   - `parseIdentityReply()`: Comprueba el formato `F0 7E <devId> 06 02 <manufId...> <modelId...> F7`.
-   - Si coincide con un contrato, marca `isSysExVerified = true` y extrae versión de firmware si está disponible.
-5. **Heurística de Respaldo**:
-   - `matchFromPortNames()`: Si el sintetizador no responde a SysEx (ej. interfaces USB genéricas sin passthrough SysEx), compara heurísticamente el nombre del puerto con las palabras clave declaradas en el contrato.
+1. **Generación de Consultas**: `buildDetectionQueries()` recopila Universal broadcast + cada `autoDetectSysEx` único (deduplicados).
+2. **Apertura de Puertos**: Abre secuencialmente cada puerto de salida; empareja entrada por nombre/identifier.
+3. **Emisión y Escucha con Timeout**: Transmite queries y espera `timeoutMs` (defecto 350 ms).
+4. **Decodificación de Respuestas**: `parseIdentityReply()` verifica formato `F0 7E <devId> 06 02 <manufId...> <modelId...> F7` contra contratos; marca `isSysExVerified` y extrae firmware.
+5. **Heurística de Respaldo** (opcional): `matchFromPortNames()` compara nombre de puerto con `portNameMatches` del contrato.
+6. **Filtrado**: Whitelist (`allowedHardwareIds`), SysEx verification (`requireSysExVerified`), límite (`maxResults`).
+7. **Enriquecimiento**: Añade `modelImage`/`brandLogo` del contrato matchado.
 
 ---
 
 ## 6. Capa 2: WebView2 + WebUI (`JuceHardwareMidiPicker`)
 
-Siguiendo el patrón de `ABDScope`, el host no se encarga del renderizado de la UI de selección, sino que delega en el WebUI compartido.
-
 ### Puente de Transporte (`MidiHardwareBackend`)
-El host implementa la interfaz pura [`MidiHardwareBackend`](file:///D:/desarrollos/ABDSynths/ABDSharedCode/HardwareMidiDetect/MidiHardwareBackend.h):
+El host implementa la interfaz pura:
 
 ```cpp
 class MySynthMidiBackend : public abd::hwid::MidiHardwareBackend
@@ -147,24 +181,80 @@ public:
 };
 ```
 
-### Contrato del Canal de Comunicación (Canal `nativeEvent`)
+### Contrato del Canal `nativeEvent`
 
 | Evento / Mensaje | Dirección | Formato / Parámetros | Propósito |
 |---|---|---|---|
-| `hardware.send` | WebUI $\to$ Host | `{ payload: "<base64>" }` | Solicita transmitir bytes SysEx por el puerto MIDI de salida. |
-| `hardware.listen` | WebUI $\to$ Host | `{}` | Ordena al host abrir el puerto de entrada e iniciar la escucha. |
-| `hardware.stop` | WebUI $\to$ Host | `{}` | Detiene la escucha en el puerto de entrada. |
-| `hardware.result` | WebUI $\to$ Host | `{ cancelled: bool, hardwareId: string, displayName: string, manufacturer: string, model: string }` | Notifica al host la selección final o cancelación del usuario. |
-| `__pushMidiBytes` | Host $\to$ WebUI | `__pushMidiBytes("<base64>")` | Inyecta tramas MIDI/SysEx recibidas hacia el motor analítico de JS. |
+| `hardware.detect` | WebUI → Host | `{}` | Usuario clicó "Detect" → C++ ejecuta `detector.scanAllPorts(config)` |
+| `hardware.refreshPorts` | WebUI → Host | `{}` | Usuario clicó "Rescan" → `backend.refreshPorts()` + re-scan |
+| `hardware.result` | WebUI → Host | Ver abajo | Usuario seleccionó dispositivo(s) o canceló |
+| `__setDetectedDevices` | Host → WebUI | `devices[] + config` | C++ empuja resultados + config (maxResults) |
+| `__setConfig` | Host → WebUI | `{maxResults}` | C++ informa modo single/multi para radio/checkbox |
+
+**`hardware.result` payload (single / multi):**
+
+```json
+// Single (maxResults=1):
+{
+  "action": "hardware.result",
+  "cancelled": false,
+  "hardwareId": "korg_ms2000",
+  "displayName": "Korg MS2000 / MS2000R",
+  "manufacturer": "42",
+  "model": "58",
+  "firmwareVersion": "01020304"
+}
+
+// Multi (maxResults>1):
+{
+  "action": "hardware.result",
+  "cancelled": false,
+  "hardwareIds": ["korg_ms2000", "roland_juno106"],
+  "displayNames": ["Korg MS2000 / MS2000R", "Roland JUNO-106"],
+  "manufacturer": "42",
+  "model": "58",
+  "firmwareVersion": "01020304"
+}
+```
 
 ---
 
-## 7. Integración en CMake
+## 7. Theme System (estilo ABDScope)
+
+El WebUI usa el sistema universal de estilos de `ABDSharedAssets/styles/`:
+
+```html
+<link rel="stylesheet" href="styles/index.css">
+<body data-theme="audiolab">  <!-- Default, host lo cambia via setTheme() -->
+```
+
+```cpp
+// Temas disponibles: "ms2000", "cz101", "deepmind", "juno", "audiolab"
+picker->setTheme("audiolab"); // cambia colores, bordes, scrollbars automáticamente
+```
+
+Tokens CSS usados: `--color-bg-base`, `--color-panel-bg`, `--color-panel-border`, `--color-accent`, `--color-success`, `--color-warning`, `--color-danger`, `--font-sans`, `--radius-md`, `--space-*`, `--transition-fast`.
+Clases de componentes: `.btn`, `.btn-primary`, `.btn-ghost`, `.led-indicator`, `.panel` (de `components/panels.css`).
+Scrollbars globales coherentes definidos en `tokens.css` + overrides por tema.
+
+---
+
+## 8. Asset Serving (Filesystem vs Embed)
+
+| Tipo | Origen | Servido por |
+|------|--------|-------------|
+| `index.html`, `*.js` (root) | Embedded binary data | `HardwareMidiPickerAssets` (`juce_add_binary_data`) |
+| `styles/**/*` | `ABDSharedAssets/styles/` | `HardwareMidiPickerResourceProvider` (filesystem) |
+| `models/**/*` | `ABDSharedAssets/models/` | `HardwareMidiPickerResourceProvider` (filesystem) |
+| `brands/**/*` | `ABDSharedAssets/brands/` | `HardwareMidiPickerResourceProvider` (filesystem) |
+
+---
+
+## 9. Integración en CMake
 
 En el `CMakeLists.txt` del proyecto consumidor:
 
 ```cmake
-# 1. Enlazar la librería compartida
 target_link_libraries(TuProyecto
     PRIVATE
         ABDShared::HardwareMidiDetect
@@ -172,28 +262,31 @@ target_link_libraries(TuProyecto
 ```
 
 El target `ABDShared::HardwareMidiDetect` es una librería `INTERFACE` que:
-1. Exporta los include directories necesarios (`HardwareMidiDetect/`).
-2. Compila los ficheros fuente compartidos en la unidad del consumidor.
-3. Enlaza `juce_audio_devices`, `juce_gui_extra`, `juce_core` y `nlohmann_json`.
-4. Si JUCE está en scope, compila automáticamente `HardwareMidiPickerAssets` (`juce_add_binary_data`) para que no se requieran ficheros sueltos en disco en tiempo de ejecución.
+1. Exporta include directories `HardwareMidiDetect/`.
+2. Compila fuentes compartidas en la unidad del consumidor.
+3. Enlaza `juce_audio_devices`, `juce_gui_extra`, `juce_core`, `nlohmann_json`.
+4. Si JUCE está en scope, compila `HardwareMidiPickerAssets` (`juce_add_binary_data`) para `index.html` + JS root.
 
 ---
 
-## 8. Vectores de Prueba y Verificación (Test Vectors)
+## 10. Vectores de Prueba y Verificación (Test Vectors)
 
 ### Vector 1: Korg MS2000 (Universal Identity Reply)
 - **Consulta Enviada**: `F0 7E 7F 06 01 F7`
-- **Trama de Respuesta Simulado**:
-  `F0 7E 00 06 02 42 58 00 00 00 01 00 F7`
+- **Trama de Respuesta Simulado**: `F0 7E 00 06 02 42 58 00 00 00 01 00 F7`
 - **Resultado Esperado**:
   - `hardwareId`: `"korg_ms2000"`
   - `displayName`: `"Korg MS2000 / MS2000R"`
   - `isSysExVerified`: `true`
+  - `deviceId`: `0x00`
+  - `modelImage`: `"models/korg-ms2000.png"`
+  - `brandLogo`: `"brands/korg-logo.svg"`
 
 ### Vector 2: Roland AIRA Modular (Demora / Bitrazer / Torcido)
 - **Consulta Enviada**: `F0 7E 7F 06 01 F7`
-- **Trama de Respuesta Simulado**:
-  `F0 7E 10 06 02 41 40 01 00 00 01 00 F7`
+- **Trama de Respuesta Simulado**: `F0 7E 10 06 02 41 40 01 00 00 01 00 F7`
 - **Resultado Esperado**:
-  - `hardwareId`: `"roland_aira_demora"` o módulo AIRA correspondiente.
+  - `hardwareId`: `"roland_aira_demora"`
+  - `displayName`: `"Roland AIRA Demora"`
   - `isSysExVerified`: `true`
+  - `deviceId`: `0x10`

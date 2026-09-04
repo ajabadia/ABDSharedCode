@@ -55,6 +55,7 @@ struct HardwareContract
     std::string model;
     std::string modelIdHex;
     std::string autoDetectSysEx;
+    std::string theme { "audiolab-light" };
 
     MidiIdentityContract midiIdentity;
 };
