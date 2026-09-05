@@ -9,7 +9,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['WebUI/src/**/*.js'],
-      exclude: ['WebUI/src/renderers/**', 'WebUI/demo/**']
+      exclude: ['WebUI/src/renderers/**']
     }
   }
 });

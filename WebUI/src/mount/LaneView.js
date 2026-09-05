@@ -7,6 +7,8 @@
  * LaneController owns those.
  */
 
+import { SCOPE_ICONS } from '../icons.js';
+
 export class LaneView {
   constructor(options = {}) {
     this.index = options.index ?? 0;
@@ -79,10 +81,7 @@ export class LaneView {
     this.freezeBtn.className = 'abd-scope-lane-tool-btn abd-scope-lane-freeze-btn';
     this.freezeBtn.title = 'Freeze / Hold this Lane';
     this.freezeBtn.innerHTML = `
-      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-        <rect x="6" y="4" width="4" height="16"/>
-        <rect x="14" y="4" width="4" height="16"/>
-      </svg>
+      ${SCOPE_ICONS.freeze}
     `;
     rightGroup.appendChild(this.freezeBtn);
 
@@ -90,10 +89,7 @@ export class LaneView {
     this.snapshotBtn.className = 'abd-scope-lane-tool-btn abd-scope-lane-snapshot-btn';
     this.snapshotBtn.title = 'Export PNG Snapshot of this Lane';
     this.snapshotBtn.innerHTML = `
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
+      ${SCOPE_ICONS.camera}
     `;
     rightGroup.appendChild(this.snapshotBtn);
 

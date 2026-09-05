@@ -4,19 +4,102 @@
 
 ---
 
-## 1. WebUI Linking via NTFS Directory Junction (Zero-Copy)
+## 1. WebUI Linking
 
-From your synthesizer's `WebUI/src` folder, create a directory junction pointing directly to `ABDScope/WebUI/src`:
+There are two supported web-linking strategies (choose one). **ABDMS2000 uses the copy/sync strategy (§1.1)** because the web build runs on plain native ES modules without a bundler (see §1.2 for the Vite path, deferred for now).
+
+### 1.1. Copy/Sync Into Web Root — the `sync_scope.js` pattern (**ABDMS2000, chosen**)
+
+When the web UI is served as **native ES modules from the web root** (no bundler — e.g. `sirv-cli WebUI --port 8384 --cors --single --dev`), files outside `WebUI/` produce 404s and native ESM cannot `import './x.css'`. ABDScope is therefore **copied** into the consumer's web root on every start, and the original in `ABDScope/WebUI/src` remains the **single source of truth**.
+
+Create a sync script in `Scripts/sync_scope.js` (modeled on `sync_bankmanager.js`) that **deletes the destination first** (so deprecated files never linger) then copies `ABDScope/WebUI` → `<synth>/WebUI/abdscope/`, excluding anything not needed by the raw-ESM runtime. The script is ESM (the repo's `package.json` sets `"type": "module"`) and relies on `fs.cpSync` with a `filter` (the delete-first behaviour is achieved with an explicit `fs.rmSync` before the copy):
+
+```js
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const rootDir   = path.resolve(__dirname, '..');
+const sourceDir = path.resolve(rootDir, '..', 'ABDScope', 'WebUI');
+const destRoot  = path.join(rootDir, 'WebUI', 'abdscope');
+
+const toPosix = (p) => p.split(path.sep).join('/');
+const EXCLUDE_FILES = new Set(['vite.config.js', 'vite.config.mjs', 'vitest.config.js',
+  'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'index.html']);
+const EXCLUDE_DIRS = new Set(['node_modules', 'tests']);
+
+function shouldCopy(src) {
+  if (EXCLUDE_FILES.has(path.basename(src))) return false;
+  const rel = toPosix(src);
+  for (const dir of EXCLUDE_DIRS) {
+    if (path.basename(src) === dir) return false;
+    if (rel.split('/').includes(dir)) return false;
+  }
+  return true;
+}
+
+console.log('Sincronizando ABDScope WebUI -> WebUI/abdscope/');
+if (!fs.existsSync(sourceDir)) { console.error('Origen no encontrado:', sourceDir); process.exit(1); }
+
+fs.rmSync(destRoot, { recursive: true, force: true });           // delete destination first
+fs.cpSync(sourceDir, destRoot, { recursive: true, dereference: true, filter: shouldCopy });
+
+console.log('OK - ABDScope sincronizado.');
+```
+
+Wire it into your `start.bat` (before the static server starts) and `package.json`:
+
+```bat
+node Scripts/sync_scope.js
+node Scripts/sync_bankmanager.js
+:: ... then sirv WebUI --port 8384 --cors --single --dev
+```
+
+```json
+{ "scripts": { "sync:scope": "node Scripts/sync_scope.js" } }
+```
+
+Then reference the **copied** files from your web root:
+
+```html
+<!-- index.html — CSS via <link> (native ESM cannot import CSS) -->
+<link rel="stylesheet" href="abdscope/src/scope.css">
+```
+
+```javascript
+// your component — import scope.js from the copied location
+import { createScope } from '../../abdscope/src/scope.js';
+```
+
+> **Rule of thumb:** never `import './x.css'` in a raw-ESM build — every stylesheet must go through a `<link>` in `index.html`. Only `scope.js` is imported as a module.
+
+### 1.2. Vite / Bundler Adoption — **adopted: Vite is the dev server (production content stays embedded)**
+
+**Status:** Vite is now the **development server** for `WebUI/` (it replaced `sirv-cli` in `start.bat`, same port **8384**, September 2026). Plugin production content is untouched: WebView2 still loads `juce://backend` → `pluginResourceProvider` → embedded `WebUIAssets` binaries. A `vite build` producing a served `dist/` artifact remains a future option.
+
+**What was required to adopt Vite dev:**
+- `npm i -D vite@5 @abdsynths/shared dexie file-saver jszip` in ABDMS2000 (the 3 runtime deps of the synced `abdbank` subtree so Vite can serve `abdbank/index.html` as its own SPA entry without resolution errors).
+- `start.bat` runs the existing module syncs (`keyboard`, `sync_bankmanager`, `sync_scope`, `sync_assets`) then `npx -y vite --config vite.config.js`.
+- `vite.config.js`: `root: 'WebUI'`, `base: './'`, `port: 8384`, `strictPort`, `fs.allow: ['..']`, plus a `transformIndexHtml` plugin that injects `<link href="/src/styles/shared-cascade.css">` **before** `themes.css` so the 3-level shared cascade renders (Shared tokens → theme → host MS2000 overrides win).
+- `WebUI/src/styles/shared-cascade.css` = `@import '@abdsynths/shared/styles/tokens.css'`.
+
+**Verified:** `GET /` (200, cascade injected first), `/abdbank/index.html` (200, 47 KB), `/abdbank/src/store/persistence.js` (200), shared-cascade (200), empty Vite error log, `npm test` **65/65**. `start.bat`/`index.html` behavior preserved after the switch; `sirv-cli` is no longer required.
+
+> **Known risk (dev-only):** `npm audit` reports 4 vulnerabilities in the local dev toolchain (`esbuild ≤0.24.2` + `vite ≤6.4.2` → the esbuild dev-server advisory GHSA-67mh-4wv8-2f99). These affect the **localhost dev server only**; they never ship in the plugin build. The non-breaking fix is to bump vite/vitest later; documented, not forced.
+
+### 1.3. NTFS Directory Junction (legacy alternative, not used by ABDMS2000)
+
+Previous approach — a junction live-links the source so edits hot-reload without copying:
 
 ```cmd
-:: Example for ABDMS2000:
 cd D:\desarrollos\ABDSynths\ABDMS2000\WebUI\src
 mklink /J scope D:\desarrollos\ABDSynths\ABDScope\WebUI\src
 ```
 
-Now `import { createScope } from './scope/scope.js'` and `<link rel="stylesheet" href="./scope/scope.css">` are immediately available in your synth with live hot-reloading.
-
----
+`import { createScope } from './scope/scope.js'` and `<link rel="stylesheet" href="./scope/scope.css">` then resolve live. (Not used because the raw-ESM web root must contain everything physically, and a junction points outside `WebUI/`.)
 
 ## 2. CMake Build Configuration (C++ Core)
 
@@ -262,6 +345,53 @@ export function createScopeModal() {
 
 > **Tip:** The `onTapChange` callback also fires once per lane right after the scope mounts (and after layout changes), so the C++ side learns the initial lane subscriptions without any extra handshake code.
 
+### Pattern C: Browser Web Audio `AnalyserNode` (`ABDMS2000` web path, no IPC)
+
+When the scope runs in a **real browser** (synthesizer's own Web Audio engine over WebAudio, not WebView2 IPC), feed ABDScope from a `WebAudioAnalyserNode` tapped at the engine's master bus. This is the simplest robust wiring — no per-tap C++ frame pump required; the scope's `connectAnalyser()` drives its own 60 FPS drawing loop.
+
+1. In the audio engine module, expose the live `AudioContext` and the master gain (`masterGain`) so the UI can tap the bus.
+2. In the bridge layer (`BridgeWasm`), add pass-through getters so the UI can reach them (they are often not exposed from the engine directly):
+   ```javascript
+   get audioContext() { return this.engine?.audioCtx ?? null; }
+   get masterGain()   { return this.engine?.masterGain ?? null; }
+   ```
+3. Lazy-init ABDScope on first `open()` (audio may not be ready at construction — do **not** build the analyser in the constructor):
+   ```javascript
+   import { createScope } from '../../abdscope/src/scope.js';
+
+   async _ensureScope() {
+     const bridge = this.bridge;
+     const audioCtx = bridge.audioContext;   // AudioContext
+     const master   = bridge.masterGain;     // GainNode (master bus)
+     if (!audioCtx || !master) return;
+
+     this.scope = createScope({
+       mountMode: 'floating',
+       title: 'MS2000 TELEMETRY LAB',
+       maxLanes: 2,
+       layout: 'single',
+       enabledModes: ['oscilloscope', 'spectrum', 'lissajous', 'phase', 'spectrogram'],
+       defaultMode: 'oscilloscope',
+       showFreeze: true,
+       showSnapshot: true,
+       availableTaps: this.SCOPE_TAPS,       // [{ id, name }] labels; single analyser source
+     });
+
+     // Tap the master bus with a real AnalyserNode
+     const analyser = audioCtx.createAnalyser();
+     analyser.fftSize = 2048;
+     master.connect(analyser);               // analyser is read-only tap; bus passes signal through
+     this.scope.connectAnalyser(analyser, { sampleRate: audioCtx.sampleRate });
+   }
+
+   open()  { if (!this.scope) this._ensureScope(); this.scope?.open();  }
+   close() { this.scope?.close(); }
+   toggle(){ if (!this.scope) this._ensureScope(); this.scope?.toggle(); }
+   destroy(){ this.scope?.destroy(); this.scope = null; }
+   ```
+
+> **Note:** a single `AnalyserNode` tapped at the master bus feeds all lane taps (the multi-tap `availableTaps` list is purely presentational in this path). For genuine per-tap isolation in the browser, create one `AnalyserNode` per tap id and call `connectAnalyser({ analyserL, analyserR })` per lane.
+
 ---
 
 ## 5. Theme Styling
@@ -329,12 +459,13 @@ private:
 
 When embedding `ABDScope` inside a plugin or application using WebView2 without spinning up an HTTP server, keep these architectural rules in mind:
 
-### 7.1. Embedded Telemetry (`WebUI/index.html`) vs. Browser Demo (`WebUI/demo/`)
+### 7.1. Embedded Telemetry (`WebUI/index.html`)
 - **`WebUI/index.html` (Production Embedded Scope)**: Contains only the multi-lane canvas visualizer (`EmbeddedMount`), listening to C++ IPC via `window.__pushScopeFrame` and message events. It fills 100% of the viewport and does NOT include any signal generators or local Web Audio controls. The page is silent by default: to surface IPC parsing errors in the WebView host console, evaluate `window.__ABDSCOPE_DEBUG__ = true;` before loading it (see `docs/USAGE_GUIDE.md` §6).
-- **`WebUI/demo/` (Browser Sandbox Only)**: A standalone browser testbed containing synthetic Web Audio API oscillators and GUI sliders. **NEVER bundle `WebUI/demo/*` into `juce_add_binary_data`**, otherwise duplicate `index.html` entries will collide in C++ binary data and overwrite the production embedded view.
+
+> The interactive browser sandbox (`WebUI/demo/`) was removed on 2026-09-05; the standalone WebUI is exercised via `npm run serve` (serves `WebUI/` with the canonical dark theme) and the Vitest suites.
 
 ### 7.2. CMake Binary Assets Packaging Pattern
-In `CMakeLists.txt`, always exclude `/demo/`, `/tests/`, and `/node_modules/`:
+In `CMakeLists.txt`, always exclude `/tests/` and `/node_modules/`:
 
 ```cmake
 # Embedded WebUI Binary Assets for WebView2
@@ -343,7 +474,6 @@ if(COMMAND juce_add_binary_data)
     "${CMAKE_CURRENT_SOURCE_DIR}/WebUI/src/*"
   )
   list(APPEND ABDSCOPE_WEB_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/WebUI/index.html")
-  list(FILTER ABDSCOPE_WEB_ASSETS EXCLUDE REGEX "/demo/")
   list(FILTER ABDSCOPE_WEB_ASSETS EXCLUDE REGEX "/tests/")
   list(FILTER ABDSCOPE_WEB_ASSETS EXCLUDE REGEX "/node_modules/")
 

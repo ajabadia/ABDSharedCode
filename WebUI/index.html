@@ -7,7 +7,7 @@
   <script>
     (function() {
       const params = new URLSearchParams(window.location.search);
-      const theme = params.get("theme") || "audiolab-light";
+      const theme = params.get("theme") || "ms2000";
       document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
@@ -38,7 +38,7 @@
   <script>
     window.addEventListener("DOMContentLoaded", () => {
       const params = new URLSearchParams(window.location.search);
-      const theme = params.get("theme") || "audiolab-light";
+      const theme = params.get("theme") || "ms2000";
       document.body.setAttribute("data-theme", theme);
       document.body.classList.add("theme-" + theme);
       try {

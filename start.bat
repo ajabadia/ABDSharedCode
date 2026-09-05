@@ -6,11 +6,11 @@ REM ============================================================
 echo ============================================================
 echo   ABDScope - Universal Audio Visualizer Engine
 echo   Iniciando Servidor Web Local en Puerto 8391...
-echo   URL de Acceso: http://localhost:8391/demo/
+echo   URL de Acceso: http://localhost:8391/
 echo ============================================================
 
 REM Abre el navegador automaticamente tras 1 segundo
-start "" http://localhost:8391/demo/
+start "" http://localhost:8391/
 
 REM Inicia el servidor estatico sirv con CORS y hot-reload
 npx -y sirv-cli WebUI --port 8391 --cors --dev

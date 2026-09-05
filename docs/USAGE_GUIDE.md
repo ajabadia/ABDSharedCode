@@ -7,6 +7,8 @@
 
 ## 1. Quick Initialization
 
+> **Import path note:** in this repo you import from `./src/scope.js`. Consumer synths that use the **copy/sync pattern** (see `docs/INTEGRATION_GUIDE.md` §1.1) reference the copied location instead, e.g. `import { createScope } from '../../abdscope/src/scope.js'`. For browser-Web-Audio hosts (no C++ IPC), feed the scope with a real `AnalyserNode` via `scope.connectAnalyser()` (see INTEGRATION_GUIDE §4 Pattern C) instead of `pushFrame`.
+
 ```javascript
 import { createScope } from './src/scope.js';
 
@@ -141,4 +143,23 @@ The component passes the active theme in the URL query string (`?theme=...`) and
 <script>window.__ABDSCOPE_DEBUG__ = true;</script>
 ```
 
-- The only other `console.log` output in the project lives in the **demo harness** (`WebUI/demo/index.html`), which is a standalone test bed and is never bundled into production assets (see `docs/INTEGRATION_GUIDE.md` §7).
+- No `console.log` is allowed in `WebUI/src` module code. The dev demo harness (`WebUI/demo/`) was **removed** (2026-09-05); the standalone host page (`WebUI/index.html`) stays silent unless the host sets `window.__ABDSCOPE_DEBUG__ = true` before load.
+
+---
+
+## Theming & Icons (updated 2026-09-05)
+
+### Theming
+
+- `WebUI/src/scope.css` contains **layout + canonical dark fallbacks only** (`:root`, 16 `--scope-*` tokens). Per-theme palettes are no longer shipped with the module.
+- Color per theme comes from the **host cascade**: shared tokens → theme (`ABDSharedAssets/styles/themes/*.css`) → component adapter (`ABDSharedAssets/styles/components/scope.css`), which maps the full `--scope-*` set onto `--color-*`/`--font-*` (fallbacks mirror the module's canonical defaults).
+- Adapters must load **after** the module's CSS so the `:root` mapping wins by source order.
+- `--scope-font-lcd` is the token the module consumes; hosts provide `--scope-font` (aliased by the adapter).
+- The embedded host page defaults to the dark canonical theme (`?theme=ms2000`); hosts can pass any shared theme name once they inject the cascade.
+- Keyboard component: same contract via `ABDSharedAssets/styles/components/keyboard.css` (21 theme tokens; runtime per-key state like `--kbd-pressure`/`--kbd-velocity` is not themable).
+
+### Icons
+
+- Single source of truth: `ABDSharedAssets/icons/*.svg`. Consumers embed **only the icons they use**.
+- The scope renders from `WebUI/src/icons.js` (generated module: `camera`, `close`, `freeze`) — never inline SVG in module code.
+- Parity is enforced by `WebUI/tests/icons.test.js` (compares against the canonical files; auto-skips outside the ABDSynths workspace).

@@ -4,15 +4,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(ABDScopeCore INTERFACE)
+# Pure header-only C++20 core (no JUCE dependency). Safe for JUCE-free consumers
+# (e.g. the standalone smoke test) and the base for the JUCE-integration target.
+add_library(ABDScopeCoreHeaders INTERFACE)
 
-target_include_directories(ABDScopeCore INTERFACE
+target_include_directories(ABDScopeCoreHeaders INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Core>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/JUCE>
 )
 
-target_sources(ABDScopeCore INTERFACE
+target_sources(ABDScopeCoreHeaders INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/ScopeTapType.h
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/SpscRingBuffer.h
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/ScopeTap.h
@@ -20,26 +21,39 @@ target_sources(ABDScopeCore INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/TapId.h
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/TriggerDetector.h
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/ScopeFrameSerializer.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/JuceScopeComponent.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/JuceWebScopeComponent.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/ScopeResourceProvider.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/ScopeResourceProvider.cpp
 )
 
-target_compile_definitions(ABDScopeCore INTERFACE
+target_compile_definitions(ABDScopeCoreHeaders INTERFACE
   ABD_SCOPE_EXPORTS
 )
 
-target_compile_options(ABDScopeCore INTERFACE
+target_compile_options(ABDScopeCoreHeaders INTERFACE
   $<$<CXX_COMPILER_ID:MSVC>:/W4;/wd4324;/permissive-;/Zc:__cplusplus;/Zc:inline>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
 )
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  target_compile_options(ABDScopeCore INTERFACE /MD)
+  target_compile_options(ABDScopeCoreHeaders INTERFACE /MD)
 else()
-  target_compile_options(ABDScopeCore INTERFACE -fPIC)
+  target_compile_options(ABDScopeCoreHeaders INTERFACE -fPIC)
 endif()
+
+# JUCE-integration core: pure core + JUCE glue (native/WebView2 components and the
+# embedded-asset resource provider). JUCE consumers link this one; the JUCE glue
+# sources propagate and get compiled into the consumer alongside its JUCE modules.
+add_library(ABDScopeCore INTERFACE)
+target_link_libraries(ABDScopeCore INTERFACE ABDScopeCoreHeaders)
+
+target_include_directories(ABDScopeCore INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/JUCE>
+)
+
+target_sources(ABDScopeCore INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/JuceScopeComponent.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/JuceWebScopeComponent.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/ScopeResourceProvider.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/ScopeResourceProvider.cpp
+)
 
 set(ABD_SCOPE_VERSION "0.3.1")
 configure_file(
@@ -48,7 +62,7 @@ configure_file(
   @ONLY
 )
 
-target_include_directories(ABDScopeCore INTERFACE
+target_include_directories(ABDScopeCoreHeaders INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 

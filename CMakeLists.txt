@@ -31,7 +31,6 @@ if(COMMAND juce_add_binary_data)
     "${CMAKE_CURRENT_SOURCE_DIR}/WebUI/src/*"
   )
   list(APPEND ABDSCOPE_WEB_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/WebUI/index.html")
-  list(FILTER ABDSCOPE_WEB_ASSETS EXCLUDE REGEX "/demo/")
   list(FILTER ABDSCOPE_WEB_ASSETS EXCLUDE REGEX "/tests/")
   list(FILTER ABDSCOPE_WEB_ASSETS EXCLUDE REGEX "/node_modules/")
 
@@ -44,9 +43,11 @@ if(COMMAND juce_add_binary_data)
   add_library(ABDScope::ABDScopeWebAssets ALIAS ABDScopeWebAssets)
 endif()
 
-# Standalone C++ Smoke Test (MSVC Validation)
+# Standalone C++ Smoke Test (MSVC Validation). Links the JUCE-free core headers
+# target only: this test validates the pure DSP/serializer contract in any toolchain
+# and must not pull in the JUCE glue (which needs JUCE + WebView2 to compile).
 add_executable(ABDScope_CppSmoke Source/tests/StandaloneSmoke.cpp)
-target_link_libraries(ABDScope_CppSmoke PRIVATE ABDScopeCore)
+target_link_libraries(ABDScope_CppSmoke PRIVATE ABDScopeCoreHeaders)
 
 if(TARGET juce::juce_gui_extra)
   juce_add_gui_app(ABDScope_GuiDemo

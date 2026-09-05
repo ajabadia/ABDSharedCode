@@ -59,9 +59,9 @@ ABDScope/
 │   │   ├── mount/                # MountBase + Mounts, LaneController/LaneView, layout & DOM helpers
 │   │   ├── renderers/            # Oscilloscope, Spectrum, Lissajous, Phase, Spectrogram, VU
 │   │   ├── input/                # AnalyserInput (WebAudio) & PushInput (Bridge)
+│   │   ├── icons.js             # Generated icon module (canonical: ABDSharedAssets/icons)
 │   │   └── utils/                # exportImage (PNG clipboard/download)
-│   ├── demo/                     # Standalone interactive test harness & signal generator
-│   └── tests/                    # Vitest unit test suite (56 tests)
+│   └── tests/                    # Vitest unit test suite (59 tests)
 ├── docs/                         # Integration guides, data contracts, and usage manuals
 ├── ARCHITECTURE_SPEC.md          # Complete technical architectural specification
 ├── ROADMAP.md                    # Roadmap milestone tracking
@@ -73,7 +73,7 @@ ABDScope/
 ## ⚡ Quick Start
 
 ### 0. Install JavaScript Dependencies (two committed lockfiles)
-The repo keeps **two self-contained npm toolchains** — repo root (`Vitest` suite over `WebUI/tests`, happy-dom) and `WebUI/` (jsdom suite + demo server). Each has its own committed `package-lock.json`, so install deterministically with `npm ci`:
+The repo keeps **two self-contained npm toolchains** — repo root (`Vitest` suite over `WebUI/tests`, happy-dom) and `WebUI/` (jsdom suite). Each has its own committed `package-lock.json`, so install deterministically with `npm ci`:
 
 ```cmd
 npm ci
@@ -86,14 +86,14 @@ cd ..
 build.bat
 ```
 
-### 2. Standalone Web Demo (WebUI/demo)
+### 2. Standalone Host Page (WebUI/index.html)
 ```cmd
 cd WebUI
-npm run demo
+npm run serve
 ```
-Open `http://localhost:8080/demo/` in any browser. The demo lives in `WebUI/demo/` and must never be bundled into `juce_add_binary_data` — see `docs/INTEGRATION_GUIDE.md` §7.
+Open `http://localhost:8080/` in any browser. This is the embedded WebView2 host page: it renders the canonical dark theme and receives live frames via `pushFrame`/IPC. Per-theme palettes are **not** bundled with the module anymore — hosts adopting the ABDSynths design system supply them through the shared cascade (`@abdsynths/shared` themes + component adapter, see `docs/INTEGRATION_GUIDE.md`). The interactive `WebUI/demo/` harness was removed (2026-09-05).
 
-> `start.bat` is an alternative launcher that serves the whole `WebUI/` folder (with the embedded `index.html` and `/demo/`) on port 8391.
+> `start.bat` is an alternative launcher that serves the whole `WebUI/` folder (with the embedded host page `index.html`) on port 8391.
 
 ---
 

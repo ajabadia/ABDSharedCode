@@ -1,8 +1,8 @@
 # ABDScope — Developer Context & Handoff Document
 
-> **Last Updated:** September 4, 2026
+> **Last Updated:** September 5, 2026
 > **Current Version:** 0.3.1
-> **Status:** Phases 1–4, 6.1 & 6.4 completed with 100% JS tests passing (56/56) and a C++ smoke verification that runs real checks in both Debug and Release builds (see `Source/tests/StandaloneSmoke.cpp`). The JUCE integration is compile-verified against MSVC + JUCE 8.0.12 + the WebView2 SDK (see §3, v0.3.1).
+> **Status:** Phases 1–4, 6.1 & 6.4 completed with 100% JS tests passing (59/59) and a C++ smoke verification that runs real checks in both Debug and Release builds (see `Source/tests/StandaloneSmoke.cpp`). The JUCE integration is compile-verified against MSVC + JUCE 8.0.12 + the WebView2 SDK (see §3, v0.3.1). Ecosystem decision 2026-09-05: absorb ABDScope into `ABDSharedCode` as a module — option A1, see §6 and `docs/EVALUATION_ABDSHAREDCODE_ASSETS.md`.
 
 ---
 
@@ -31,7 +31,7 @@
 
 - **Two self-contained Vitest toolchains**: repo-root `vitest.config.js` (happy-dom over `WebUI/tests`) and `WebUI/vitest.config.js` (jsdom, package-scoped) each serve a different consumer layout; both must stay green. Their `package-lock.json` files are committed — install with `npm ci`, never `npm install`.
 - **UTF-8 BOM + CRLF are preserved** in the docs that ship with them (`docs/INTEGRATION_GUIDE.md`, `docs/DATA_CONTRACT.md`, `CHANGELOG.md`): MSVC/Windows tooling friendly. Do not strip BOMs or convert EOLs in unrelated commits.
-- **Console output policy**: `console.log` is allowed only in the dev demo harness (`WebUI/demo/`); the production host page (`WebUI/index.html`) is silent unless the host sets `window.__ABDSCOPE_DEBUG__ = true` before load.
+- **Console output policy**: `console.log` is forbidden in `WebUI/src` module code; the standalone host page (`WebUI/index.html`) is silent unless the host sets `window.__ABDSCOPE_DEBUG__ = true` before load. The dev demo harness (`WebUI/demo/`) was removed 2026-09-05.
 
 ---
 
@@ -76,5 +76,28 @@ When opening sessions in target projects:
 - [docs/INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md): 5-minute integration guide (real C++ API + tap id contract).
 - [docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md): Developer API manual.
 - [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md): Wire protocol & ScopeDataFrame contract.
+- [docs/EVALUATION_ABDSHAREDCODE_ASSETS.md](docs/EVALUATION_ABDSHAREDCODE_ASSETS.md): Ecosystem consolidation evaluation, decision record (option A1) and phased execution plan.
 - [ROADMAP.md](ROADMAP.md): Detailed phase breakdown and definition of done.
 - [CHANGELOG.md](CHANGELOG.md): Semantic release history.
+
+---
+
+## 6. Ecosystem Consolidation — Decision (2026-09-05)
+
+Decided with the ecosystem owner; the full evaluation lives in `docs/EVALUATION_ABDSHAREDCODE_ASSETS.md`.
+
+- **Option A1 — Absorb ABDScope into ABDSharedCode with history**: move `Source/` + `WebUI/` into `ABDSharedCode/Scope/` (`git subtree`/merge to keep history), register `ABDShared::Scope*` targets with `ABDScope::*` compatibility aliases, and update consumers (ABDMS2000, ABDAudioLab) in the same change.
+- **Versioning**: semver tags per module in ABDSharedCode (e.g. `scope-v0.4.0`).
+- **`ABDScope.git`**: archived as obsolete once the migration closes (Fase 4); the local repo stays untouched until everything has moved — never deleted.
+- **WebUI serving policy**: single canonical WebUI source in the module (one commit = identical result on every host); serving mechanism is per host — MS2000 → Vite/disk, ABDAudioLab → binary-data embed via `juce_add_binary_data`. Embed remains the self-contained distribution mode.
+
+Execution follows the phase plan in the evaluation doc (§6).
+
+**Fase 0 closed** (record above). **Fase 1 (assets, low risk) executed 2026-09-05** (nothing committed):
+- ABDSharedAssets component adapters enriched to the full module token sets — `scope.css`: 16 `--scope-*` tokens + `--scope-font`/`--scope-font-lcd` aliasing; `keyboard.css`: 21 theme tokens (3D key shades + FX colors; runtime JS-state tokens like `--kbd-pressure`/`--kbd-velocity` documented as non-themable).
+- `WebUI/src/scope.css` stripped of per-theme `[data-theme]` palettes (canonical dark `:root` defaults only). Per-theme palettes now live in ABDSharedAssets (themes + adapter); hosts supply them via the shared cascade.
+- Icons moved to a generated module `WebUI/src/icons.js` (`camera`/`close`/`freeze`) with parity test `WebUI/tests/icons.test.js` vs `ABDSharedAssets/icons/`. No inline SVGs left in `WebUI/src`.
+- Interactive demo harness `WebUI/demo/` **removed** (folder + CMake/vitest/start.bat/README/guide references). `index.html` now defaults to the dark canonical theme (`ms2000`); `npm run serve` (was `demo`) serves `WebUI/`.
+- JS tests: **59/59 in both toolchains** (was 56/56; +3 from icons.test.js).
+
+**Still pending:** visual/pixel parity verification on real hosts once ABDMS2000/AudioLab adopt the shared cascade; CHANGELOG/version + remaining doc pass at closure (Fase 4).

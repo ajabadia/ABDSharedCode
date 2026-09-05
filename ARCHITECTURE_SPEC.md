@@ -238,7 +238,7 @@ interface ScopeDataFrame {
 ABDScope admite **dos modos de alimentación de datos**, seleccionados automáticamente según el contexto:
 
 ### A. Modo Web Audio Directo (`connectAnalyser`)
-Para demos standalone, modo WASM y entornos donde hay un `AudioContext` accesible:
+Para modo standalone (web sin JUCE), WASM y entornos donde hay un `AudioContext` accesible:
 ```javascript
 const scope = createScope({ containerId: 'scope-view', enabledModes: ['oscilloscope', 'spectrum'] });
 
@@ -473,10 +473,7 @@ ABDScope/
 │   │   │   ├── LaneView.js             # DOM de cada carril
 │   │   │   └── mountLayout/mountDom.js # Helpers puros de grid y DOM
 │   │   └── scope.css                   # Theming dinámico mediante CSS Custom Properties
-│   ├── demo/
-│   │   ├── index.html                  # Banco de pruebas interactivo
-│   │   ├── demo.css
-│   │   └── test-signals.js             # Generador de tonos, FM, ruido y entrada de micrófono
+│   ├── icons.js                       # Módulo generado desde ABDSharedAssets/icons (con test de paridad)
 │   ├── tests/
 │   │   ├── trigger.test.js             # Tests unitarios del algoritmo de disparo
 │   │   ├── frame.test.js               # Tests de decodificación y métricas

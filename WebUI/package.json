@@ -27,7 +27,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "demo": "npx serve . -l 8080"
+    "serve": "npx serve . -l 8080"
   },
   "keywords": [
     "audio",

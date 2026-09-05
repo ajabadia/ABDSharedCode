@@ -2,7 +2,9 @@
  * ABDScope Unified Styling System
  * ================================
  * Pure Vanilla CSS with cascading token fallbacks from host themes.
- * Zero hardcoded colors — fully skin-adaptable for any ABDSynths instrument.
+ * Canonical defaults only: per-theme palettes are owned by ABDSharedAssets
+ * (themes + component adapter) and reach this module through the host
+ * cascade. Zero hardcoded colors in layout — fully skin-adaptable.
  */
 
 :root {
@@ -17,83 +19,11 @@
   --scope-trace-r: #ff007f;
   --scope-spectrum: #00e676;
   --scope-grid: rgba(255, 255, 255, 0.07);
+  --scope-grid-center: rgba(255, 255, 255, 0.12);
+  --scope-header-bg: rgba(0, 0, 0, 0.6);
   --scope-text-main: #e8f4fc;
   --scope-text-muted: #7e9bb5;
   --scope-font-lcd: 'Courier New', 'Roboto Mono', monospace;
-}
-
-[data-theme="ms2000"],
-.theme-ms2000 {
-  --scope-bg: #080c14;
-  --scope-surface: #0d1522;
-  --scope-surface-elevated: #152236;
-  --scope-accent: #00c3ff;
-  --scope-accent-hover: #38d3ff;
-  --scope-trace-l: #00c3ff;
-  --scope-trace-r: #ff007f;
-  --scope-spectrum: #00e676;
-  --scope-border: rgba(0, 195, 255, 0.25);
-}
-
-[data-theme="cz101"],
-.theme-cz101 {
-  --scope-bg: #12080a;
-  --scope-surface: #1e0d11;
-  --scope-surface-elevated: #2c1218;
-  --scope-accent: #ff3344;
-  --scope-accent-hover: #ff5566;
-  --scope-trace-l: #ff3344;
-  --scope-trace-r: #00c3ff;
-  --scope-spectrum: #ff3344;
-  --scope-border: rgba(255, 51, 68, 0.3);
-}
-
-[data-theme="deepmind"],
-.theme-deepmind {
-  --scope-bg: #140e06;
-  --scope-surface: #22170a;
-  --scope-surface-elevated: #32220f;
-  --scope-accent: #ffaa00;
-  --scope-accent-hover: #ffbb33;
-  --scope-trace-l: #ffaa00;
-  --scope-trace-r: #00e676;
-  --scope-spectrum: #ffaa00;
-  --scope-border: rgba(255, 170, 0, 0.3);
-}
-
-[data-theme="audiolab"],
-[data-theme="dark"],
-.theme-audiolab,
-.theme-dark {
-  --scope-bg: #06120a;
-  --scope-surface: #0d1e12;
-  --scope-surface-elevated: #132c1a;
-  --scope-accent: #00e676;
-  --scope-accent-hover: #33eb91;
-  --scope-trace-l: #00e676;
-  --scope-trace-r: #00c3ff;
-  --scope-spectrum: #00e676;
-  --scope-border: rgba(0, 230, 118, 0.3);
-}
-
-[data-theme="audiolab-light"],
-[data-theme="light"],
-.theme-audiolab-light {
-  --scope-bg: #f8f9fa;
-  --scope-surface: #ffffff;
-  --scope-surface-elevated: #f1f3f5;
-  --scope-header-bg: #f1f3f5;
-  --scope-accent: #00a86b;
-  --scope-accent-hover: #008f5a;
-  --scope-trace-l: #00a86b;
-  --scope-trace-r: #0284c7;
-  --scope-spectrum: #00a86b;
-  --scope-grid: rgba(15, 23, 42, 0.08);
-  --scope-grid-center: rgba(15, 23, 42, 0.18);
-  --scope-border: #e2e8f0;
-  --scope-border-strong: #cbd5e1;
-  --scope-text-main: #1a1d20;
-  --scope-text-muted: #6c757d;
 }
 
 /* ─── Global Theme-Aware Scrollbars ─── */
@@ -291,6 +221,25 @@
 .abd-scope-close-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* Icon sizing: icon markup (ABDSharedAssets/icons) ships with a 16px
+   default; per-control sizes are applied here via CSS. */
+.abd-scope-snapshot-btn svg {
+  width: 10px;
+  height: 10px;
+}
+.abd-scope-close-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.abd-scope-lane-freeze-btn svg {
+  width: 8px;
+  height: 8px;
+}
+.abd-scope-lane-snapshot-btn svg {
+  width: 9px;
+  height: 9px;
 }
 
 /* ─── Visualizer Body & 2-Column Responsive Grid Container ─── */
