@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABDKeyboard — Interactive Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0c;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      color: #00ccff;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .subtitle {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    /* Main layout */
+    .demo-container {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    /* Left panel: controls */
+    .control-panel {
+      width: 200px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-section {
+      background: #141418;
+      border: 1px solid #222;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .panel-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    /* Status indicators */
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 0.75rem;
+    }
+
+    .status-label { color: #999; }
+    .status-value { color: #00ccff; font-family: 'Courier New', monospace; font-weight: 700; }
+
+    .status-value.active { color: #33cc55; }
+    .status-value.panic { color: #ff2233; }
+
+    /* LED indicators */
+    .led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      display: inline-block;
+      margin-right: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .led.green { background: #33cc55; box-shadow: 0 0 6px #33cc55; }
+    .led.red { background: #ff2233; box-shadow: 0 0 6px #ff2233; }
+    .led.blue { background: #00ccff; box-shadow: 0 0 6px #00ccff; }
+    .led.yellow { background: #ffcc00; box-shadow: 0 0 6px #ffcc00; }
+
+    /* Buttons */
+    .demo-btn {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      margin-top: 6px;
+      background: #1e1e22;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #ccc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .demo-btn:hover {
+      background: #28282e;
+      border-color: #555;
+      color: #fff;
+    }
+
+    .demo-btn:active {
+      background: #111;
+      transform: translateY(1px);
+    }
+
+    .demo-btn.panic-btn {
+      border-color: #661111;
+      color: #ff6666;
+    }
+
+    .demo-btn.panic-btn:hover {
+      border-color: #ff2233;
+      color: #ff2233;
+    }
+
+    .demo-btn.sustain-btn {
+      border-color: #114411;
+      color: #66cc66;
+    }
+
+    .demo-btn.sustain-btn.active {
+      background: #1a3a1a;
+      border-color: #33cc55;
+      color: #33cc55;
+    }
+
+    /* Keyboard area */
+    .keyboard-area {
+      flex: 1;
+      background: #080808;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      padding: 16px;
+      position: relative;
+    }
+
+    /* Piano keys */
+    .piano-container {
+      display: flex;
+      position: relative;
+      height: 140px;
+      background: #0a0a0c;
+      border-radius: 0 0 4px 4px;
+      overflow: visible;
+    }
+
+    .white-key {
+      flex: 1;
+      background: linear-gradient(to bottom, #fdfcf8 0%, #ffffff 40%, #f5f2ea 82%, #e9e4d8 96%, #dfd9cb 100%);
+      border: 1px solid #b2aea4;
+      border-top: none;
+      border-right: 1px solid #848074;
+      cursor: pointer;
+      position: relative;
+      border-radius: 0 0 4px 4px;
+      user-select: none;
+      transition: transform 0.04s ease, background 0.04s ease;
+      z-index: 10;
+    }
+
+    .white-key:last-child { border-right: 1px solid #b2aea4; }
+
+    .white-key:hover {
+      background: linear-gradient(to bottom, #f4f8fc 0%, #ffffff 40%, #e6f0fa 82%, #d6e5f2 100%);
+    }
+
+    .white-key.active {
+      transform: translateY(3px);
+      background: linear-gradient(to bottom, #b8cad8 0%, #a8b8c8 100%);
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+
+    .white-key.active::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--led-color, #00ccff);
+      box-shadow: 0 0 14px 4px var(--led-color, #00ccff);
+      z-index: 15;
+      animation: keyGlow 0.22s ease-out;
+    }
+
+    .black-key {
+      position: absolute;
+      top: 0;
+      right: -60%;
+      width: 120%;
+      height: 64%;
+      background: linear-gradient(to bottom, #2f2f35 0%, #1c1c22 38%, #0c0c10 85%, #141418 100%);
+      border: 1px solid #060608;
+      border-top: 1px solid #484852;
+      z-index: 30;
+      cursor: pointer;
+      border-radius: 0 0 3px 3px;
+      box-shadow:
+        -1px 0 2px rgba(0, 0, 0, 0.6),
+        1px 0 2px rgba(0, 0, 0, 0.6),
+        0 5px 7px rgba(0, 0, 0, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.6);
+      user-select: none;
+      transition: transform 0.04s ease, background 0.04s ease;
+    }
+
+    .black-key:hover {
+      background: linear-gradient(to bottom, #404048 0%, #26262e 38%, #121216 100%);
+    }
+
+    .black-key.active {
+      transform: translateY(2px);
+      background: linear-gradient(to bottom, #0a0f14 0%, #1a1008 100%);
+      box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .black-key.active::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--led-color, #00ccff);
+      box-shadow: 0 0 12px 3px var(--led-color, #00ccff);
+      z-index: 35;
+      animation: keyGlow 0.22s ease-out;
+    }
+
+    /* Pressure visual */
+    .white-key.pressured {
+      transition: background 0.04s, box-shadow 0.04s;
+      background: color-mix(in srgb,
+        color-mix(in srgb, #b8cad8, #e8d4b8 80%),
+        #ff6633 calc(var(--pressure, 0) * 100%)
+      );
+      box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.2),
+        0 0 calc(6px * var(--pressure, 0)) rgba(255, 102, 51, calc(0.6 * var(--pressure, 0)));
+      transform: translateY(calc(3px + 2px * var(--pressure, 0)));
+    }
+
+    .black-key.pressured {
+      transition: background 0.04s, box-shadow 0.04s;
+      background: color-mix(in srgb,
+        color-mix(in srgb, #0a0f14, #1a1008 80%),
+        #cc3300 calc(var(--pressure, 0) * 100%)
+      );
+      box-shadow:
+        0 0 calc(4px * var(--pressure, 0)) rgba(204, 51, 0, calc(0.5 * var(--pressure, 0)));
+    }
+
+    /* Note labels */
+    .note-label {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.55rem;
+      color: #888;
+      pointer-events: none;
+    }
+
+    .black-key .note-label {
+      color: #666;
+      bottom: 8px;
+      font-size: 0.5rem;
+    }
+
+    /* Animation */
+    @keyframes keyGlow {
+      0% { opacity: 0; transform: scaleY(0.4); }
+      50% { opacity: 1; transform: scaleY(1); }
+      100% { opacity: 0.8; transform: scaleY(0.8); }
+    }
+
+    @keyframes ledFlash {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 1; }
+    }
+
+    /* QWERTY hints */
+    .qwerty-hint {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: #999;
+      pointer-events: none;
+    }
+
+    .black-key .qwerty-hint {
+      color: #777;
+      font-size: 0.45rem;
+    }
+
+    /* Event log */
+    .event-log {
+      margin-top: 12px;
+      background: #0d0d10;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      padding: 8px;
+      height: 100px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.65rem;
+    }
+
+    .event-log .entry {
+      padding: 2px 0;
+      color: #888;
+      border-bottom: 1px solid #111;
+    }
+
+    .event-log .entry.note-on { color: #33cc55; }
+    .event-log .entry.note-off { color: #ff6666; }
+    .event-log .entry.sustain { color: #ffcc00; }
+    .event-log .entry.panic { color: #ff2233; }
+    .event-log .entry.aftertouch { color: #ff9933; }
+
+    /* Info bar */
+    .info-bar {
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: #111114;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      color: #666;
+      text-align: center;
+    }
+
+    .info-bar kbd {
+      background: #1e1e22;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: 'Courier New', monospace;
+      color: #aaa;
+      font-size: 0.6rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎹 ABDKeyboard — Interactive Demo</h1>
+  <p class="subtitle">Click keys or use QWERTY • Hold + drag down for aftertouch</p>
+
+  <div class="demo-container">
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <div class="panel-section">
+        <div class="panel-title">Status</div>
+        <div class="status-row">
+          <span class="status-label">Active Notes</span>
+          <span class="status-value" id="active-count">0</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Velocity</span>
+          <span class="status-value" id="velocity-display">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Aftertouch</span>
+          <span class="status-value" id="aftertouch-display">0.00</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Octave</span>
+          <span class="status-value" id="octave-display">0</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Pedals</div>
+        <div class="status-row">
+          <span><span class="led" id="sustain-led"></span>Sustain</span>
+          <span class="status-value" id="sustain-display">OFF</span>
+        </div>
+        <button class="demo-btn sustain-btn" id="sustain-toggle" onclick="toggleSustain()">
+          SUSTAIN [Ctrl+Space]
+        </button>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Controls</div>
+        <div class="status-row">
+          <span><span class="led" id="octave-up-led"></span>Octave+</span>
+        </div>
+        <button class="demo-btn" onclick="shiftOctave(1)">▲ OCT UP [↑]</button>
+        <div class="status-row" style="margin-top: 6px;">
+          <span><span class="led" id="octave-down-led"></span>Octave-</span>
+        </div>
+        <button class="demo-btn" onclick="shiftOctave(-1)">▼ OCT DOWN [↓]</button>
+        <button class="demo-btn panic-btn" onclick="panic()" style="margin-top: 10px;">
+          🔴 PANIC [Ctrl+Q]
+        </button>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Config</div>
+        <div class="status-row">
+          <span class="status-label">Velocity Source</span>
+          <span class="status-value">yPosition</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Aftertouch</span>
+          <span class="status-value">channel</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Keys</span>
+          <span class="status-value">2 octaves</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard -->
+    <div class="keyboard-area">
+      <div class="piano-container" id="piano"></div>
+      <div class="event-log" id="event-log"></div>
+    </div>
+  </div>
+
+  <div class="info-bar">
+    <kbd>QWERTY</kbd> Play notes •
+    <kbd>↑</kbd><kbd>↓</kbd> Octave shift •
+    <kbd>Ctrl+Q</kbd> Panic •
+    <kbd>Ctrl+Space</kbd> Sustain •
+    Click + drag down = Aftertouch
+  </div>
+
+  <script>
+    // ── State ──
+    let octaveShift = 0;
+    let sustainOn = false;
+    let channelAftertouch = 0;
+    const activeNotes = new Map(); // midiNote -> { element, velocity, startY }
+
+    // ── Note names ──
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    function midiToName(midi) {
+      return NOTE_NAMES[midi % 12] + Math.floor(midi / 12 - 1);
+    }
+
+    // ── Build keyboard (2 octaves: C3–B4 + C5) ──
+    const OCTAVE_PATTERN = [
+      { offset: 0, sharp: 1 }, { offset: 2, sharp: 3 }, { offset: 4, sharp: null },
+      { offset: 5, sharp: 6 }, { offset: 7, sharp: 8 }, { offset: 9, sharp: 10 }, { offset: 11, sharp: null }
+    ];
+
+    const piano = document.getElementById('piano');
+    const startNote = 48; // C3
+
+    for (let oct = 0; oct < 2; oct++) {
+      const base = startNote + oct * 12;
+      for (const p of OCTAVE_PATTERN) {
+        const whiteNote = base + p.offset;
+        const whiteKey = document.createElement('div');
+        whiteKey.className = 'white-key';
+        whiteKey.dataset.note = whiteNote;
+
+        const label = document.createElement('span');
+        label.className = 'note-label';
+        label.textContent = midiToName(whiteNote);
+        whiteKey.appendChild(label);
+
+        // QWERTY hint
+        const qwertyMap = { 48:'Z', 50:'X', 52:'C', 53:'V', 55:'B', 57:'N', 59:'M',
+                            60:'Q', 62:'W', 64:'E', 65:'R', 67:'T', 69:'Y', 71:'U' };
+        if (qwertyMap[whiteNote]) {
+          const hint = document.createElement('span');
+          hint.className = 'qwerty-hint';
+          hint.textContent = qwertyMap[whiteNote];
+          whiteKey.appendChild(hint);
+        }
+
+        if (p.sharp !== null) {
+          const blackNote = base + p.sharp;
+          const blackKey = document.createElement('div');
+          blackKey.className = 'black-key';
+          blackKey.dataset.note = blackNote;
+
+          const bLabel = document.createElement('span');
+          bLabel.className = 'note-label';
+          bLabel.textContent = midiToName(blackNote);
+          blackKey.appendChild(bLabel);
+
+          // QWERTY hint for black keys
+          const blackQwerty = { 49:'S', 51:'D', 54:'G', 56:'H', 58:'J',
+                                61:'2', 63:'3', 66:'5', 68:'6', 70:'7' };
+          if (blackQwerty[blackNote]) {
+            const hint = document.createElement('span');
+            hint.className = 'qwerty-hint';
+            hint.textContent = blackQwerty[blackNote];
+            blackKey.appendChild(hint);
+          }
+
+          whiteKey.appendChild(blackKey);
+
+          blackKey.addEventListener('pointerdown', (e) => playNote(blackNote, e));
+          blackKey.addEventListener('pointerup', () => stopNote(blackNote));
+          blackKey.addEventListener('pointerleave', () => stopNote(blackNote));
+          blackKey.addEventListener('pointermove', (e) => handleAftertouchMove(blackNote, e));
+        }
+
+        whiteKey.addEventListener('pointerdown', (e) => playNote(whiteNote, e));
+        whiteKey.addEventListener('pointerup', () => stopNote(whiteNote));
+        whiteKey.addEventListener('pointerleave', () => stopNote(whiteNote));
+        whiteKey.addEventListener('pointermove', (e) => handleAftertouchMove(whiteNote, e));
+
+        piano.appendChild(whiteKey);
+      }
+    }
+    // High C
+    const highC = document.createElement('div');
+    highC.className = 'white-key';
+    highC.dataset.note = startNote + 24;
+    const hcLabel = document.createElement('span');
+    hcLabel.className = 'note-label';
+    hcLabel.textContent = midiToName(startNote + 24);
+    highC.appendChild(hcLabel);
+    highC.addEventListener('pointerdown', (e) => playNote(startNote + 24, e));
+    highC.addEventListener('pointerup', () => stopNote(startNote + 24));
+    highC.addEventListener('pointerleave', () => stopNote(startNote + 24));
+    highC.addEventListener('pointermove', (e) => handleAftertouchMove(startNote + 24, e));
+    piano.appendChild(highC);
+
+    // ── Note control ──
+    function playNote(midiNote, event) {
+      const actualNote = Math.max(0, Math.min(127, midiNote + octaveShift * 12));
+      if (activeNotes.has(midiNote)) return;
+
+      // Calculate velocity from Y position
+      let velocity = 0.85;
+      if (event && event.clientY != null) {
+        const key = event.target.closest('.white-key, .black-key');
+        if (key) {
+          const rect = key.getBoundingClientRect();
+          if (rect.height > 0) {
+            const relY = (event.clientY - rect.top) / rect.height;
+            velocity = Math.max(0.15, Math.min(1.0, 0.15 + relY * 0.85));
+          }
+        }
+      }
+
+      // Find key element
+      const keyEl = piano.querySelector(`[data-note="${midiNote}"]`);
+      if (keyEl) {
+        keyEl.classList.add('active');
+        keyEl.style.setProperty('--led-color', '#00ccff');
+      }
+
+      activeNotes.set(midiNote, { element: keyEl, velocity, startY: event?.clientY });
+
+      // Update displays
+      updateActiveCount();
+      document.getElementById('velocity-display').textContent = velocity.toFixed(2);
+
+      // Log event
+      logEvent('note-on', `Note On: ${midiToName(actualNote)} (${actualNote}) vel=${velocity.toFixed(2)}`);
+    }
+
+    function stopNote(midiNote) {
+      if (!activeNotes.has(midiNote)) return;
+      const { element } = activeNotes.get(midiNote);
+      const actualNote = Math.max(0, Math.min(127, midiNote + octaveShift * 12));
+
+      if (element) {
+        element.classList.remove('active', 'pressured');
+        element.style.removeProperty('--led-color');
+        element.style.removeProperty('--pressure');
+      }
+
+      activeNotes.delete(midiNote);
+      updateActiveCount();
+
+      // Release aftertouch
+      if (sustainOn) {
+        logEvent('sustain', `Note Off (sustained): ${midiToName(actualNote)}`);
+      } else {
+        logEvent('note-off', `Note Off: ${midiToName(actualNote)}`);
+      }
+    }
+
+    // ── Aftertouch from pointer Y movement ──
+    function handleAftertouchMove(midiNote, event) {
+      if (!activeNotes.has(midiNote)) return;
+      const state = activeNotes.get(midiNote);
+      if (state.startY == null) return;
+
+      const deltaY = state.startY - event.clientY;
+      const key = event.target.closest('.white-key, .black-key');
+      if (!key) return;
+      const maxDelta = key.getBoundingClientRect().height * 0.8;
+      const rawPressure = Math.max(0, Math.min(1, deltaY / maxDelta));
+      const pressure = Math.round(rawPressure * 127) / 127;
+
+      // Update visual
+      if (state.element) {
+        state.element.style.setProperty('--pressure', pressure.toFixed(3));
+        if (pressure > 0.01) {
+          state.element.classList.add('pressured');
+        } else {
+          state.element.classList.remove('pressured');
+        }
+      }
+
+      // Update display
+      channelAftertouch = pressure;
+      document.getElementById('aftertouch-display').textContent = pressure.toFixed(2);
+
+      if (pressure > 0.01) {
+        logEvent('aftertouch', `Aftertouch: ${pressure.toFixed(2)}`);
+      }
+    }
+
+    // ── Sustain ──
+    function toggleSustain() {
+      sustainOn = !sustainOn;
+      const led = document.getElementById('sustain-led');
+      const display = document.getElementById('sustain-display');
+      const btn = document.getElementById('sustain-toggle');
+
+      if (sustainOn) {
+        led.classList.add('green');
+        display.textContent = 'ON';
+        display.classList.add('active');
+        btn.classList.add('active');
+        logEvent('sustain', 'Sustain ON (CC#64)');
+      } else {
+        led.classList.remove('green');
+        display.textContent = 'OFF';
+        display.classList.remove('active');
+        btn.classList.remove('active');
+        logEvent('sustain', 'Sustain OFF (CC#64)');
+
+        // Release all sustained notes
+        for (const [midiNote] of activeNotes) {
+          stopNote(midiNote);
+        }
+      }
+    }
+
+    // ── Octave shift ──
+    function shiftOctave(delta) {
+      octaveShift = Math.max(-3, Math.min(3, octaveShift + delta));
+      document.getElementById('octave-display').textContent = octaveShift;
+
+      const upLed = document.getElementById('octave-up-led');
+      const downLed = document.getElementById('octave-down-led');
+
+      upLed.classList.remove('green', 'yellow');
+      downLed.classList.remove('green', 'yellow');
+
+      if (octaveShift > 0) {
+        upLed.classList.add(octaveShift >= 2 ? 'green' : 'yellow');
+      } else if (octaveShift < 0) {
+        downLed.classList.add(octaveShift <= -2 ? 'green' : 'yellow');
+      }
+
+      logEvent('note-on', `Octave shift: ${octaveShift > 0 ? '+' : ''}${octaveShift}`);
+    }
+
+    // ── Panic ──
+    function panic() {
+      // Flash all keys red
+      const keys = piano.querySelectorAll('.white-key, .black-key');
+      let flashes = 0;
+      const interval = setInterval(() => {
+        keys.forEach(k => {
+          if (flashes % 2 === 0) {
+            k.style.setProperty('--led-color', '#ff2233');
+            if (!k.classList.contains('active')) k.classList.add('active');
+          } else {
+            k.style.removeProperty('--led-color');
+            if (!activeNotes.has(parseInt(k.dataset.note))) k.classList.remove('active');
+          }
+        });
+        flashes++;
+        if (flashes >= 6) {
+          clearInterval(interval);
+          keys.forEach(k => {
+            k.style.removeProperty('--led-color');
+            if (!activeNotes.has(parseInt(k.dataset.note))) k.classList.remove('active');
+          });
+        }
+      }, 90);
+
+      // Release all notes
+      for (const [midiNote] of activeNotes) {
+        const { element } = activeNotes.get(midiNote);
+        if (element) {
+          element.classList.remove('active', 'pressured');
+          element.style.removeProperty('--led-color');
+          element.style.removeProperty('--pressure');
+        }
+      }
+      activeNotes.clear();
+      updateActiveCount();
+
+      // Release sustain
+      if (sustainOn) toggleSustain();
+
+      logEvent('panic', '🔴 PANIC — All Notes Off');
+    }
+
+    // ── Update displays ──
+    function updateActiveCount() {
+      document.getElementById('active-count').textContent = activeNotes.size;
+    }
+
+    // ── Event log ──
+    function logEvent(type, message) {
+      const log = document.getElementById('event-log');
+      const entry = document.createElement('div');
+      entry.className = `entry ${type}`;
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      entry.textContent = `[${time}] ${message}`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+
+      // Keep max 50 entries
+      while (log.children.length > 50) {
+        log.removeChild(log.firstChild);
+      }
+    }
+
+    // ── QWERTY input ──
+    const QWERTY_MAP = {
+      'z': 48, 's': 49, 'x': 50, 'd': 51, 'c': 52, 'v': 53, 'g': 54, 'b': 55,
+      'h': 56, 'n': 57, 'j': 58, 'm': 59, ',': 60, 'l': 61, '.': 62, ';': 63, '/': 64,
+      'q': 60, '2': 61, 'w': 62, '3': 63, 'e': 64, 'r': 65, '5': 66, 't': 67,
+      '6': 68, 'y': 69, '7': 70, 'u': 71, 'i': 72, '9': 73, 'o': 74, '0': 75,
+      'p': 76, '[': 77, '=': 78, ']': 79
+    };
+
+    const qwertyActive = new Set();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // Ctrl+Q → Panic
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+        panic();
+        return;
+      }
+
+      // Ctrl+Space → Sustain
+      if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
+        e.preventDefault();
+        toggleSustain();
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+
+      // Arrow keys → octave
+      if (e.key === 'ArrowUp') { e.preventDefault(); shiftOctave(1); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); shiftOctave(-1); return; }
+
+      // QWERTY notes
+      const key = e.key.toLowerCase();
+      if (QWERTY_MAP[key] !== undefined && !qwertyActive.has(key)) {
+        qwertyActive.add(key);
+        playNote(QWERTY_MAP[key], null);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (QWERTY_MAP[key] !== undefined && qwertyActive.has(key)) {
+        qwertyActive.delete(key);
+        stopNote(QWERTY_MAP[key]);
+      }
+    });
+
+    // ── Init log ──
+    logEvent('note-on', 'ABDKeyboard Demo ready — click keys or use QWERTY');
+  </script>
+</body>
+</html>
