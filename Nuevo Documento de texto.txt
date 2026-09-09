@@ -1,0 +1,1 @@
+Consume SynthCore from ABDEep or ABDCZ101 to prove cross-project reuse     Commit the Phase 3 + SynthCore changes in the three repos            Generalize MS2000 VoiceManager stealing policy onto abd::synth::VoiceAllocator

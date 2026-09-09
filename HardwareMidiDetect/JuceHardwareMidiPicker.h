@@ -1,10 +1,13 @@
-﻿/**
+/**
  * @file JuceHardwareMidiPicker.h
  * @brief Plug-and-play JUCE WebView2 component for MIDI hardware detection.
  * @details The host prepares the bridge by injecting a MidiHardwareBackend.
  *          Detection is performed by the shared C++ HardwareMidiDetector;
  *          the embedded WebUI is a pure view that renders the detected device list
  *          and relays the user's selection back via callback.
+ *          Webview scaffolding (webview2 backend, resource provider wiring,
+ *          theme state/reload, pageLoaded hook) is inherited from the shared
+ *          WebView2Bridge JuceWebView2Component base.
  * @author ABDSynths
  * @date 2026
  */
@@ -18,6 +21,7 @@
 #include "MidiHardwareBackend.h"
 #include "HardwareMidiDetector.h"
 #include "HardwareMidiPickerResourceProvider.h"
+#include "WebView2Bridge/JuceWebView2Component.h"
 
 namespace abd::hwid
 {
@@ -54,27 +58,24 @@ using HardwarePickCallback = std::function<void(const HardwarePickResult&)>;
  * @brief JUCE Component that embeds the HardwareMidiPicker WebUI in WebView2,
  *        runs detection via HardwareMidiDetector, and bridges to host MidiHardwareBackend.
  */
-class JuceHardwareMidiPicker : public juce::Component
+class JuceHardwareMidiPicker : public abd::webview2::JuceWebView2Component
 {
 public:
     JuceHardwareMidiPicker(MidiHardwareBackend& backend,
                            HardwarePickCallback onResult,
                            const std::vector<HardwareContract>& contracts = {},
-                           const HardwareMidiDetector::DetectionConfig& config = {})
-        : midiBackend(backend),
+                           const HardwareMidiDetector::DetectionConfig& config = {},
+                           const juce::String& initialTheme = "audiolab-light")
+        : JuceWebView2Component(abd::hwid::hardwareMidiPickerResourceProvider,
+                                { { "nativeEvent", [this](const juce::var& message) {
+                                       onNativeEvent(message);
+                                   } } },
+                                initialTheme),
+          midiBackend(backend),
           detector(contracts),
           currentConfig(config),
-          resultCallback(std::move(onResult)),
-          webBrowser(juce::WebBrowserComponent::Options{}
-                         .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
-                         .withNativeIntegrationEnabled(true)
-                         .withResourceProvider(abd::hwid::hardwareMidiPickerResourceProvider)
-                         .withEventListener("nativeEvent", [this](const juce::var& message) {
-                             onNativeEvent(message);
-                         }))
+          resultCallback(std::move(onResult))
     {
-        addAndMakeVisible(webBrowser);
-        reload();
     }
 
     ~JuceHardwareMidiPicker() override
@@ -95,46 +96,60 @@ public:
         currentConfig = config;
     }
 
-    /** @brief Set the visual theme (ms2000, cz101, deepmind, juno, audiolab, or custom). */
-    void setTheme(const std::string& themeName)
-    {
-        juce::String js = "document.body.dataset.theme = '" + juce::String(themeName) + "';";
-        juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
-    }
+    /** @brief Set the visual theme (ms2000, cz101, deepmind, juno, audiolab, audiolab-light, etc.). */
+    using JuceWebView2Component::setTheme;
 
-    void resized() override
+    /** @brief Push detection config (maxResults, autoSelectIfSingle) to the WebUI. */
+    void pushConfigToWebUI()
     {
-        webBrowser.setBounds(getLocalBounds());
+        juce::DynamicObject::Ptr cfg = new juce::DynamicObject();
+        cfg->setProperty("maxResults", currentConfig.maxResults);
+        cfg->setProperty("autoSelectIfSingle", currentConfig.autoSelectIfSingle);
+        juce::String js = "if (window.__setConfig) window.__setConfig(" + juce::JSON::toString(juce::var(cfg.get())) + ");";
+        juce::MessageManager::callAsync([this, js]() { getWebBrowser().evaluateJavascript(js); });
     }
 
     /** @brief Run a full scan with current config and present results in the WebUI. */
     void startPick()
     {
         auto results = detector.scanAllPorts(currentConfig, 350);
+        lastDetectedDevices = results;
+
+        if (currentConfig.autoSelectIfSingle && currentConfig.maxResults == 1 && results.size() == 1)
+        {
+            HardwarePickResult result;
+            result.cancelled = false;
+            result.hardwareId = results[0].hardwareId;
+            result.displayName = results[0].displayName;
+            result.manufacturer = results[0].manufacturer;
+            result.model = results[0].model;
+            result.firmwareVersion = results[0].firmwareVersion;
+            result.allDetected = results;
+            if (resultCallback)
+                resultCallback(result);
+            return;
+        }
+        pushConfigToWebUI();
         pushDevicesToWebUI(results);
     }
 
-    /** @brief Run a scan with a specific config (temporarily overrides currentConfig). */
+    /** @brief Run a scan with a specific config (overrides currentConfig). */
     void startPick(const HardwareMidiDetector::DetectionConfig& config)
     {
-        auto results = detector.scanAllPorts(config, 350);
-        pushDevicesToWebUI(results);
+        currentConfig = config;
+        startPick();
     }
-
-    /** @brief Navigate back to the picker root (re-runs detection UI). */
-    void reload()
-    {
-        auto rootUrl = juce::WebBrowserComponent::getResourceProviderRoot();
-        webBrowser.goToURL(rootUrl);
-    }
-
-    /** @brief Access the underlying WebBrowserComponent (e.g. for sizing). */
-    [[nodiscard]] juce::WebBrowserComponent& getWebBrowser() noexcept { return webBrowser; }
 
     /** @brief Access the detector for advanced use (headless scans, etc.). */
     [[nodiscard]] HardwareMidiDetector& getDetector() noexcept { return detector; }
 
 private:
+    /** @brief Re-push config to the WebUI once the page is up (theme is re-applied by the base). */
+    void onPageLoaded() override
+    {
+        pushConfigToWebUI();
+    }
+
     void pushDevicesToWebUI(const std::vector<DiscoveredDevice>& devices)
     {
         juce::Array<juce::var> list;
@@ -156,7 +171,7 @@ private:
             list.add(juce::var(obj));
         }
         juce::String js = "if (window.__setDetectedDevices) window.__setDetectedDevices(" + juce::JSON::toString(juce::var(list)) + ");";
-        juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
+        juce::MessageManager::callAsync([this, js]() { getWebBrowser().evaluateJavascript(js); });
     }
 
     void onNativeEvent(const juce::var& message)
@@ -221,7 +236,6 @@ private:
     HardwareMidiDetector detector;
     HardwareMidiDetector::DetectionConfig currentConfig;
     HardwarePickCallback resultCallback;
-    juce::WebBrowserComponent webBrowser;
     std::vector<DiscoveredDevice> lastDetectedDevices;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(JuceHardwareMidiPicker)

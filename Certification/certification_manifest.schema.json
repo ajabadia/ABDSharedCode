@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ABDAudioLab Analog Hardware Certification Manifest",
+  "description": "Canonical schema for analog hardware measurement manifests and calibration packages (.tar.gz)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "timestamp",
+    "sample_rate",
+    "hardware"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0",
+        "1.1",
+        "2.0"
+      ]
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "sample_rate": {
+      "type": "number",
+      "minimum": 22050,
+      "maximum": 192000
+    },
+    "author": {
+      "type": "string"
+    },
+    "laboratory": {
+      "type": "string"
+    },
+    "hardware": {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "name": {
+          "type": "string"
+        },
+        "device_type": {
+          "type": "string",
+          "enum": [
+            "MANUAL_EURORACK",
+            "ANALOGUE_PEDAL",
+            "AUTOMATED_SYSEX",
+            "AUTOMATED_MIDI_CC",
+            "MOCK_DSP"
+          ]
+        },
+        "category": {
+          "type": "string"
+        },
+        "firmware_version": {
+          "type": "string"
+        },
+        "active_function": {
+          "type": "string"
+        }
+      }
+    },
+    "audio_calibration": {
+      "type": "object",
+      "properties": {
+        "sample_rate": {
+          "type": "number"
+        },
+        "loopback_snr_db": {
+          "type": "number"
+        },
+        "measured_latency_samples": {
+          "type": "integer"
+        },
+        "noise_floor_db": {
+          "type": "number"
+        }
+      }
+    },
+    "measured_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "point_index",
+          "parameters"
+        ],
+        "properties": {
+          "point_index": {
+            "type": "integer"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "normalized_value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "normalized_value": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0
+                }
+              }
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "snr_db": {
+                "type": "number"
+              },
+              "thd_percent": {
+                "type": "number",
+                "minimum": 0.0
+              },
+              "primary_mean": {
+                "type": "number"
+              },
+              "primary_std_dev": {
+                "type": "number"
+              },
+              "sec_mean": {
+                "type": "number"
+              },
+              "sec_std_dev": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "crc32_checksum": {
+      "type": [
+        "integer",
+        "string"
+      ]
+    },
+    "sha256_bundle_hash": {
+      "type": "string"
+    }
+  }
+}

@@ -21,6 +21,37 @@ target_link_libraries(ABDShared_AutoUpdater PUBLIC
     juce_events
 )
 
+# --- SynthCore Module ---
+# Shared, JUCE-free DSP primitives extracted from the synths (Phase 2 of the
+# transversal DRY plan): PolyBLEP, DSPUtils, EnvelopeCurves, ADSREnvelope,
+# PortamentoGlide, LFO, AudioThreadSnapshot and the generic VoiceAllocator
+# (converged from LutDSP). Namespace: abd::synth.
+add_library(ABDShared_SynthCore STATIC
+    SynthCore/PolyBLEP.cpp
+    SynthCore/ADSREnvelope.cpp
+    SynthCore/PortamentoGlide.cpp
+    SynthCore/LFO.cpp
+)
+
+add_library(ABDShared::SynthCore ALIAS ABDShared_SynthCore)
+
+target_include_directories(ABDShared_SynthCore PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_features(ABDShared_SynthCore PUBLIC cxx_std_20)
+
+# Standalone unit tests for the module (no JUCE). Disable when consuming
+# ABDSharedCode from a project that does not want the extra test target.
+option(ABDSHAREDCODE_BUILD_SYNTHCORE_TESTS "Build SynthCore standalone tests" ON)
+if(ABDSHAREDCODE_BUILD_SYNTHCORE_TESTS)
+    add_executable(ABDShared_SynthCore_Tests
+        SynthCore/SynthCoreTests.cpp
+    )
+    target_link_libraries(ABDShared_SynthCore_Tests PRIVATE ABDShared_SynthCore)
+    target_compile_features(ABDShared_SynthCore_Tests PRIVATE cxx_std_20)
+endif()
+
 # --- HardwareMidiDetect Module ---
 # Contract-driven MIDI hardware detection.
 # Two consumable layers:

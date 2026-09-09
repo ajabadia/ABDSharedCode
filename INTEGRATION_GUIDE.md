@@ -408,3 +408,159 @@ El WebUI importa `<link rel="stylesheet" href="styles/index.css">` que carga tok
   if (raw) { auto functions = (*raw)["functions"]; /* consume */ }
   ```
 - Convertí `abdaudiolab::core::HardwareContract` → base `abd::hwid::HardwareContract` en los call sites (`SlideInDrawer`, `HardwareManager`), o casteá al detector base.
+---
+
+## Módulo: HardwareDrivers
+
+Controladores de hardware físico, protocolos de comunicación MIDI/SysEx/FSK y contratos de control en dos niveles (*Two-Tier Hardware Architecture*).
+
+### Arquitectura en Dos Niveles
+
+El módulo establece una separación estricta entre los **drivers agnósticos de protocolo** (compartidos) y los **controladores interactivos de la aplicación** (específicos del host):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 NIVEL 1: CORE COMPARTIDO (ABDSharedCode)                    │
+│                                                                             │
+│  IHardwareController (Contrato base: connect, setParameter, sendMidi...)    │
+│  ├── MidiCcController     (Controlador CC estándar y 14-bit NRPN)           │
+│  ├── AiraSysExController  (Driver Roland DT1/RQ1, Checksum y Audio FSK)     │
+│  ├── RoutingValidator     (Matriz topológica de 31 submódulos Roland AIRA)  │
+│  ├── SysExCodec           (Empaquetado/desempaquetado canónico 7-to-8 bit)  │
+│  ├── NRPNParser           (Máquina de estados para recepción/envío 14-bit)  │
+│  └── FskAudioModem        (Continuous-Phase FSK 12/14 kHz + Goertzel)       │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ (Heredan de IHardwareController)
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 NIVEL 2: HOST / APLICACIÓN (ej. ABDAudioLab)                 │
+│                                                                             │
+│  Controladores Específicos del Host:                                        │
+│  ├── ManualAnalogueController (Operador humano, diálogos y metrónomo visual)│
+│  └── MockHardwareController   (Simulador DSP analógico para CI y CTest)     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Integración en CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::HardwareDrivers)
+```
+
+### 1. Contrato Base: `IHardwareController`
+Define la interfaz virtual pura para interactuar con cualquier equipo (físico o simulado):
+```cpp
+#include <HardwareDrivers/HardwareController.h>
+
+class MiControladorCustom : public abd::hw::IHardwareController
+{
+public:
+    bool isAutomatic() const noexcept override { return false; } // false para operador humano
+    bool connect() override { /* ... */ return true; }
+    void disconnect() override { /* ... */ }
+    bool setParameter(int paramIndex, float normalizedValue) override { /* ... */ return true; }
+    // ...
+};
+```
+
+### 2. Controladores de Protocolo Disponibles
+
+- **`abd::hw::MidiCcController`**:
+  Envía cambios de parámetro estándar (CC 0..127) o de alta resolución de 14 bits (NRPN MSB/LSB CC 99/98 + Data Entry CC 6/38).
+- **`abd::hw::AiraSysExController`**:
+  Gestiona la memoria modular de los efectos Roland AIRA (Bitrazer, Demora, Torcido, Scooper) mediante tramas DT1/RQ1 y cálculo automático del checksum Roland.
+- **`abd::hw::RoutingValidator`**:
+  Valida conexiones entre jacks virtuales y submódulos (RF-25, RF-26) impidiendo cortocircuitos o bucles salida-salida antes de tocar el hardware.
+- **`abd::hw::SysExCodec`**:
+  Empaquetador/desempaquetador universal 7-to-8 bit. Transforma 7 bytes de memoria cruda de 8 bits en 8 bytes de 7 bits con byte recolector MSB (estándar en Korg, Yamaha y Roland).
+- **`abd::hw::NRPNParser`**:
+  Máquina de estados reactiva para parsear secuencias entrantes de CC 99, 98, 6 y 38 ensamblando el valor de 14 bits `[0..16383]` en tiempo real.
+- **`abd::hw::FskAudioModem`**:
+  Módem de audio FSK de fase continua (CP-FSK) a 1200 baudios con frecuencias portadoras a 12 kHz (Mark/0) y 14 kHz (Space/1) y discriminación espectral Goertzel para inyección de parches por audio in (*Remote In*).
+
+---
+
+## Módulo: AudioComparator
+
+Motor de alta precisión para comparación acústica A/B, alineamiento temporal y dictamen automático de calidad analógica vs digital.
+
+### Integración en CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::AudioComparator)
+```
+
+### Componentes
+
+- **`abd::audio::AudioABComparator`**:
+  - **Alineamiento Sub-Muestra**: Correlación cruzada FFT para cálculo de retardo intrínseco (`sampleOffset`, `timeOffsetMs`, `correlationPeak`).
+  - **Métricas Temporales**: Comparativa de Peak dBFS, RMS dBFS, MAE y RMSE.
+  - **Métricas Espectrales**: Desviación de magnitud logarítmica (`logMagMeanAbsDiffDb`), centroide espectral y balance de energía en 3 bandas (bajos, medios, agudos).
+- **`abd::audio::AudioABVerdictEngine`**:
+  Evalúa el resultado frente a una matriz de tolerancias configurables (`AudioABVerdictTolerances`) emitiendo un resultado formal: `pass` (dentro de tolerancia), `warn` o `fail`.
+
+### Ejemplo de Uso
+
+```cpp
+#include <AudioComparator/AudioABComparator.h>
+#include <AudioComparator/AudioABVerdictEngine.h>
+
+abd::audio::AudioABSignal refSignal; // Audio grabado del hardware real
+abd::audio::AudioABSignal capSignal; // Audio renderizado por el plugin emulador
+
+abd::audio::AudioABRunContext ctx;
+ctx.runId = "test-verification";
+
+abd::audio::AudioABComparatorConfig config;
+config.enableCrossCorrelation = true;
+
+abd::audio::AudioABComparator comparator;
+auto result = comparator.compare(refSignal, capSignal, ctx, config);
+
+abd::audio::AudioABVerdictEngine verdictEngine;
+abd::audio::AudioABVerdictTolerances tolerances;
+auto verdict = verdictEngine.evaluate(result, tolerances);
+
+if (verdict.level == "pass")
+{
+    // El modelo coincide fielmente con el hardware
+}
+```
+
+---
+
+## Módulo: LutDSP
+
+Evaluación ultra-rápida de Look-Up Tables multidimensionales con aceleración vectorial SIMD y filtrado analógico polifónico.
+
+### Integración en CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::LutDSP)
+```
+
+### Componentes
+
+- **`abd::lutdsp::LutEvaluatorSimd`**:
+  Evaluador SIMD de tablas 1D y 2D (con interpolación bilineal / bicúbica Catmull-Rom) optimizado para llamadas en bloque dentro del callback de audio de tiempo real.
+- **`abd::lutdsp::AnalogLutFilterModule`**:
+  Módulo de filtrado polifónico de 8 voces con suavizado balístico exponencial (`smoothingRate`) para evitar artefactos en saltos bruscos de modulación analógica.
+
+
+---
+
+## Integración Ecosistema: ABDBankManager y Contratos Normativos (Three-Tier Architecture)
+
+El ecosistema ABDSynths adopta una **Arquitectura en Tres Niveles** para unificar el perfilado en laboratorio (`ABDAudioLab`) y la gestión de bancos de patches (`ABDBankManager`):
+
+1. **Nivel 0: Fuente Única de la Verdad (`ABDSharedAssets/contracts`)**:
+   - Cada sintetizador se define mediante un archivo JSON que contiene tanto los metadatos de identidad MIDI (`midiIdentification`) como la sección de gestión de bancos y volcados SysEx (`bankManagement`).
+   - El esquema normativo está validado por `hardware_profile.schema.json`.
+
+2. **Nivel 1: Core de Detección y Transporte (`ABDSharedCode`)**:
+   - `ABDShared::HardwareMidiDetect`: Proporciona detección activa multicanal por *Universal SysEx Identity Inquiry* y monitorización de desconexión/conexión USB en caliente (`HardwareMidiHotplugMonitor`).
+   - `ABDShared::HardwareDrivers`: Aporta codecs universales de transporte (`SysExCodec`, `NRPNParser`, `FskAudioModem`).
+
+3. **Nivel 2: Aplicaciones Consumidoras**:
+   - **ABDAudioLab**: Carga dinámica mediante `core::HardwareContractRegistry` para calibración y perfilado acústico.
+   - **ABDBankManager**: Sincronización e hidratación declarativa de `ModelContract`s mediante `npm run sync-contracts` (`scripts/sync_contracts.mjs`).

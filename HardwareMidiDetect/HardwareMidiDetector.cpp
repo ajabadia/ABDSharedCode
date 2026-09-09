@@ -413,8 +413,8 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
         {
             if (c.id == dev.hardwareId)
             {
-                dev.modelImage = c.midiIdentity.modelIdHex.empty() ? "" : ("models/" + dev.hardwareId + ".png");
-                dev.brandLogo = c.midiIdentity.manufacturer.empty() ? "" : ("brands/" + dev.manufacturer + "-logo.svg");
+                dev.modelImage = c.modelImage.empty() ? ("models/" + dev.hardwareId + ".png") : c.modelImage;
+                dev.brandLogo = c.brandLogo.empty() ? ("brands/" + c.brand + "-logo.svg") : c.brandLogo;
                 break;
             }
         }

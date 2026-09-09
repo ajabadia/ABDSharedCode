@@ -170,7 +170,7 @@ picker = std::make_unique<JuceHardwareMidiPicker>(
 );
 
 // Tema visual
-picker->setTheme("audiolab");  // "ms2000" | "cz101" | "deepmind" | "juno" | "audiolab"
+picker->setTheme("audiolab-light");  // "ms2000" | "cz101" | "deepmind" | "juno" | "audiolab" | "audiolab-light"
 
 addAndMakeVisible(picker.get());
 picker->setBounds(getLocalBounds());
@@ -196,18 +196,26 @@ struct HardwarePickResult {
 ### Theme System
 
 ```cpp
-picker->setTheme("ms2000");   // "cz101" | "deepmind" | "juno" | "audiolab"
+picker->setTheme("audiolab-light");   // "ms2000" | "cz101" | "deepmind" | "juno" | "audiolab" | "audiolab-light"
 ```
 
-El WebUI usa `styles/index.css` del sistema universal `ABDSharedAssets/styles/` (tokens + 5 temas + componentes). Scrollbars coherentes automáticamente.
+El WebUI usa `styles/index.css` del sistema universal `ABDSharedAssets/styles/` (tokens + 6 temas + componentes, incluyendo el tema claro de precisión `audiolab-light`). La URL de carga pasa automáticamente `?theme=...` y el proveedor de recursos `HardwareMidiPickerResourceProvider` despoja query strings y fragmentos para garantizar la entrega íntegra de recursos embebidos y assets compartidos.
+
+### Sincronización de Configuración (`DetectionConfig` -> WebUI)
+Al iniciar o cambiar la configuración en C++, `JuceHardwareMidiPicker` invoca `pushConfigToWebUI()`, transmitiendo `maxResults` y `autoSelectIfSingle` a `window.__setConfig`:
+- **`maxResults == 1`**: La lista de dispositivos detectados renderiza botones de radio (selección única). Si `autoSelectIfSingle == true` y se detecta 1 único dispositivo, se ejecuta el callback inmediatamente.
+- **`maxResults > 1`**: La lista renderiza casillas de verificación (*checkboxes*) y un contador de selección `X/N selected`.
 
 ---
 
 ## 6. Contrato host ↔ WebUI (canal `nativeEvent`)
 
-| Evento | Dirección | Carga |
-|---|---|---|
-| `hardware.detect` | WebUI → Host | `{}` |
+| Evento / Función | Dirección | Carga | Descripción |
+|---|---|---|---|
+| `pageLoaded` | WebUI → Host | `{}` | Disparado en `DOMContentLoaded` para sincronizar tema y config sin condiciones de carrera. |
+| `window.__setConfig` | Host → WebUI | `{ maxResults, autoSelectIfSingle }` | Actualiza la presentación de selección (radio vs checkbox). |
+| `window.__setDetectedDevices` | Host → WebUI | `[DiscoveredDevice, ...]` | Entrega la lista de dispositivos descubiertos. |
+| `hardware.detect` | WebUI → Host | `{}` | Solicita re-escaneo de puertos. |
 | `hardware.refreshPorts` | WebUI → Host | `{}` |
 | `hardware.result` | WebUI → Host | `{cancelled, hardwareId, displayName, manufacturer, model, firmwareVersion}` (single) o `{cancelled, hardwareIds[], displayNames[], manufacturer, model, firmwareVersion}` (multi) |
 | `__setDetectedDevices` | Host → WebUI | `devices[] + config` |

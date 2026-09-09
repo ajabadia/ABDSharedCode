@@ -4,16 +4,46 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Detect Hardware</title>
+  <script>
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme") || "audiolab-light";
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
   <link rel="stylesheet" href="styles/index.css">
   <style>
+    /* ─── Theme-aware scrollbars (using --color-* tokens that themes override) ─── */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--color-bg-base);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--color-panel-surface);
+      border: 1px solid var(--color-panel-border);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--color-accent);
+    }
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-panel-border) var(--color-bg-base);
+    }
+
     .hmd-root {
       padding: var(--space-6);
       height: 100vh;
+      max-height: 100vh;
       display: flex;
       flex-direction: column;
       background: var(--color-bg-base);
       color: var(--color-text-main);
       font-family: var(--font-sans);
+      overflow: hidden; /* Prevent main window scroll */
     }
     .hmd-title {
       font-size: var(--text-xl);
@@ -130,6 +160,30 @@
       gap: var(--space-3);
       margin-top: var(--space-5);
     }
+    .btn-primary {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: var(--color-accent-hover);
+      border-color: var(--color-accent-hover);
+      color: #ffffff;
+    }
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--color-panel-border);
+      color: var(--color-text-main);
+    }
+    .btn-ghost:hover {
+      background: var(--color-panel-surface-elevated);
+      border-color: var(--color-panel-border-strong);
+    }
     .hmd-counter {
       font-size: var(--text-sm);
       color: var(--color-text-muted);
@@ -137,7 +191,7 @@
     }
   </style>
 </head>
-<body data-theme="audiolab">
+<body>
   <div class="hmd-root">
     <h2 class="hmd-title">Hardware Detection</h2>
     <p class="hmd-subtitle">Scans MIDI ports for known synthesizer hardware and matches against shared contracts.</p>
@@ -151,10 +205,10 @@
 
     <div class="hmd-panel">
       <div class="hmd-status-row">
-        <span id="dot" class="led-indicator" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-dim);"></span>
-        <span id="listenLabel" style="font-size: var(--text-sm); color: var(--color-text-muted);">Ready</span>
+        <span id="dot" class="led-indicator" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); animation: blink 1s infinite;"></span>
+        <span id="listenLabel" style="font-size: var(--text-sm); color: var(--color-text-muted);">Scanning ports...</span>
       </div>
-      <div id="status" class="hmd-status">Click Detect to probe connected hardware.</div>
+      <div id="status" class="hmd-status">Detecting connected hardware...</div>
     </div>
 
     <div id="devicePanel" class="hmd-panel" style="display:none">
@@ -226,15 +280,18 @@
         const imgSrc = d.modelImage || 'models/placeholder-synth.svg';
         const badgeClass = d.isSysExVerified ? 'verified' : 'heuristic';
         const badgeText = d.isSysExVerified ? 'Verified' : 'Name match';
+        
+        // Meta line: solo port + deviceId (displayName ya tiene manufacturer/model)
         const portInfo = d.outPortName ? ` · ${d.outPortName}` : '';
         const deviceIdInfo = d.deviceId ? ` · DevID 0x${d.deviceId.toString(16).toUpperCase().padStart(2, '0')}` : '';
+        const meta = `${portInfo}${deviceIdInfo}`.trim();
 
         el.innerHTML = `
           <input type="${maxResults === 1 ? 'radio' : 'checkbox'}" name="device" ${i === 0 && maxResults === 1 ? 'checked' : ''}>
           <img class="hmd-device-image" src="${imgSrc}" alt="${d.displayName}" onerror="this.src='models/placeholder-synth.svg'">
           <div class="hmd-device-info">
             <div class="hmd-device-name">${escapeHtml(d.displayName)}</div>
-            <div class="hmd-device-meta">${escapeHtml(d.manufacturer)} · ${escapeHtml(d.model)}${portInfo}${deviceIdInfo}</div>
+            ${meta ? `<div class="hmd-device-meta">${escapeHtml(meta)}</div>` : ''}
           </div>
           <span class="hmd-device-badge ${badgeClass}">${badgeText}</span>
         `;
@@ -342,14 +399,28 @@
     document.getElementById('selectBtn').onclick = () => emitResult(false);
     document.getElementById('cancelBtn').onclick = () => emitResult(true);
 
+    document.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme") || "audiolab-light";
+      document.body.setAttribute("data-theme", theme);
+      document.body.dataset.theme = theme;
+      try {
+        if (window.__JUCE__ && window.__JUCE__.backend) {
+          window.__JUCE__.backend.emitEvent("pageLoaded", {});
+        }
+      } catch (e) {}
+    });
+
     // --- Receive config from C++ ---
     window.__setConfig = function(config) {
+      if (!config) return;
       maxResults = config.maxResults || 1;
+      updateCounter();
     };
 
     // Initial state
-    setStatus('Ready. Click Detect to probe your hardware.', '');
-    setListening(false);
+    setStatus('Detecting connected hardware...', '');
+    setListening(true);
     showDevicePanel(false);
   </script>
 </body>

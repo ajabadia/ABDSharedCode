@@ -74,6 +74,7 @@ void AutoUpdater::handleAsyncUpdate()
 
 void AutoUpdater::performCheck()
 {
+    bool wasManual = manualCheckPending;
     UpdateInfo info;
     if (fetchLatestRelease(info))
     {
@@ -84,12 +85,22 @@ void AutoUpdater::performCheck()
         if (isNewerVersion(info.version, config.currentVersion))
         {
             updateAvailable = true;
-            notifyUpdateAvailable(info, manualCheckPending);
+            notifyUpdateAvailable(info, wasManual);
         }
         else
         {
             updateAvailable = false;
+            if (wasManual)
+            {
+                notifyUpdateAvailable(info, true);
+            }
         }
+    }
+    else if (wasManual)
+    {
+        info.version = config.currentVersion;
+        updateAvailable = false;
+        notifyUpdateAvailable(info, true);
     }
     manualCheckPending = false;
 }
