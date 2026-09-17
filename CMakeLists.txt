@@ -6,20 +6,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # --- AutoUpdater Module ---
-add_library(ABDShared_AutoUpdater STATIC
-    AutoUpdater/AutoUpdater.cpp
-)
+# JUCE-dependent (juce_core / juce_events), so it cannot exist in the Emscripten
+# WASM builds: consumers with no JUCE in scope set this OFF (ABDMS2000/wasm
+# does). Sin este option la libreria se construia siempre y el paso WASM de
+# build.bat fallaba con "juce_core/juce_core.h file not found".
+option(ABDSHAREDCODE_BUILD_AUTOUPDATER "Build AutoUpdater module" ON)
+if(ABDSHAREDCODE_BUILD_AUTOUPDATER)
+    add_library(ABDShared_AutoUpdater STATIC
+        AutoUpdater/AutoUpdater.cpp
+    )
 
-add_library(ABDShared::AutoUpdater ALIAS ABDShared_AutoUpdater)
+    add_library(ABDShared::AutoUpdater ALIAS ABDShared_AutoUpdater)
 
-target_include_directories(ABDShared_AutoUpdater PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-)
+    target_include_directories(ABDShared_AutoUpdater PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
 
-target_link_libraries(ABDShared_AutoUpdater PUBLIC
-    juce_core
-    juce_events
-)
+    target_link_libraries(ABDShared_AutoUpdater PUBLIC
+        juce_core
+        juce_events
+    )
+endif()
 
 # --- SynthCore Module ---
 # Shared, JUCE-free DSP primitives extracted from the synths (Phase 2 of the
@@ -50,6 +57,56 @@ if(ABDSHAREDCODE_BUILD_SYNTHCORE_TESTS)
     )
     target_link_libraries(ABDShared_SynthCore_Tests PRIVATE ABDShared_SynthCore)
     target_compile_features(ABDShared_SynthCore_Tests PRIVATE cxx_std_20)
+endif()
+
+# --- LutDSP Module ---
+# Header-only LUT evaluation and analogue modelling (namespace abd::lutdsp):
+# LutEvaluatorSimd (SSE intrinsics), AnalogLutFilterModule, VoiceDispersionModel,
+# VoiceAllocator and JunoBBD. No compiled sources: consumers only need the
+# include path (the SIMD headers compile per-TU, so there is nothing to link).
+# WASM note: LutEvaluatorSimd.h compiles under Emscripten with the recipe
+# -msimd128 -D__SSE__ -D__SSE2__ -include immintrin.h (see ABDCZ101/wasm),
+# which maps the SSE intrinsics onto WASM SIMD128.
+add_library(ABDShared_LutDSP INTERFACE)
+
+add_library(ABDShared::LutDSP ALIAS ABDShared_LutDSP)
+
+target_include_directories(ABDShared_LutDSP INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# --- HardwareDrivers Module ---
+# Protocol-level hardware drivers shared by the synths (namespace abd::hw): the
+# SysEx and NRPN codecs consumed by every synth's MIDI layer.
+#
+# The Casio CZ / Juno tape / FSK controllers that live in the same folder are
+# deliberately NOT part of this target: ABDAudioLab compiles them directly from
+# source and they require nlohmann/json, which would otherwise become a hard
+# dependency for every consumer of the target.
+#
+# NOTE: it pulls juce_audio_basics, so the Emscripten WASM builds compile
+# SysExCodec.cpp directly instead of linking this target.
+option(ABDSHAREDCODE_BUILD_HARDWAREDRIVERS "Build HardwareDrivers module" ON)
+if(ABDSHAREDCODE_BUILD_HARDWAREDRIVERS)
+    add_library(ABDShared_HardwareDrivers STATIC
+        HardwareDrivers/SysExCodec.cpp
+        HardwareDrivers/NRPNParser.cpp
+    )
+
+    add_library(ABDShared::HardwareDrivers ALIAS ABDShared_HardwareDrivers)
+
+    # Exposing the module root lets consumers write `#include <HardwareDrivers/...>`
+    # (used by ABDJUNiO601) as well as relative includes.
+    target_include_directories(ABDShared_HardwareDrivers PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    target_compile_features(ABDShared_HardwareDrivers PUBLIC cxx_std_20)
+
+    target_link_libraries(ABDShared_HardwareDrivers PUBLIC
+        juce_core
+        juce_audio_basics
+    )
 endif()
 
 # --- HardwareMidiDetect Module ---
@@ -120,5 +177,24 @@ if(COMMAND juce_add_binary_data)
         )
         target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE HardwareMidiPickerAssets)
         add_library(ABDShared::HardwareMidiPickerAssets ALIAS HardwareMidiPickerAssets)
+    endif()
+
+    # StudioTopology WebUI Binary Assets
+    file(GLOB TOPOLOGY_WEB_ASSETS
+        "${CMAKE_CURRENT_SOURCE_DIR}/StudioTopology/resources/index.html"
+        "${CMAKE_CURRENT_SOURCE_DIR}/StudioTopology/resources/*.js"
+        "${CMAKE_CURRENT_SOURCE_DIR}/StudioTopology/resources/*.css"
+    )
+    if(TOPOLOGY_WEB_ASSETS)
+        juce_add_binary_data(StudioTopologyAssets
+            HEADER_NAME "StudioTopologyAssets.h"
+            NAMESPACE "StudioTopologyAssets"
+            SOURCES ${TOPOLOGY_WEB_ASSETS}
+        )
+
+        target_include_directories(StudioTopologyAssets INTERFACE
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/juce_binarydata_StudioTopologyAssets/JuceLibraryCode>"
+        )
+        add_library(ABDShared::StudioTopologyAssets ALIAS StudioTopologyAssets)
     endif()
 endif()
