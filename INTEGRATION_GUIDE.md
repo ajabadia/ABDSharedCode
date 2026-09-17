@@ -7,30 +7,40 @@
 ## Filosofía
 
 - **Zero-copy:** Los proyectos nunca copian el código de ABDSharedCode
-- **CMake nativo:** Se integra via `add_subdirectory` o `FetchContent`
-- **Modular:** Cada módulo es una librería estática independiente
+- **CMake nativo (módulos C++):** Se integra via `add_subdirectory` o `FetchContent`
+- **pnpm workspace (módulos WebUI/JS):** Los módulos JS (MidiKeyboard) se consumen como
+  dependencia de workspace pnpm, NO via CMake — ver la sección del módulo más abajo
+- **Modular:** Cada módulo es una librería estática independiente (o paquete JS autónomo)
 - **Configurable:** Cada proyecto define su propia configuración
 
 ---
 
 ## Estructura
 
+> Árbol abreviado — los directorios reales incluyen también `Certification`,
+> `StudioTopology`, `SynthCore`, `WebView2Bridge`, `visualizers` y `docs`.
+
 ```
 ABDSharedCode/
-├── CMakeLists.txt              ← Orquestador
+├── CMakeLists.txt              ← Orquestador (solo módulos C++)
 ├── INTEGRATION_GUIDE.md        ← Este archivo
 ├── AutoUpdater/
 │   ├── AutoUpdaterConfig.h     ← Config por proyecto
 │   ├── AutoUpdater.h           ← Interfaz pública
 │   └── AutoUpdater.cpp         ← Implementación
-└── HardwareMidiDetect/
-    ├── HardwareContract.h          ← Contrato de identidad base
-    ├── HardwareContractRegistry.*  ← Parser JSON de contratos (ABDSharedAssets)
-    ├── HardwareMidiDetector.*      ← Detector C++ contract-driven (sin GUI)
-    ├── MidiHardwareBackend.h       ← Interfaz de transporte inyectado por el host
-    ├── JuceHardwareMidiPicker.h    ← Componente WebView2 (pick UX) estilo ABDScope
-    ├── HardwareMidiPickerResourceProvider.* ← Sirve el WebUI embebido + assets
-    └── WebUI/index.html            ← WebUI de detección (queries por contrato)
+├── HardwareMidiDetect/
+│   ├── HardwareContract.h          ← Contrato de identidad base
+│   ├── HardwareContractRegistry.*  ← Parser JSON de contratos (ABDSharedAssets)
+│   ├── HardwareMidiDetector.*      ← Detector C++ contract-driven (sin GUI)
+│   ├── MidiHardwareBackend.h       ← Interfaz de transporte inyectado por el host
+│   ├── JuceHardwareMidiPicker.h    ← Componente WebView2 (pick UX) estilo ABDScope
+│   ├── HardwareMidiPickerResourceProvider.* ← Sirve el WebUI embebido + assets
+│   └── WebUI/index.html            ← WebUI de detección (queries por contrato)
+└── MidiKeyboard/               ← Módulo WebUI/JS (pnpm, NO CMake)
+    ├── package.json                ← @abdsynths/midi-keyb (workspace pnpm)
+    ├── src/keyboard.js             ← createKeyboard: teclado + ruedas + pedals
+    ├── src/keyboard.css            ← Temas/tokens (importa @abdsynths/shared)
+    └── tests/                      ← vitest + jsdom (323 tests)
 ```
 
 ---
@@ -180,6 +190,92 @@ autoUpdater->setUpdateCallback(
 2. Agregar `add_library()` en `CMakeLists.txt` raíz
 3. Crear alias `ABDShared::NombreModulo`
 4. Documentar en esta guía
+
+---
+
+## Módulo: MidiKeyboard (WebUI/JS)
+
+> **OJO: este módulo NO es CMake.** Es un paquete JS (`@abdsynths/midi-keyb`) que se consume
+> desde las WebUI de los proyectos vía pnpm workspace, igual que `@abdsynths/shared`
+> (ABDSharedAssets). No tiene target C++ ni aparece en `CMakeLists.txt`.
+
+Teclado virtual completo (keybed responsivo, ruedas pitch/mod con filmstrip, pedals,
+QWERTY, touch, chord memory, scale filter) + **API de feedback host-driven** (v0.2.0) para
+reflejar MIDI externo (hardware/DAW/bridge nativo) en la UI **sin eco**: los moves aplicados
+por el host no se re-disparan como input de usuario.
+
+### Requisito: workspace pnpm
+
+El proyecto consumidor debe ser workspace pnpm (o estar en uno) que incluya el paquete y sus
+internos como miembros — el paquete declara `"@abdsynths/shared": "workspace:*"`, así que
+`ABDSharedAssets` debe ser miembro del MISMO workspace:
+
+```yaml
+# pnpm-workspace.yaml del proyecto consumidor (ej. ABDNeural/WebPilot)
+packages:
+  - '.'
+  - '../../ABDSharedAssets'
+  - '../../ABDSharedCode/MidiKeyboard'
+```
+
+```json
+// package.json del proyecto consumidor
+"dependencies": {
+  "@abdsynths/midi-keyb": "workspace:*",
+  "@abdsynths/shared": "workspace:*"
+}
+```
+
+### Consumo (React/Next — ver ABDNeural/WebPilot/app/page.jsx; en vanilla, ver ABDMS2000)
+
+```js
+import { createKeyboard } from '@abdsynths/midi-keyb';
+import '@abdsynths/midi-keyb/keyboard.css';
+
+// Contenedores por id (keybed + ruedas); callbacks para el camino de salida.
+const keyboard = createKeyboard({
+  containerId: 'piano-keyboard',
+  wheelPitchId: 'pitch-wheel-container',
+  wheelModId: 'mod-wheel-container',
+  onNoteOn: (note, velocity) => { /* -> motor */ },
+  onNoteOff: (note) => { /* -> motor */ },
+  onPitchBend: (value) => { /* -1..+1 -> motor */ },
+  onModWheel: (value) => { /* 0..1 (CC1) -> motor */ },
+  onPanic: () => { /* -> motor allNotesOff */ },
+});
+
+// ... y en el desmontaje: keyboard.destroy();
+```
+
+### API de feedback host-driven (v0.2.0, SIN eco)
+
+```js
+// Reflejar el MIDI que llega al PLUGIN (hardware, DAW, bridge nativo):
+keyboard.setPitchBend(-0.5);            // mueve la rueda SIN re-disparar onPitchBend
+keyboard.setModWheel(0.75);             // igual para la rueda de mod (CC1)
+keyboard.notesOffVisual([60, 64]);      // apaga resaltes SIN disparar onNoteOff
+keyboard.highlightNote(60, 0.9);        // resalta una tecla (input del host)
+```
+
+> Detalle fino: el slider del pitch wheel es con signo (`-8192..+8191`, centro 0).
+> `setPitchBend` hace la conversión; si mueves el slider a mano, no asumas 0..16383.
+
+### Patrón de integración con bridge nativo (WebView2)
+
+El consumidor tipo (NEURONiK WebPilot) cablea así:
+
+- **Salida (UI → motor):** los callbacks de `createKeyboard` emiten mensajes del protocolo
+  del bridge (`midiNoteOn/Off/pitchBend/modWheel/panic`); el plugin valida rangos e inyecta
+  por su FIFO MIDI lock-free (el MISMO camino del editor JUCE).
+- **Entrada (motor → UI):** el host publica periódicamente el estado externo del plugin
+  (notas mantenidas + posiciones de rueda) y la página lo aplica con la API de feedback
+  silenciosa de arriba — hardware y DAW se ven en la página sin bucles de eco.
+
+### Pruebas
+
+```bash
+cd ABDSharedCode/MidiKeyboard && pnpm install && pnpm test   # 323 tests, vitest + jsdom
+```
 
 ---
 
