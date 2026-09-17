@@ -106,10 +106,18 @@ export function createKeyboard(deps = {}) {
   let softPedalOn = false;
   const _chords = new Array(cfg.maxChordSlots).fill(null);
 
+  // True while setPitchBend()/setModWheel() apply host-driven wheel moves.
+  // Prevents the UI update from echoing back through onChange as if the user
+  // had dragged the wheel (v0.2: native->page feedback support).
+  let suppressWheelCallbacks = false;
+
   const container = document.getElementById(containerId);
   if (!container) {
     console.warn(`[Keyboard] Container #${containerId} not found`);
-    return { destroy() {}, panic() {}, sweep() {}, getOctave: () => 0 };
+    return {
+      destroy() {}, panic() {}, sweep() {}, getOctave: () => 0,
+      setPitchBend() {}, setModWheel() {}, notesOffVisual() {},
+    };
   }
 
   let _keysWrapper = null;
@@ -117,6 +125,38 @@ export function createKeyboard(deps = {}) {
   // ══════════════════════════════════════════════════════════════
   //  KEYBED RENDERING
   // ══════════════════════════════════════════════════════════════
+
+  // Responsive octave count calculation based on available width
+  function calculateResponsiveLayout(width) {
+    const minKeyW = 20;
+    const maxKeyW = 36;
+    const targetW = 26;
+    const candidates = [
+      { octaves: 4, startNote: 36 }, // 49 keys, 29 white
+      { octaves: 3, startNote: 48 }, // 37 keys, 22 white
+      { octaves: 2, startNote: 48 }, // 25 keys, 15 white
+      { octaves: 5, startNote: 24 }, // 61 keys, 36 white
+    ];
+    let best = candidates[0];
+    let bestDiff = 9999;
+    for (const c of candidates) {
+      const whiteCount = c.octaves * 7 + 1;
+      const keyW = width / whiteCount;
+      if (keyW >= minKeyW && keyW <= maxKeyW) {
+        const diff = Math.abs(keyW - targetW);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = c;
+        }
+      }
+    }
+    if (width > 1250) return { octaves: 5, startNote: 24 };
+    if (bestDiff < 9999) return best;
+    if (width < 450) return { octaves: 2, startNote: 48 };
+    if (width < 680) return { octaves: 3, startNote: 48 };
+    return { octaves: 4, startNote: 36 };
+  }
+
 
   function renderKeybed() {
     container.classList.add('kbd-piano-keys');
@@ -127,6 +167,12 @@ export function createKeyboard(deps = {}) {
         _keysWrapper.className = 'kbd-keys-wrapper';
         container.prepend(_keysWrapper);
       }
+    }
+    const availW = _keysWrapper.clientWidth || container.clientWidth;
+    if (availW > 120 && !cfg.fixedOctaves) {
+      const resp = calculateResponsiveLayout(availW);
+      cfg.numOctaves = resp.octaves;
+      cfg.startNote = resp.startNote;
     }
     _keysWrapper.innerHTML = '';
     for (let oct = 0; oct < cfg.numOctaves; oct++) {
@@ -484,12 +530,51 @@ export function createKeyboard(deps = {}) {
     const wheel = createWheel(elementId, {
       type: isPitch ? 'pitch' : 'mod',
       onChange: (val) => {
+        if (suppressWheelCallbacks) return; // host-driven move, not user input
         if (isPitch) onPitchBend(val / 8192.0);
         else onModWheel(val / 127.0);
       },
     });
     if (wheel) wheels.push(wheel);
     return wheel;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  HOST-DRIVEN FEEDBACK (v0.2)
+  //  Let the owning page reflect external MIDI state (hardware controller,
+  //  DAW playback, a native-side bridge) on the keyboard UI.
+  // ══════════════════════════════════════════════════════════════
+
+  let pitchWheel = null;
+  let modWheel = null;
+
+  /** Reflect an external pitch bend (-1..+1) on the pitch wheel without
+   *  echoing the move back through onPitchBend. Wheel slider range is
+   *  signed (-8192..+8191) with 0 = center. */
+  function setPitchBend(normalized) {
+    if (!pitchWheel) return;
+    const v = Math.max(-1, Math.min(1, Number(normalized) || 0));
+    suppressWheelCallbacks = true;
+    pitchWheel.setValue(Math.round(v > 0 ? v * 8191 : v * 8192), false);
+    suppressWheelCallbacks = false;
+  }
+
+  /** Reflect an external mod wheel value (0..1) on the mod wheel without
+   *  echoing the move back through onModWheel. */
+  function setModWheel(normalized) {
+    if (!modWheel) return;
+    const v = Math.max(0, Math.min(1, Number(normalized) || 0));
+    suppressWheelCallbacks = true;
+    modWheel.setValue(Math.round(v * 127.0), false);
+    suppressWheelCallbacks = false;
+  }
+
+  /** Clear key highlights for notes the host says are no longer sounding
+   *  (does NOT fire onNoteOff — the sound side already happened). Unknown
+   *  notes are ignored, so it is safe to call with any note list. */
+  function notesOffVisual(midiNotes) {
+    if (!Array.isArray(midiNotes)) return;
+    for (const n of midiNotes) _releaseKey(Number(n));
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -824,8 +909,8 @@ export function createKeyboard(deps = {}) {
 
   function init() {
     renderKeybed();
-    setupWheel(wheelPitchId, true);
-    setupWheel(wheelModId, false);
+    pitchWheel = setupWheel(wheelPitchId, true);
+    modWheel = setupWheel(wheelModId, false);
 
     const octUp = document.getElementById(octUpId);
     const octDown = document.getElementById(octDownId);
@@ -935,11 +1020,19 @@ export function createKeyboard(deps = {}) {
         if (destroyed || _collapsed) return;
         for (const entry of entries) {
           const { width, height } = entry.contentRect;
-          if (Math.abs(width - _lastWidth) < 3 && Math.abs(height - _lastHeight) < 3) continue;
+          if (Math.abs(width - _lastWidth) < 6 && Math.abs(height - _lastHeight) < 6) continue;
           _lastWidth = width; _lastHeight = height;
-          renderKeybed();
-          if (cfg.enableAccessibility) setupAccessibility();
-          applyScaleVisuals();
+          const availW = (_keysWrapper && _keysWrapper.clientWidth) || width;
+          if (availW > 120 && !cfg.fixedOctaves) {
+            const resp = calculateResponsiveLayout(availW);
+            if (resp.octaves !== cfg.numOctaves || resp.startNote !== cfg.startNote) {
+              cfg.numOctaves = resp.octaves;
+              cfg.startNote = resp.startNote;
+              renderKeybed();
+              if (cfg.enableAccessibility) setupAccessibility();
+              applyScaleVisuals();
+            }
+          }
         }
       });
       _resizeObserver.observe(container);
@@ -960,6 +1053,10 @@ export function createKeyboard(deps = {}) {
     },
     releaseNote: (midiNote) => { _releaseKey(midiNote); onNoteOff(midiNote); },
     highlightNote: (midiNote, velocity) => { _highlightKey(midiNote, velocity); },
+    // Host-driven feedback API (v0.2)
+    setPitchBend,
+    setModWheel,
+    notesOffVisual,
     setSustain,
     getSustain: () => sustainOn,
     toggleSustain,

@@ -4,6 +4,23 @@ All notable changes to ABDKeyboard will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.0] - 2026-09-17
+
+### Added
+- Host-driven feedback API — let the embedding page reflect external MIDI state
+  (hardware controller, DAW playback, a native bridge) on the keyboard UI:
+  - `setPitchBend(-1..+1)` — moves the pitch wheel visually WITHOUT echoing the
+    move back through `onPitchBend` (suppress-gate around `Wheel.setValue(n, false)`)
+  - `setModWheel(0..1)` — same for the mod wheel / `onModWheel`
+  - `notesOffVisual([notes])` — clears key highlights for notes the host reports
+    as released; never fires `onNoteOff` (the sound side already happened)
+  - No-container stub now carries the new no-op methods too
+- Wheel handles captured at init (`pitchWheel`/`modWheel`) for the feedback API
+
+### Consumers
+- NEURONiK WebPilot (ABDNeural) — first consumer of the feedback API over the
+  WebView2 bridge (`midiNoteState` messages from the plugin)
+
 ## [0.1.5] - 2025-08-26
 
 ### Added

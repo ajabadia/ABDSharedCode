@@ -1,7 +1,7 @@
 {
   "name": "@abdsynths/midi-keyb",
-  "version": "0.1.0",
-  "description": "MIDI-responsive virtual keyboard with pitch/mod wheels, octave LEDs, QWERTY, touch, and LED animations — shared across all ABDSynths projects",
+  "version": "0.2.0",
+  "description": "MIDI-responsive virtual keyboard with pitch/mod wheels, octave LEDs, QWERTY, touch, LED animations, and host-driven feedback (wheels + note visuals) — shared across all ABDSynths projects",
   "type": "module",
   "main": "src/keyboard.js",
   "style": "src/keyboard.css",

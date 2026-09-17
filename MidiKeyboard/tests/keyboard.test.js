@@ -2724,3 +2724,72 @@ describe('Chord Memory', () => {
     expect(chords1[0]).toEqual(chords2[0]); // Same contents
   });
 });
+
+describe('host-driven feedback API (v0.2)', () => {
+  let kbd;
+  let pitchLog;
+  let modLog;
+  let noteOffLog;
+
+  beforeEach(() => {
+    createFixture();
+    pitchLog = [];
+    modLog = [];
+    noteOffLog = [];
+    kbd = createKeyboard({
+      containerId: 'piano-keyboard',
+      wheelPitchId: 'pitch-wheel-container',
+      wheelModId: 'mod-wheel-container',
+      onPitchBend: (v) => pitchLog.push(v),
+      onModWheel: (v) => modLog.push(v),
+      onNoteOff: (n) => noteOffLog.push(n),
+      config: { numOctaves: 2, startNote: 60, enableQwerty: false, enableTouch: false },
+    });
+  });
+
+  afterEach(() => {
+    if (kbd) kbd.destroy();
+    destroyFixture();
+  });
+
+  it('setPitchBend moves the pitch wheel without echoing onPitchBend', () => {
+    kbd.setPitchBend(0.5);
+    const slider = document.querySelector('#pitch-wheel-container .kbd-wheel-slider');
+    expect(slider.value).toBe(String(Math.round(0.5 * 8191))); // signed range, 0 = center
+    expect(pitchLog).toHaveLength(0); // host-driven, not user input
+  });
+
+  it('setPitchBend clamps to -1..+1', () => {
+    kbd.setPitchBend(7);
+    expect(document.querySelector('#pitch-wheel-container .kbd-wheel-slider').value).toBe('8191');
+    kbd.setPitchBend(-9);
+    expect(document.querySelector('#pitch-wheel-container .kbd-wheel-slider').value).toBe('-8192');
+  });
+
+  it('setModWheel moves the mod wheel without echoing onModWheel', () => {
+    kbd.setModWheel(0.25);
+    const slider = document.querySelector('#mod-wheel-container .kbd-wheel-slider');
+    expect(slider.value).toBe(String(Math.round(0.25 * 127)));
+    expect(modLog).toHaveLength(0);
+    kbd.setModWheel(2);
+    expect(document.querySelector('#mod-wheel-container .kbd-wheel-slider').value).toBe('127');
+  });
+
+  it('notesOffVisual clears key highlight without firing onNoteOff', () => {
+    kbd.highlightNote(60, 0.9);
+    const key = document.querySelector('#piano-keyboard [data-note="60"]');
+    expect(key.classList.contains('active')).toBe(true);
+    kbd.notesOffVisual([60, 999]); // unknown note ignored
+    expect(key.classList.contains('active')).toBe(false);
+    expect(noteOffLog).toHaveLength(0); // sound side already happened
+  });
+
+  it('no-container stub carries the feedback no-ops', () => {
+    const stub = createKeyboard({ containerId: 'does-not-exist' });
+    expect(() => {
+      stub.setPitchBend(0.5);
+      stub.setModWheel(0.5);
+      stub.notesOffVisual([60]);
+    }).not.toThrow();
+  });
+});
