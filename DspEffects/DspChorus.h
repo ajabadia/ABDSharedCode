@@ -87,8 +87,10 @@ public:
         const int chan = channel % 2;
         const int bufferSize = delayBuffer.getNumSamples();
 
-        // Modulacion: LFO entre 5ms y 30ms
-        const float mod = (std::sin (phase) + 1.0f) * 0.5f;   // 0 a 1
+        // Modulacion: LFO entre 5ms y 30ms. Sin determinista propio (no la
+        // libm de la plataforma): ver DspCore/DspMath.h. Es lo que sostiene la
+        // paridad bit a bit nativo <-> WASM del escenario C.
+        const float mod = (dsp::sin (phase) + 1.0f) * 0.5f;   // 0 a 1
         const float delaySamples = (0.005f + mod * 0.025f * depth) * static_cast<float> (sampleRate_);
 
         delayBuffer.setSample (chan, writePos, input);

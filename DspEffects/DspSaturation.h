@@ -60,7 +60,7 @@ public:
     /** Un sample saturado con la ganancia de drive dada. */
     static float processSample (float input, float drive) noexcept
     {
-        return std::atan (input * drive) * atanNormalisation;
+        return dsp::atan (input * drive) * atanNormalisation;
     }
 
     /** Aplica la saturacion a todo el buffer con una ganancia constante.

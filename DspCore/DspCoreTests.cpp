@@ -30,6 +30,8 @@
          puntero/elemento) y el ctor de AudioBuffer sobre memoria externa, que es
          su consumidor con array, sigue operando sobre los canales del que llama
          incluso despues de moverse.
+      8. DspMath: sin/cos/atan deterministas (sin libm) y su precision frente a la
+         libm de la plataforma. Ver DspCore/DspMath.h.
 
     Uso: ABDShared_DspCore_Tests  (no toma argumentos; 0 = OK)
 
@@ -365,6 +367,35 @@ void testRandom()
     check (inRange, "Random::nextFloat fuera de [0, 1)");
 }
 
+//==============================================================================
+/** DspMath: determinista (sin libm del sistema) y con precision suficiente.
+    La libm de la plataforma se usa AQUI solo como referencia de precision; la
+    propiedad que importa (resultado identico en MSVC y en emscripten) se
+    verifica compilando el mismo barrido en los dos toolchains. */
+void testDspMath()
+{
+    // Valores conocidos.
+    check (abd::dsp::sin (0.0f) == 0.0f, "dsp::sin(0) != 0");
+    check (abd::dsp::atan (0.0f) == 0.0f, "dsp::atan(0) != 0");
+    check (abd::dsp::cos (0.0f) == 1.0f, "dsp::cos(0) != 1");
+    check (std::abs (abd::dsp::sin (1.5707963f) - 1.0f) < 1.0e-5f, "dsp::sin(pi/2) != 1");
+    check (std::abs (abd::dsp::atan (1.0f) - 0.7853981634f) < 1.0e-4f, "dsp::atan(1) != pi/4");
+
+    // Precision frente a la libm de la plataforma en los rangos de audio.
+    float maxSinErr = 0.0f, maxAtanErr = 0.0f;
+    for (int i = 0; i <= 200000; ++i)
+    {
+        const float x = (float) i * 0.000031415926f;          // 0 .. ~2pi
+        maxSinErr = std::max (maxSinErr, std::abs (abd::dsp::sin (x) - std::sin (x)));
+
+        const float y = ((float) i - 100000.0f) * 0.0001f;    // -10 .. 10
+        maxAtanErr = std::max (maxAtanErr, std::abs (abd::dsp::atan (y) - std::atan (y)));
+    }
+
+    check (maxSinErr < 1.0e-5f, "dsp::sin: error vs libm por encima de 1e-5");
+    check (maxAtanErr < 1.0e-5f, "dsp::atan: error vs libm por encima de 1e-5");
+}
+
 } // namespace
 
 //==============================================================================
@@ -377,6 +408,7 @@ int main()
     testMidiMessage();
     testMidiBuffer();
     testRandom();
+    testDspMath();
 
     if (gFailures == 0)
     {
