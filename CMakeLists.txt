@@ -59,6 +59,70 @@ if(ABDSHAREDCODE_BUILD_SYNTHCORE_TESTS)
     target_compile_features(ABDShared_SynthCore_Tests PRIVATE cxx_std_20)
 endif()
 
+# --- DspCore Module ---
+# JUCE-free substrate of the synths' engines (namespace abd::dsp), moved here
+# from ABDNeural/Source/DSP (Fase 1 [5/6] of its de-JUCE plan) so the other
+# synths stop porting the same juce_core / juce_audio_basics pieces separately:
+#   DspCore.h                 maths/Range/SmoothedValue/HeapBlock/AudioBuffer/
+#                             FloatVectorOperations/ScopedNoDenormals/Random
+#   DspMidiMessage.h          literal port of juce::MidiMessage
+#   DspMidiBuffer.h           literal port of juce::MidiBuffer
+#   DspDebug.h                dspDbg (port of DBG)
+#   DspLeakedObjectDetector.h dspLeakDetector / dspDeclareNonCopyableWithLeakDetector
+# Header-only (everything is inline/template), so consumers only need the
+# include path; there is nothing to link. C++17 on purpose: the consumer that
+# motivated the move (ABDNeural) builds at 17, not 20.
+#
+# The bit-exact comparisons against the JUCE originals (juce::MidiMessage,
+# juce::AudioBuffer, juce::Reverb) cannot live here: this module is JUCE-free by
+# contract. They stay in the consumer (ABDNeural/Tests).
+add_library(ABDShared_DspCore INTERFACE)
+
+add_library(ABDShared::DspCore ALIAS ABDShared_DspCore)
+
+target_include_directories(ABDShared_DspCore INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_features(ABDShared_DspCore INTERFACE cxx_std_17)
+
+# Standalone unit tests for the module (no JUCE), same switch convention as
+# SynthCore. Guard the invariants that break silently: HeapBlock element
+# semantics, MIDI packing, buffer growth and seed determinism.
+option(ABDSHAREDCODE_BUILD_DSPCORE_TESTS "Build DspCore standalone tests" ON)
+if(ABDSHAREDCODE_BUILD_DSPCORE_TESTS)
+    add_executable(ABDShared_DspCore_Tests
+        DspCore/DspCoreTests.cpp
+    )
+    target_link_libraries(ABDShared_DspCore_Tests PRIVATE ABDShared_DspCore)
+    target_compile_features(ABDShared_DspCore_Tests PRIVATE cxx_std_17)
+endif()
+
+# --- DspEffects Module ---
+# Effects built on the DspCore substrate (namespace abd::dsp). JUCE-free: the
+# ones that existed in JUCE are literal ports, and they keep the algorithm and
+# tunings of the original.
+#   DspReverb.h     - Freeverb, literal port of juce::Reverb
+#   DspChorus.h     - modulated delay-line chorus engine (per-sample API)
+#   DspDelay.h      - feedback delay engine (per-sample API)
+#   DspSaturation.h - atan soft clipping (stateless shape)
+# The engines take their parameters per sample on purpose: parameter smoothing
+# and the mapping from the product's controls stay in the consumer, so the move
+# does not change a single sample of the product (ABDNeural keeps its wrappers
+# in Source/DSP/Effects/ and proves it with Tests/DspEffectsParityTest.cpp).
+# Header-only: consumers only need the include path.
+add_library(ABDShared_DspEffects INTERFACE)
+
+add_library(ABDShared::DspEffects ALIAS ABDShared_DspEffects)
+
+target_include_directories(ABDShared_DspEffects INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_features(ABDShared_DspEffects INTERFACE cxx_std_17)
+
+target_link_libraries(ABDShared_DspEffects INTERFACE ABDShared::DspCore)
+
 # --- LutDSP Module ---
 # Header-only LUT evaluation and analogue modelling (namespace abd::lutdsp):
 # LutEvaluatorSimd (SSE intrinsics), AnalogLutFilterModule, VoiceDispersionModel,

@@ -289,3 +289,14 @@ isInScale(61, 60, SCALE_INTERVALS.major);  // false (C# not in C major)
 - `src/keyboard.js` — Core logic, key rendering, event handlers, all pedals, aftertouch, scale filter, chord memory, CZ-101 preset
 - `src/keyboard.css` — Visual styling, theme tokens, all button styles, scale filter dimming, chord memory, sostenuto/soft pedal
 - `tests/keyboard.test.js` — Unit tests (182 tests)
+
+## Architecture Fixes (v1.1.0)
+
+### Keybed Horizontal Flex Row (.kbd-keys-wrapper)
+- Fixed root issue where keys collapsed into an ultra-narrow vertical strip (zipper artifact) when .kbd-keys-wrapper was missing explicit display: flex; flex-direction: row; flex: 1.
+- Added contract into src/keyboard.css and ABDSharedAssets/styles/components/keyboard.css.
+
+### Unified Dynamic Theming (AudioLab Dark & Light)
+- Added query param support ?theme=audiolab / ?theme=audiolab-light on load.
+- Added window.setTheme() hook responsive to data-theme changes from JuceWebView2Component.
+- Cleaned up right-side controls layout: autoPanic and autoSustain end-cap buttons align cleanly at the right edge of #piano-keyboard.

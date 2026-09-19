@@ -696,3 +696,22 @@ npm test  # 318 tests, vitest + jsdom
 ## License
 
 Proprietary — UNLICENSED (internal ABDSynths use only).
+
+### Important Layout & Container Contract
+When hosting #piano-keyboard, its internal .kbd-keys-wrapper element requires flex layout to stretch keys horizontally across the keybed:
+`css
+.kbd-keys-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 100%;
+  min-width: 0;
+  position: relative;
+}
+`
+This is defined directly in src/keyboard.css and @abdsynths/shared/styles/components/keyboard.css.
+
+### Theming System
+The component natively adapts to dark and light modes via the data-theme attribute (e.g. udiolab, udiolab-light, ms2000, cz101, juno, deepmind).
+Pass initial theme query ?theme=audiolab or invoke window.setTheme('audiolab' | 'audiolab-light') dynamically from the host (via JuceWebView2Component::setTheme).

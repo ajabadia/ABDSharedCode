@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABD Virtual MIDI Keyboard</title>
+
+  <script>
+    window.setTheme = function(themeName) {
+      if (!themeName) return;
+      document.documentElement.setAttribute('data-theme', themeName);
+      if (document.body) {
+        document.body.setAttribute('data-theme', themeName);
+        document.body.dataset.theme = themeName;
+        const classes = Array.from(document.body.classList).filter(c => !c.startsWith('theme-') && !c.startsWith('skin-'));
+        classes.push('theme-' + themeName, 'skin-' + themeName);
+        document.body.className = classes.join(' ');
+      }
+    };
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme") || "audiolab";
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+
+  <!-- Official Unified Styles from ABDSharedAssets -->
+  <link rel="stylesheet" href="/styles/index.css">
+  <link rel="stylesheet" href="/styles/components/kbd-buttons.css">
+  <link rel="stylesheet" href="/styles/components/wheels.css">
+  <link rel="stylesheet" href="/src/keyboard.css">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--color-bg-base, #070a0e);
+      color: var(--color-text-main, #e8fff0);
+      font-family: var(--font-primary, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .keyboard-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 10px;
+      background: var(--color-bg-base, #070a0e);
+      box-sizing: border-box;
+    }
+
+    .keyboard-lower-section {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+      position: relative;
+      min-height: 0;
+    }
+
+    .wheels-block {
+      display: flex;
+      gap: 6px;
+      background: var(--color-panel-surface, #121a24);
+      border: 1px solid var(--color-panel-border, rgba(0, 230, 118, 0.25));
+      border-radius: 5px;
+      padding: 4px 6px;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+    }
+
+    #piano-keyboard {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      min-width: 0;
+      height: 100%;
+      position: relative;
+      contain: layout style;
+    }
+  </style>
+
+  <!-- Import map for bare module specifier in keyboard.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@abdsynths/shared/components/wheel.js": "/components/wheel.js",
+      "@abdsynths/shared/": "/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <div class="keyboard-container">
+    <div class="keyboard-lower-section">
+      <!-- Pitch Bend & Mod Wheels -->
+      <div class="wheels-block">
+        <div id="pitch-wheel-container"></div>
+        <div id="mod-wheel-container"></div>
+      </div>
+
+      <!-- Vertical Octave Controls -->
+      <div class="kbd-octave-controls">
+        <button id="oct-up" class="kbd-octave-btn" title="Octave Up (Up Arrow)">
+          <span>OCT +</span>
+          <div class="kbd-octave-led" id="led-up"></div>
+        </button>
+        <button id="oct-down" class="kbd-octave-btn" title="Octave Down (Down Arrow)">
+          <span>OCT -</span>
+          <div class="kbd-octave-led" id="led-down"></div>
+        </button>
+      </div>
+
+      <!-- Performance Keybed -->
+      <div id="piano-keyboard"></div>
+
+      <!-- Right Cheek: Utility Controls (Sustain & Panic) -->
+      <div class="kbd-utility-controls">
+        <button id="sustain-btn" class="kbd-octave-btn kbd-utility-btn" title="Sustain Pedal Hold (Ctrl+Space)">
+          <span>SUST</span>
+          <div class="kbd-octave-led kbd-sustain-led" id="led-sustain"></div>
+        </button>
+        <button id="panic-btn" class="kbd-octave-btn kbd-utility-btn" title="All Notes Off / Panic (Ctrl+Q)">
+          <span>PANIC</span>
+          <div class="kbd-octave-led kbd-panic-led" id="led-panic"></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme") || (document.documentElement.getAttribute("data-theme") || "audiolab");
+      window.setTheme(theme);
+      try {
+        if (window.__JUCE__ && window.__JUCE__.backend && typeof window.__JUCE__.backend.emitEvent === 'function') {
+          window.__JUCE__.backend.emitEvent("pageLoaded", {});
+        }
+      } catch (e) {}
+    });
+
+    const themeObserver = new MutationObserver(() => {
+      const curTheme = document.documentElement.getAttribute("data-theme") || "audiolab";
+      if (document.body && document.body.getAttribute("data-theme") !== curTheme) {
+        window.setTheme(curTheme);
+      }
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  </script>
+
+  <script type="module">
+    import { createKeyboard } from '/src/keyboard.js';
+
+    function emitEvent(name, payload) {
+      if (window.__JUCE__ && window.__JUCE__.backend && typeof window.__JUCE__.backend.emitEvent === 'function') {
+        window.__JUCE__.backend.emitEvent(name, payload);
+      }
+    }
+
+    const keyboard = createKeyboard({
+      containerId: 'piano-keyboard',
+      wheelPitchId: 'pitch-wheel-container',
+      wheelModId: 'mod-wheel-container',
+      octUpId: 'oct-up',
+      octDownId: 'oct-down',
+      ledUpId: 'led-up',
+      ledDownId: 'led-down',
+      panicBtnId: 'panic-btn',
+      sustainBtnId: 'sustain-btn',
+      onNoteOn: (note, velocity) => {
+        emitEvent('noteOn', { note, velocity: typeof velocity === 'number' ? velocity : 0.85 });
+      },
+      onNoteOff: (note) => {
+        emitEvent('noteOff', { note });
+      },
+      onPitchBend: (normVal) => {
+        // normVal in [-1.0 .. 1.0] -> 14-bit MIDI [0 .. 16383], center 8192
+        const midiVal = Math.round((normVal + 1.0) * 8191.5);
+        emitEvent('pitchBend', { value: Math.max(0, Math.min(16383, midiVal)) });
+      },
+      onModWheel: (normVal) => {
+        // normVal in [0.0 .. 1.0] -> 7-bit CC [0 .. 127]
+        const midiVal = Math.round(normVal * 127.0);
+        emitEvent('modWheel', { value: Math.max(0, Math.min(127, midiVal)) });
+      },
+      onPanic: () => {
+        emitEvent('allNotesOff', {});
+      },
+      onSustainChange: (active) => {
+        emitEvent('sustain', { active });
+      },
+      config: {
+        numOctaves: 4,
+        startNote: 36, // C2 (4 octaves: C2 to C6)
+        enableIvoryTexture: true,
+        enableQwerty: true,
+        enableTouch: true,
+        enablePressureDisplay: true,
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,374 @@
+/**
+ * ABD Studio Topology Overlay Styles
+ * ==================================
+ * Theme-aware layout, cables and draggable nodes using ABDSharedAssets design tokens.
+ */
+
+:root {
+    --cable-audio-out: #f59e0b; /* Ámbar (Audio Probe/Stim) */
+    --cable-audio-in:  #00e676; /* Verde Esmeralda (Audio Return) */
+    --cable-midi-out:  #a855f7; /* Púrpura (MIDI Out) */
+    --cable-midi-in:   #06b6d4; /* Cian (MIDI In) */
+}
+
+[data-theme="audiolab"], [data-theme="dark"] {
+    --color-bg-base: #121417;
+    --color-panel-bg: #1a1d20;
+    --color-panel-surface-elevated: #24282d;
+    --color-panel-border: rgba(255, 255, 255, 0.12);
+    --color-panel-border-dim: rgba(255, 255, 255, 0.06);
+    --color-panel-border-strong: rgba(255, 255, 255, 0.22);
+    --color-text-main: #f1f3f5;
+    --color-text-muted: #94a3b8;
+    --color-text-dim: #64748b;
+    --color-accent: #00e676;
+    --color-accent-dim: rgba(0, 230, 118, 0.2);
+    --cable-audio-out: #f59e0b;
+    --cable-audio-in:  #00e676;
+    --cable-midi-out:  #c084fc;
+    --cable-midi-in:   #22d3ee;
+}
+
+[data-theme="audiolab-light"], [data-theme="light"] {
+    --color-bg-base: #f8f9fa;
+    --color-panel-bg: #ffffff;
+    --color-panel-surface-elevated: #f1f3f5;
+    --color-panel-border: #cbd5e1;
+    --color-panel-border-dim: #e2e8f0;
+    --color-panel-border-strong: #94a3b8;
+    --color-text-main: #1a1d20;
+    --color-text-muted: #6c757d;
+    --color-text-dim: #94a3b8;
+    --color-accent: #00a86b;
+    --color-accent-dim: rgba(0, 168, 107, 0.15);
+    --cable-audio-out: #f59e0b;
+    --cable-audio-in:  #00a86b;
+    --cable-midi-out:  #a855f7;
+    --cable-midi-in:   #06b6d4;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #121417;
+    background-color: var(--color-bg-base, #121417);
+    color: var(--color-text-main, #f1f3f5);
+    font-family: var(--font-family-base, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+[data-theme="audiolab-light"], [data-theme="light"] {
+    background-color: #f8f9fa;
+}
+
+#canvas-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: inherit;
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(var(--color-accent-rgb, 0, 230, 118), 0.05) 0%, transparent 70%),
+        radial-gradient(var(--color-panel-border-dim, rgba(255, 255, 255, 0.05)) 1px, transparent 1px);
+    background-size: 100% 100%, 24px 24px;
+}
+
+/* Barra de Cabecera */
+.header-bar {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 50;
+    pointer-events: none;
+}
+
+.header-title-area {
+    pointer-events: auto;
+}
+
+.header-title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-subtitle {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 3px;
+}
+
+.header-legend {
+    display: flex;
+    gap: 16px;
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-panel-border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    box-shadow: var(--shadow-sm, 0 4px 14px rgba(0, 0, 0, 0.2));
+    pointer-events: auto;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+.legend-dot.audio-out { background: var(--cable-audio-out); box-shadow: 0 0 6px var(--cable-audio-out); }
+.legend-dot.audio-in  { background: var(--cable-audio-in);  box-shadow: 0 0 6px var(--cable-audio-in); }
+.legend-dot.midi-out  { background: var(--cable-midi-out);  box-shadow: 0 0 6px var(--cable-midi-out); }
+.legend-dot.midi-in   { background: var(--cable-midi-in);   box-shadow: 0 0 6px var(--cable-midi-in); }
+
+/* SVG Cables Overlay */
+#cables-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.patch-cable {
+    fill: none;
+    stroke-width: 4px;
+    stroke-linecap: round;
+    pointer-events: none;
+    filter: drop-shadow(0px 5px 6px rgba(0, 0, 0, 0.5));
+    transition: stroke 0.2s ease, opacity 0.2s ease;
+}
+
+.patch-cable.pulse-anim {
+    stroke-dasharray: 8 6;
+    animation: cablePulse 1.2s linear infinite;
+}
+
+@keyframes cablePulse {
+    from { stroke-dashoffset: 28; }
+    to { stroke-dashoffset: 0; }
+}
+
+.cable-plug {
+    fill: var(--color-panel-surface-elevated, #1e293b);
+    stroke-width: 2.5px;
+}
+
+/* Nodos Dispositivos */
+.nodes-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.device-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-panel-border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.35));
+    cursor: grab;
+    pointer-events: auto;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    will-change: transform, left, top;
+}
+
+.device-node:hover {
+    box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.5));
+    border-color: var(--color-panel-border-strong);
+}
+
+.device-node.dragging {
+    cursor: grabbing;
+    box-shadow: var(--shadow-xl, 0 16px 40px rgba(0, 0, 0, 0.65));
+    border-color: var(--color-accent);
+    z-index: 40;
+}
+
+/* Nodo Target (Central y Grande) */
+.device-node.target-hero {
+    width: 230px;
+    background: var(--color-panel-surface-elevated);
+    border: 2px solid var(--color-accent);
+    box-shadow: 0 12px 36px var(--color-accent-dim), 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 30;
+}
+
+.device-node.target-hero .node-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--color-accent);
+}
+
+.device-node.target-hero .node-image-container {
+    width: 170px;
+    height: 120px;
+}
+
+/* Nodos Interface */
+.device-node.interface-node {
+    width: 180px;
+}
+
+.device-node.interface-node .node-image-container {
+    width: 140px;
+    height: 80px;
+}
+
+/* Dispositivos Desconectados / En Gris */
+.device-node.unassigned {
+    opacity: 0.65;
+    filter: grayscale(100%);
+    transition: opacity 0.25s ease, filter 0.25s ease, border-color 0.25s ease;
+}
+
+[data-theme="audiolab"] .device-node.unassigned,
+[data-theme="dark"] .device-node.unassigned {
+    background: #181c22;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.device-node.unassigned:hover {
+    opacity: 0.95;
+    filter: grayscale(20%);
+    border-color: var(--color-panel-border-strong);
+}
+
+.node-badge {
+    align-self: flex-end;
+    font-size: 8.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+}
+
+.node-badge.connected {
+    background: var(--color-accent-dim);
+    color: var(--color-accent);
+    border: 1px solid var(--color-panel-border);
+}
+
+.node-badge.unassigned-badge {
+    background: rgba(100, 116, 139, 0.2);
+    color: var(--color-text-dim);
+}
+
+.node-badge.target-badge {
+    background: rgba(245, 158, 11, 0.18);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.node-image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="audiolab-light"] .node-image-container,
+[data-theme="light"] .node-image-container {
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.node-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    pointer-events: none;
+}
+
+.node-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--color-text-main);
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-subtitle {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin-top: 2px;
+}
+
+.node-jacks {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--color-panel-border-dim);
+    width: 100%;
+}
+
+.jack-point {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid var(--color-panel-border);
+    background: var(--color-bg-base);
+    position: relative;
+    cursor: default;
+}
+
+.jack-point.audio-out { border-color: var(--cable-audio-out); }
+.jack-point.audio-in  { border-color: var(--cable-audio-in); }
+.jack-point.midi-out  { border-color: var(--cable-midi-out); }
+.jack-point.midi-in   { border-color: var(--cable-midi-in); }
+
+.jack-point.active {
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+}

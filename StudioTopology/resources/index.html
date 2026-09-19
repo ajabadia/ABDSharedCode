@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="audiolab-light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Topology - Interconexión de Estudio</title>
+    <script>
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const theme = params.get("theme") || "audiolab-light";
+            document.documentElement.setAttribute("data-theme", theme);
+            if (document.body) document.body.setAttribute("data-theme", theme);
+        })();
+
+        window.setTheme = function(themeName) {
+            document.documentElement.setAttribute("data-theme", themeName);
+            if (document.body) {
+                document.body.setAttribute("data-theme", themeName);
+                document.body.dataset.theme = themeName;
+            }
+            requestAnimationFrame(() => {
+                if (typeof updateCables === "function") {
+                    updateCables();
+                }
+            });
+        };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                if (window.__JUCE__ && window.__JUCE__.backend && window.__JUCE__.backend.emitEvent) {
+                    window.__JUCE__.backend.emitEvent("pageLoaded", {});
+                }
+            } catch (e) {}
+        });
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="canvas-container">
+        <!-- Barra de Cabecera -->
+        <div class="header-bar">
+            <div class="header-title-area">
+                <div class="header-title">
+                    <svg class="header-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22v-5"/>
+                        <path d="M9 8V2"/>
+                        <path d="M15 2v6"/>
+                        <path d="M18 8v5a6 6 0 0 1-12 0V8z"/>
+                    </svg>
+                    <span>Entorno de Estudio &amp; Conexiones</span>
+                </div>
+                <div class="header-subtitle">
+                    Arrastra cualquier equipo libremente. Los cables se adaptan a tiempo real.
+                </div>
+            </div>
+            <div class="header-legend">
+                <div class="legend-item">
+                    <div class="legend-dot audio-out"></div>
+                    <span>Audio Out (Probe)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot audio-in"></div>
+                    <span>Audio In (Return)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot midi-out"></div>
+                    <span>MIDI Out</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot midi-in"></div>
+                    <span>MIDI In</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Capa SVG de Cables Físicos -->
+        <svg id="cables-svg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <filter id="cable-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000000" flood-opacity="0.5"/>
+                </filter>
+            </defs>
+            <g id="cables-group"></g>
+            <g id="plugs-group"></g>
+        </svg>
+
+        <!-- Capa de Nodos HTML Arrastrables -->
+        <div class="nodes-layer" id="nodes-layer">
+            <div id="topology-loading" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:var(--color-text-muted); font-size:14px;">
+                Cargando topología del estudio...
+            </div>
+        </div>
+    </div>
+
+    <script src="topology.js"></script>
+</body>
+</html>

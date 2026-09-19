@@ -63,9 +63,21 @@ public:
     {
         if (currentTheme.empty()) return;
         const juce::String theme(currentTheme);
-        const juce::String js = "document.documentElement.setAttribute('data-theme', '" + theme + "');"
-                                "if (document.body) { document.body.setAttribute('data-theme', '" + theme + "');"
-                                "document.body.dataset.theme = '" + theme + "'; }";
+        const juce::String js =
+            "(() => {"
+            "  const t = '" + theme + "';"
+            "  document.documentElement.setAttribute('data-theme', t);"
+            "  if (document.body) {"
+            "    document.body.setAttribute('data-theme', t);"
+            "    document.body.dataset.theme = t;"
+            "    const classes = Array.from(document.body.classList).filter(c => !c.startsWith('theme-') && !c.startsWith('skin-'));"
+            "    classes.push('theme-' + t, 'skin-' + t);"
+            "    document.body.className = classes.join(' ');"
+            "  }"
+            "  if (typeof window.setTheme === 'function') {"
+            "    window.setTheme(t);"
+            "  }"
+            "})();";
         juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
     }
 

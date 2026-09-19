@@ -1,0 +1,5 @@
+{
+  "//": "Scope ESM de los helpers de testing del puente WebView2. Lo consumen los runners de cada host (vitest en ABDMS2000/ABDCZ101) y scripts `node` pelados (ABDJUNiO601). Sin este `type`, Node avisa (MODULE_TYPELESS_PACKAGE_JSON) porque tiene que reparsear el .js al detectar sintaxis ESM.",
+  "private": true,
+  "type": "module"
+}
