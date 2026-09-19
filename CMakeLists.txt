@@ -173,6 +173,43 @@ if(ABDSHAREDCODE_BUILD_HARDWAREDRIVERS)
     )
 endif()
 
+# --- WebView2Bridge Module ---
+# Shared WebView2 scaffolding for every module that embeds a WebUI in a JUCE
+# component: the resource provider pipeline (normalize -> embedded binary catalog
+# -> optional ABDSharedAssets filesystem fallback) plus the JuceWebView2Component
+# base (webview2 backend, native integration, theme + pageLoaded hook).
+#
+# INTERFACE, like the other shared modules: the sources propagate and are
+# compiled into the consumer alongside its own JUCE, so consumers only need to
+# fill a BinaryAssetsCatalog with their generated header and link this target.
+# ABDScope already probes for it (`if(TARGET ABDShared::WebView2Bridge)`); until
+# now nothing defined it, so that probe silently fell back to a bare include dir
+# and nobody compiled WebView2ResourceProvider.cpp.
+#
+# Gated on NOT EMSCRIPTEN (same reason as ABDSHAREDCODE_BUILD_AUTOUPDATER): the
+# bridge is juce_gui_extra, which does not exist in the WASM builds, and a
+# propagated .cpp would break them at compile time.
+if(NOT EMSCRIPTEN)
+    add_library(ABDShared_WebView2Bridge INTERFACE)
+
+    add_library(ABDShared::WebView2Bridge ALIAS ABDShared_WebView2Bridge)
+
+    target_include_directories(ABDShared_WebView2Bridge INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    target_sources(ABDShared_WebView2Bridge INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/WebView2Bridge/JuceWebView2Component.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/WebView2Bridge/WebView2ResourceProvider.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/WebView2Bridge/WebView2ResourceProvider.cpp
+    )
+
+    target_link_libraries(ABDShared_WebView2Bridge INTERFACE
+        juce_core
+        juce_gui_extra
+    )
+endif()
+
 # --- HardwareMidiDetect Module ---
 # Contract-driven MIDI hardware detection.
 # Two consumable layers:
