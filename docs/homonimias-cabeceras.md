@@ -130,6 +130,23 @@ existe y está probado.
 | **P4** | `Voice.h` / `VoiceManager.h`: converger sobre `SynthCore::VoiceAllocator` | La política de robo de MS2000 ya está generalizada ahí (con `StealHint` por slot). CZ101 es el otro asignador. | Medio |
 | **P5** | Fronteras de plugin (`WasmBridge`, `BridgeActions`, `PluginEditor_ResourceProvider`) | Convergen vía `WebView2Bridge` + los contratos de bridge ya compartidos. Es el bloque más grande y el de mayor riesgo; va al final. | Alto |
 
+### Nota de P5 (2026-09-19): NEURONiK empieza a poner su mitad
+
+ABDNeural arranca 8.1 (el editor del plugin hospeda la página web) y lo hace **sin crear
+nombres nuevos**, que es exactamente lo que P5 pide:
+
+- `ABDNeural/Source/WebUI/BridgeAdapters.h` — **no** es homónimo: es el único
+  `BridgeAdapters.h` del workspace (comprobado). Contiene los tres adaptadores que enchufan el
+  procesador real al `ParameterBridge` (`PresetManagerAdapter`, `MidiInjectionAdapter`,
+  `EngineModelsAdapter`) en `namespace NEURONiK::WebUI`, compartidos por el editor y por la
+  bancada del piloto en vez de una copia por superficie. Es la mitad "backend" del bridge; el
+  contrato ya estaba compartido (`BridgeProtocolContractTest`).
+- Su proveedor de recursos (`Source/WebPilotHost.cpp`, ~150 líneas: normalizar URL, MIME,
+  catálogo embebido y fallback) es **la misma función** que
+  `abd::webview2::webView2ResourceProvider`. Decisión tomada: el *plugin* adopta el compartido;
+  la bancada de desarrollo conserva el suyo **solo** por el *disco primero* con hot-reload, que
+  el compartido no hace. Así no nace un tercer `PluginEditor_ResourceProvider`.
+
 Y una regla para el resto del refactor: **si el contenido podría acabar en un módulo
 compartido, nombrarlo ya con la convención de destino** (`Dsp*`, `abd::dsp`), y
 reservar el renombrado para cuando se sepa que el fichero es de producto.
