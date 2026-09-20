@@ -16,6 +16,8 @@ Repositorio: https://github.com/ajabadia/ABDSharedCode.git
 | **HardwareMidiDetect** | Detección contract-driven de hardware MIDI (C++ puro + picker WebView2 estilo ABDScope) | INTERFACE | `ABDShared::HardwareMidiDetect` (+ `ABDShared::HardwareMidiPickerAssets`) | ABDAudioLab |
 | **AutoUpdater** | Auto-actualización via GitHub Releases | STATIC | `ABDShared::AutoUpdater` | ABDMS2000, ABDAudioLab |
 | **MidiKeyboard** | Teclado y ruedas compartidos (`@abdsynths/midi-keyb`) | paquete de workspace pnpm, no CMake | — | ABDMS2000 |
+| **Segmented** | Selector segmentado universal (`abd::ui::Segmented`): radio group de botones planos, valor por índice, vetados con nota (gating por motor) | INTERFACE (header-only), sonda opt-in `ABDShared_SegmentedProbe` | `ABDShared::Segmented` | (gemelo JS: `@abdsynths/shared/components/segmented.js`; consumidor NEURONiK pendiente de adoptarlo en el panel nativo) |
+| **LcdDisplay** | Pantalla de caracteres universal + máquina de menú (`abd::ui`): LcdDisplay + LcdMenuManager, arbol como dato y hooks | INTERFACE (header-only), gate WASM | `ABDShared::LcdDisplay` | (gemelo JS: lcdMachine/lcdScreen/lcdPanel en `@abdsynths/shared`) |
 
 > `StudioTopology/resources` se expone como `ABDShared::StudioTopologyAssets` cuando el asset existe (consumido por ABDAudioLab). Los directorios `Certification`, `WebView2Bridge`, `AudioComparator` y `visualizers` **no están expuestos como target CMake** todavía: son fuentes para consumir por ruta o candidatas a módulo formal.
 
