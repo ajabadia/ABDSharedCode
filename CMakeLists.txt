@@ -210,6 +210,60 @@ if(NOT EMSCRIPTEN)
     )
 endif()
 
+# --- LcdDisplay Module ---
+# Universal character LCD (screen + menu state machine), C++ side. Pure
+# component + data-driven menu tree with std::function hooks: the synth
+# injects its tree and reacts; nothing here touches parameters or processors.
+# INTERFACE (header-only) so consumers compile it alongside their JUCE.
+# Gated on NOT EMSCRIPTEN (juce_gui_basics is absent from the WASM builds).
+if(NOT EMSCRIPTEN)
+    add_library(ABDShared_LcdDisplay INTERFACE)
+
+    add_library(ABDShared::LcdDisplay ALIAS ABDShared_LcdDisplay)
+
+    target_include_directories(ABDShared_LcdDisplay INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    target_sources(ABDShared_LcdDisplay INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/LcdDisplay/LcdDisplay.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/LcdDisplay/LcdMenuManager.h
+    )
+
+    target_link_libraries(ABDShared_LcdDisplay INTERFACE
+        juce_gui_basics
+    )
+endif()
+
+# --- Segmented Module ---
+# Universal inline option switcher (radio group of flat buttons), C++ side.
+# The native sibling of the shared Segmented component (ABDSharedAssets/
+# components/segmented.js). INTERFACE (header-only) so consumers compile it
+# alongside their JUCE. Gated on NOT EMSCRIPTEN (juce_gui_basics is absent
+# from the WASM builds).
+if(NOT EMSCRIPTEN)
+    add_library(ABDShared_Segmented INTERFACE)
+
+    add_library(ABDShared::Segmented ALIAS ABDShared_Segmented)
+
+    target_include_directories(ABDShared_Segmented INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    target_sources(ABDShared_Segmented INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Segmented/Segmented.h
+    )
+
+    target_link_libraries(ABDShared_Segmented INTERFACE
+        juce_gui_basics
+    )
+
+    # Sonda opt-in de compilacion Y ejecucion (main propio, auto-verificable):
+    # NO forma parte del paquete; es la manera de validar el header contra JUCE
+    # real sin montar un plugin entero.
+    add_executable(ABDShared_SegmentedProbe Segmented/SegmentedProbe.cpp)
+    target_link_libraries(ABDShared_SegmentedProbe PRIVATE ABDShared_Segmented)
+endif()
 # --- HardwareMidiDetect Module ---
 # Contract-driven MIDI hardware detection.
 # Two consumable layers:
