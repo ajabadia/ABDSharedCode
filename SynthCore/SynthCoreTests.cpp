@@ -403,6 +403,7 @@ int main() {
     abd::synth::tests::testModMatrixGet();
     abd::synth::tests::testModMatrixEquivalenceWithAbdeep();
     abd::synth::tests::testModDestinationDescriptor();
+    abd::synth::tests::testModMatrixZeroIdIsNotAlwaysInert();
 
     printf("\n=== Results: %d passed, %d failed ===\n",
            abd::synth::tests::testsPassed, abd::synth::tests::testsFailed);

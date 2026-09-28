@@ -107,8 +107,21 @@ struct ModDestinationDescriptor {
  * Tamaño fijo en tiempo de compilación, sin asignaciones: el objeto entero
  * son `N` structs triviales. `N` lo elige el proyecto (8 buses el DeepMind
  * clásico, 4 el MS-2000, 4 hoy ABDNeural y hasta 32 en su futuro).
+ *
+ * @tparam kNumSlots        buses de la matriz.
+ * @tparam kZeroIdInert     si el índice 0 de fuente y destino está RESERVADO
+ *                          (o sea, es el "None"/"Off" y no modula). Es true en
+ *                          ABDEep y en ABDNeural, y **false en ABDMS2000**,
+ *                          cuyo `PatchSource::EG1 == 0` es una fuente de
+ *                          verdad: su tabla no tiene columna inerte y una ruta
+ *                          se apaga con la INTENSIDAD a cero, no eligiendo un
+ *                          índice nulo.
+ *
+ *                          No se puede suponer lo de la derecha: con el valor
+ *                          equivocado, el EG1 del MS-2000 se descartaría
+ *                          silenciosamente y sus patches no modularían.
  */
-template <std::size_t kNumSlots>
+template <std::size_t kNumSlots, bool kZeroIdInert = true>
 class ModMatrixT {
 public:
     static constexpr std::size_t kSlots = kNumSlots;
@@ -120,6 +133,15 @@ public:
     {
         for (auto& route : routes_)
             route = ModRoute{};
+    }
+
+    /**
+     * ¿Este id es el reservado (el "None"/"Off")? Con `kZeroIdInert` el
+     * reservado es el 0; sin él, no hay ninguno y TODOS los ids valen.
+     */
+    static constexpr bool isInert(std::size_t id) noexcept
+    {
+        return kZeroIdInert && id == 0;
     }
 
     /**
@@ -153,10 +175,13 @@ public:
     /** ¿Hay alguna ruta viva (fuente distinta de "None")? */
     bool hasAnyRoute() const noexcept
     {
-        for (const auto& route : routes_)
-            if (route.source != kNoModSource && route.destination != kNoModDestination
-                && route.amount != 0.0f)
+        for (const auto& route : routes_) {
+            if (route.amount == 0.0f)
+                continue;
+            if (!isInert(static_cast<std::size_t>(route.source))
+                && !isInert(static_cast<std::size_t>(route.destination)))
                 return true;
+        }
         return false;
     }
 
@@ -188,17 +213,16 @@ public:
         {
             const auto& route = routes_[slot];
 
-            if (route.source == kNoModSource || route.destination == kNoModDestination)
+            const auto sourceIndex = static_cast<std::size_t>(route.source);
+            const auto destIndex = static_cast<std::size_t>(route.destination);
+
+            if (isInert(sourceIndex) || isInert(destIndex))
                 continue;
             if (route.amount == 0.0f)
                 continue;
-
-            const auto sourceIndex = static_cast<std::size_t>(route.source);
-            if (sourceIndex == 0 || sourceIndex >= sourceCount || sourceValues == nullptr)
+            if (sourceIndex >= sourceCount || sourceValues == nullptr)
                 continue;
-
-            const auto destIndex = static_cast<std::size_t>(route.destination);
-            if (destIndex == 0 || destIndex >= destCount)
+            if (destIndex >= destCount)
                 continue;
 
             destAccum[destIndex] += sourceValues[sourceIndex] * route.amount;
@@ -217,7 +241,7 @@ public:
                             const float* sourceValues,
                             std::size_t   sourceCount) const noexcept
     {
-        if (destination == kNoModDestination || sourceValues == nullptr)
+        if (isInert(static_cast<std::size_t>(destination)) || sourceValues == nullptr)
             return 0.0f;
 
         float total = 0.0f;
@@ -228,11 +252,11 @@ public:
 
             if (route.destination != destination)
                 continue;
-            if (route.source == kNoModSource || route.amount == 0.0f)
+            if (route.amount == 0.0f)
                 continue;
 
             const auto sourceIndex = static_cast<std::size_t>(route.source);
-            if (sourceIndex == 0 || sourceIndex >= sourceCount)
+            if (isInert(sourceIndex) || sourceIndex >= sourceCount)
                 continue;
 
             total += sourceValues[sourceIndex] * route.amount;

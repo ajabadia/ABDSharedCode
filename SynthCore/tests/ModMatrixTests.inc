@@ -342,4 +342,58 @@ static void testModDestinationDescriptor() {
     check(true, "el motor no guarda punteros: es trivialmente copiable");
 }
 
+// ── El índice 0: una diferencia REAL entre los tres synths ────────────────
+
+static void testModMatrixZeroIdIsNotAlwaysInert() {
+    printf("=== ModMatrix: el índice 0 no siempre es inerte ===\n");
+
+    // ABDMS2000: `enum class PatchSource { EG1 = 0, ... }`. El 0 es el EG1, una
+    // fuente de VERDAD, y su tabla no tiene columna inerte: una ruta se apaga
+    // con la intensidad a cero, no eligiendo un índice nulo. Por eso su
+    // matriz se instancia con kZeroIdInert = false.
+    //
+    // Con el valor por defecto (true), el EG1 se descartaría en silencio y sus
+    // patches no modularían. Este test es el que no deja que eso pase.
+    using Ms2000Matrix = ModMatrixT<4, /* kZeroIdInert */ false>;
+
+    constexpr std::size_t kSources = 8;
+    constexpr std::size_t kDests = 8;
+
+    // sources[0] = EG1, sources[1] = EG2, sources[2] = LFO1
+    const float sources[kSources] = { 0.5f, 0.25f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    float accum[kDests] = {};
+
+    Ms2000Matrix m;
+    m.setRoute(0, 0, 0, 1.0f);   // EG1 (fuente 0) -> Pitch (destino 0)
+
+    m.accumulate(sources, kSources, accum, kDests);
+
+    check(accum[0] == sources[0],
+          "con kZeroIdInert=false la fuente 0 y el destino 0 modularan de verdad");
+    check(m.get(0, sources, kSources) == sources[0],
+          "get() tampoco descarta el id 0 cuando no está reservado");
+    check(m.hasAnyRoute(), "una ruta por EG1 cuenta como viva");
+
+    // Y con el valor por defecto (ABDEep / ABDNeural), el 0 SÍ se descarta.
+    using ReservedMatrix = ModMatrixT<4>;
+    ReservedMatrix r;
+    r.setRoute(0, 0, 0, 1.0f);
+    check(r.get(0, sources, kSources) == 0.0f,
+          "con el 0 reservado, una ruta por el id 0 no modula");
+    check(!r.hasAnyRoute(), "con el 0 reservado, esa ruta no cuenta como viva");
+
+    // La ruta se apaga por la CANTIDAD, que es como lo hace el MS-2000.
+    r.setRoute(0, 1, 1, 0.0f);
+    check(!r.hasAnyRoute(), "una ruta con cantidad 0 está apagada aunque tenga ids");
+
+    r.setRoute(0, 1, 1, 0.5f);
+    check(r.hasAnyRoute(), "con cantidad distinta de 0 la ruta está viva");
+
+    // isInert() es la regla, expuesta para que el consumidor la consulte.
+    static_assert(ReservedMatrix::isInert(0), "con el 0 reservado, el 0 es inerte");
+    static_assert(!ReservedMatrix::isInert(1), "el resto de ids no son inertes");
+    static_assert(!Ms2000Matrix::isInert(0), "sin reservado, NADIE es inerte");
+    check(true, "isInert() refleja la reserva declarada por el proyecto");
+}
+
 // (ya dentro de `namespace abd::synth::tests`, que abre el .cpp)
