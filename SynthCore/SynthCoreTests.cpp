@@ -1,6 +1,7 @@
 // SynthCore unit tests — standalone executable, no JUCE dependency.
-// Covers the shared DSP primitives extracted from ABDMS2000 (Phase 2 DRY)
-// and the VoiceAllocator converged from LutDSP.
+// Covers the shared DSP primitives extracted from ABDMS2000 (Phase 2 DRY),
+// the VoiceAllocator converged from LutDSP, and the shared ModMatrix
+// (the modulation-matrix core every synth will sit on top of).
 //
 // Style mirrors ABDMS2000/Source/Tests/DSPCoreTests.cpp (check() + counters).
 
@@ -8,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <type_traits>
+#include <algorithm>
 
 #include "DSPUtils.h"
 #include "PolyBLEP.h"
@@ -19,6 +21,7 @@
 #include "VoiceAllocator.h"
 // Compat-shim coverage: the LutDSP path must keep aliasing the canonical type.
 #include "LutDSP/VoiceAllocator.h"
+#include "ModMatrix.h"
 
 namespace abd::synth::tests {
 
@@ -35,6 +38,11 @@ static void check(bool condition, const char* testName) {
     }
     fflush(stdout);
 }
+
+// La matriz de modulacion tiene su propio .inc: es un bloque autocontenido
+// (incluye una COPIA LITERAL de la implementacion previa de ABDEep para el
+// test de equivalencia, que no debe contaminar los includes de los demas).
+#include "tests/ModMatrixTests.inc"
 
 // ─────────────────────────── DSPUtils ───────────────────────────
 
@@ -390,6 +398,11 @@ int main() {
     abd::synth::tests::testLFO();
     abd::synth::tests::testAudioThreadSnapshot();
     abd::synth::tests::testVoiceAllocator();
+    abd::synth::tests::testModMatrixAccumulation();
+    abd::synth::tests::testModMatrixBounds();
+    abd::synth::tests::testModMatrixGet();
+    abd::synth::tests::testModMatrixEquivalenceWithAbdeep();
+    abd::synth::tests::testModDestinationDescriptor();
 
     printf("\n=== Results: %d passed, %d failed ===\n",
            abd::synth::tests::testsPassed, abd::synth::tests::testsFailed);
