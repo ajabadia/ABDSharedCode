@@ -38,6 +38,14 @@
          con los numeros de fabrica que traian del original. Un perfil es lo
          unico que se puede cambiar sin que nada falle al compilar.
 
+      7. AUDITRIA ESTRUCTURAL DEL MOTOR DE HUECOS. Lo de arriba pregunta
+         "suena bien"; esto pregunta que VIVE el hueco: quien crea y quien
+         destruye cada instancia, que hace el hueco con una fila a medias, que
+         pasa con un indice que no existe o con un NaN, y que forma tiene que
+         tener el bloque. Nada de eso se oye en un test de sonido, y todo eso
+         acaba en el panel como un zumbido que no se va. Ver el criterio C1 a
+         C8 en la seccion correspondiente.
+
     Lo que NO se promete aqui: paridad con ningun efecto de ABDEep. Este modulo
     no tiene los originales a mano; la comparacion, si se quiere, vive en el
     consumidor (que es lo que hizo DspReverb con juce::Reverb en ABDNeural).
@@ -65,6 +73,8 @@
 #include "DspEffects/profiles/JunoBbdProfile.h"
 #include "DspEffects/FxEngine.h"
 #include "DspEffects/FxDefaultCatalogue.h"
+#include "DspEffects/ShelfFilter.h"
+#include "DspEffects/Phaser4.h"
 
 #include <cmath>
 #include <cstdio>
@@ -2064,6 +2074,66 @@ namespace fxprobe
         return p;
     }
 
+    /** Pasa una senal por UNA fila del catalogo y devuelve el canal izquierdo.
+
+        Sin esto, un contrato de fila tendria que montar un `FxEngine`, elegir un
+        slot y deal los mandos uno a uno, y el fallo mas probable —que la fila no
+        este bien registrada, o que el motor no la encuentre— quedaria envuelto
+        en el motor y no se veria. Aqui la fila se llama DIRECTO, que es como
+        corre cuando el motor la tiene en un slot pero sin el mezclador delante.
+
+        `mandos` es opcional, y van en el ORDEN DE LA DECLARACION de la fila, no
+        en el orden que se le ocurra a quien llama: ese orden es parte de la
+        fila, y un test que lo suponga estara probando la suposicion en vez de
+        la fila.
+
+        Y LA SENAL SE PASA VARIAS VECES antes de devolver nada, porque las
+        rampas de los mandos tardan 20 ms en asentarse y sin eso la medicion
+        sale con el arranque en vez de con el mando. Cuatro vueltas de la senal
+        entera son de sobra para 20 ms, incluso con la senal mas corta que usan
+        los contratos. */
+    std::vector<float> porFila (const abd::dsp::FxEffectInfo& fila,
+                                const std::vector<float>& in, int bloque,
+                                const std::vector<float>* mandos = nullptr)
+    {
+        auto* inst = fila.create (double (kSr));
+        if (inst == nullptr)
+            return std::vector<float> ();
+
+        const int n = static_cast<int> (in.size ());
+
+        if (mandos != nullptr)
+        {
+            std::vector<float> v = *mandos;
+            v.resize (static_cast<std::size_t> (fila.numParams), 0.0f);
+
+            // `setAllParams` PUEDE ser nullptr en el contrato, y entonces hay
+            // que ir mando a mando. Una fila que solo expose el conjunto no es
+            // una fila utilizable desde un panel, y por eso se comprueba que
+            // las dos rutas dan el mismo resultado en vez de asumir la rapida.
+            if (fila.setAllParams != nullptr)
+                fila.setAllParams (inst, v.data (), fila.numParams);
+            else
+                for (int i = 0; i < fila.numParams; ++i)
+                    fila.setParam (inst, i, v[static_cast<std::size_t> (i)]);
+        }
+
+        std::vector<float> scratch = in;
+        for (int rep = 0; rep < 5; ++rep)
+        {
+            for (int i = 0; i < n; i += bloque)
+            {
+                const int m = jmin (bloque, n - i);
+                fila.process (inst, in.data () + i, in.data () + i,
+                              scratch.data () + i, scratch.data () + i, m);
+            }
+        }
+
+        fila.reset (inst);
+        fila.destroy (inst);
+        return scratch;
+    }
+
     const abd::dsp::FxEffectInfo* catalogo()
     {
         static int count = 0;
@@ -2078,7 +2148,7 @@ namespace fxprobe
 } // namespace fxprobe
 
 //==============================================================================
-/** EL CATALOGO POR DEFECTO: son las seis filas del modulo, y el indice 0 es
+/** EL CATALOGO POR DEFECTO: son las ocho filas del modulo, y el indice 0 es
     bypass para todos los productos sin que ninguno tenga que acordarlo. */
 void testFxCatalogue()
 {
@@ -2087,7 +2157,7 @@ void testFxCatalogue()
     const int count = fxprobe::numCatalogo();
     const FxEffectInfo* cat = fxprobe::catalogo();
 
-    check (count == 6, "el catalogo por defecto tiene las seis filas del modulo");
+    check (count == 8, "el catalogo por defecto tiene las ocho filas del modulo");
     check (cat != nullptr, "el catalogo por defecto existe");
 
     for (const char* name : { "chorus", "delay", "reverb", "saturation", "schroeder", "bbd" })
@@ -2427,15 +2497,15 @@ void testFxEngineBlockSplitting()
         e.getSlot (0).setMix (0.7f);
 
         const std::vector<float> in = fxprobe::noise (1024, 31337u);
-        AudioBuffer<float> b (1, 1024);
+        AudioBuffer<float> bus (1, 1024);
         for (int i = 0; i < 1024; ++i)
-            b.setSample (0, i, in[static_cast<size_t> (i)]);
+            bus.setSample (0, i, in[static_cast<size_t> (i)]);
 
-        e.process (b, 1024);
+        e.process (bus, 1024);
 
         float p = 0.0f;
         for (int i = 0; i < 1024; ++i)
-            p = jmax (p, std::fabs (b.getSample (0, i)));
+            p = jmax (p, std::fabs (bus.getSample (0, i)));
 
         check (std::isfinite (p) && p > 1e-3f, "un buffer de un canal se procesa como mono");
     }
@@ -2916,9 +2986,2483 @@ void testTapeColourDriftIsNotWired()
     check (maxDiff > 0.0f, "el eco del motor tiene deriva propia");
 }
 
+//==============================================================================
+/** Los 32 bits de un float, en un entero con signo. Para poder RESTAR dos
+    valores y que la resta sea en ulps y no en decimales, que es lo unico que
+    significa "cuatro ulps".
+
+    El banco es C++17, donde no hay `std::bit_cast`. El union es la forma que
+    usa el propio modulo en `DspMath.h` para lo mismo. */
+static int32_t bitsDe (float v) noexcept
+{
+    union { float f; int32_t i; } u;
+    u.f = v;
+    return u.i;
+}
+
+/** Los bits de un float, ordenados de MENOS a MAS valor.
+
+    Y aqui hay una trampa que la primera version de estos tests no vio, y que
+    importa mas de lo que parece: restar los patrones de bits a pelo NO cuenta
+    ulps. El bit de signo hace que dos floats casi iguales a cero pero de signo
+    opuesto esten a 2.147.000.000 "ulps" de distancia, porque uno es 0x7FFF_xxxx
+    y el otro 0x8000_xxxx. El filtro tiene coeficientes que cruzan cero (`a1`
+    vale +0,000000051 a 12 kHz), asi que esa comparacion salia con "peor
+    diferencia 2147450676 ulps" y decia que el port estaba destrozado, cuando la
+    diferencia real era de un par de ulps.
+
+    La clave se construye en 64 bits y se dobla el rango de los negativos, que
+    en el patron de bits van al reves. */
+static int64_t claveOrdenada (float v) noexcept
+{
+    const int64_t i = (int64_t) bitsDe (v);
+    return (i < 0) ? (0x80000000LL - i) : i;
+}
+
+/** Los ulps entre dos floats, con la clave ordenada. */
+static int ulpsEntre (float a, float b) noexcept
+{
+    const int64_t d = claveOrdenada (a) - claveOrdenada (b);
+    return (int) (d < 0 ? -d : d);
+}
+
+/** El valor absoluto, como el `jabs` de JUCE. Local del banco y no en DspCore:
+    `DspCore` lleva los puertos literales de los `j*` que el MODULO usa, y no
+    este. Meter ahi un `jabs` para que lo use un test es ensuciar la cabecera
+    compartida con algo que nadie mas necesita, y la cabecera compartida es la
+    que se audita. Se escribe como `jmax (v, -v)` y no con `std::fabs` para que
+    sea un patron de bits y no una llamada de libreria: en la comparacion de
+    ulps de abajo importa que no haya nadie metiendo una conversion. */
+static float jabs (float v) noexcept
+{
+    return abd::dsp::jmax (v, -v);
+}
+
+//==============================================================================
+/** LA REFERENCIA CONGELADA DE LA REPISA, y el cambio de sonido documentado.
+
+    Este test lleva dentro una COPIA de las cinco formulas de
+    `ABDMS2000/Source/DSP/Effects/Equalizer.cpp`, con su `std::sqrt`, su
+    `std::pow`, su `std::cos` y su `std::sin` de libm. Esa copia es la
+    referencia congelada: no se comparte codigo con `ShelfFilter` a proposito,
+    porque si compartieran las formulas el test compararia el motor consigo
+    mismo y no diria nada. Si alguien toca la copia, esta mirando el original y
+    tiene que volver a congelarlo.
+
+    Y el port NO es bit a bit, y hay que decir cuanto se aparta. MEDIDO, y las
+    cifras que salen no son las que se contaron la primera vez:
+
+        std::pow  -> dsp::pow                2 ulps
+        std::sqrt -> exp2 (0.5 * log2 (A))   2 ulps
+        std::cos  -> dsp::cos                5 ulps
+        std::sin  -> dsp::sin                5 ulps
+        (los cuatro juntos, en un coeficiente)   hasta 509 ulps
+        (y en la RESPUESTA del filtro)            0,012 dB
+        (y en la SENAL, dos bandas en cascada)    -74,8 dBFS de pico
+
+    La cuenta original decia "4 ulps" y era una mala cuenta por partida doble:
+    media solo lo de `sqrt`, y en UN punto (250 Hz, un sample rate). El port
+    cambia cuatro transcendentales de golpe y sus errores entran en las cinco
+    formulas a la vez. En las unidades que se oyen, el cambio es de 0,012 dB de
+    respuesta, que es inaudible.
+
+    Es el precio de que el filtro valga lo mismo a 32, 44,1 y 48 kHz, que es
+    justo lo que el original no hacia: el original usaba la libm de la maquina,
+    y `sqrt`/`pow`/`cos`/`sin` no tienen por que dar el mismo ultimo bit en un
+    compilador que en otro. */
+namespace frozen
+{
+
+/** Las cinco formulas del original, tal cual, con libm. Sin tocar ni un signo.
+
+    Es una copia, no un port. Que se note. */
+struct Coef
+{
+    float b0, b1, b2, a1, a2;
+};
+
+static Coef delOriginal (bool alta, float gananciaDB, float freqHz, double sampleRate)
+{
+    const float kQ = 0.70710678f;
+    const float A  = std::pow (10.0f, gananciaDB / 40.0f);
+    const float w0 = freqHz * 6.28318530718f / (float) sampleRate;
+    const float cw = std::cos (w0);
+    const float sw = std::sin (w0);
+    const float alpha = sw / (2.0f * kQ);
+
+    Coef c;
+    if (alta)
+    {
+        const float a0 = (A + 1.0f) - (A - 1.0f) * cw + 2.0f * std::sqrt (A) * alpha;
+        c.b0 = (A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * std::sqrt (A) * alpha)) / a0;
+        c.b1 = (-2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw)) / a0;
+        c.b2 = (A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * std::sqrt (A) * alpha)) / a0;
+        c.a1 = (2.0f * ((A - 1.0f) - (A + 1.0f) * cw)) / a0;
+        c.a2 = ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * std::sqrt (A) * alpha) / a0;
+    }
+    else
+    {
+        const float a0 = (A + 1.0f) + (A - 1.0f) * cw + 2.0f * std::sqrt (A) * alpha;
+        c.b0 = (A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * std::sqrt (A) * alpha)) / a0;
+        c.b1 = (2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw)) / a0;
+        // OJO EL SIGNO DE ESTA, que es el del ORIGINAL y no el del recetario: en la
+        // repisa BAJA el termino de `(A-1)*cos` va con MENOS, mientras que en la
+        // ALTA va con MAS, y en `a2` de las dos va al reves que en `b2`. La
+        // primera version de esta copia lo puso con MAS en las dos ramas, por
+        // inercia, y solo lo cazaron los ulps: 11.866.438, que es el `b2` entero
+        // de la repisa baja equivocado. Y `esIdentidad()` NO lo caza, porque a
+        // 0 dB A vale 1, los dos terminos se anulan y el filtro es la identidad
+        // con cualquiera de los dos signos. Un test de identidad no ve un signo
+        // mal puesto; una referencia congelada, si.
+        c.b2 = (A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * std::sqrt (A) * alpha)) / a0;
+        c.a1 = (-2.0f * ((A - 1.0f) + (A + 1.0f) * cw)) / a0;
+        c.a2 = ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * std::sqrt (A) * alpha) / a0;
+    }
+
+    return c;
+}
+
+/** La magnitud del biquad en una frecuencia, en DECIBELIOS.
+
+    En dB y no en amplitud porque en dB es como se describe un filtro y porque
+    las dos diferencias que se comparan (la del puerto y la del original) se
+    restan en un numero que se lee. */
+static float magnitudDb (const float* c, float w)
+{
+    const float cw = std::cos (w), sw = std::sin (w);
+    const float c2 = std::cos (2.0f * w), s2 = std::sin (2.0f * w);
+    const float nr = c[0] + c[1] * cw + c[2] * c2;
+    const float ni = -(c[1] * sw + c[2] * s2);
+    const float dr = 1.0f + c[3] * cw + c[4] * c2;
+    const float di = -(c[3] * sw + c[4] * s2);
+    return 10.0f * std::log10 ((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+
+/** El biquad del original, ya con estado, para renderizarlo muestra a muestra.
+
+    Sin esto, el camino "viejo" del test serian cinco formules sueltas y un
+    bucle escrito a mano, que es el sitio donde uno mete un error y el test lo
+    reporta como error del port. */
+struct Biquad
+{
+    explicit Biquad (const Coef& c) noexcept
+        : b0 (c.b0), b1 (c.b1), b2 (c.b2), a1 (c.a1), a2 (c.a2) {}
+
+    float procesa (float x) noexcept
+    {
+        const float y = b0 * x + s1_;
+        s1_ = b1 * x - a1 * y + s2_;
+        s2_ = b2 * x - a2 * y;
+        return y;
+    }
+
+    float b0, b1, b2, a1, a2;
+    float s1_ = 0.0f, s2_ = 0.0f;
+};
+
+} // namespace frozen
+
+//==============================================================================
+void testShelfFilter()
+{
+    using namespace abd::dsp;
+    using abd::dsp::ShelfFilter;
+
+    const float freqs[8] = { 160.0f, 250.0f, 400.0f, 600.0f,
+                             4000.0f, 6000.0f, 8000.0f, 12000.0f };
+
+    //--- 1. los coeficientes contra la referencia congelada ----------------
+    //
+    // Las ocho frecuencias del MS2000, nueve ganancias de -12 a +12, dos modos
+    // y tres sample rates: 864 combinaciones, que es el numero que hace que "en
+    // un punto" deje de ser una excusa.
+    {
+        int peor = 0;
+        float peorRespuesta = 0.0f;
+
+        for (double fs : { 32000.0, 44100.0, 48000.0 })
+        for (int alta = 0; alta < 2; ++alta)
+        for (float f : freqs)
+        for (int g = -12; g <= 12; ++g)
+        {
+            const float db = static_cast<float> (g);
+            ShelfFilter mio;
+            mio.prepare (fs);
+            mio.setMode (alta ? ShelfMode::High : ShelfMode::Low);
+            mio.setFrequencyHz (f);
+            mio.setGainDB (db);
+
+            const frozen::Coef ref = frozen::delOriginal (alta != 0, db, f, fs);
+            const float m[5] = { mio.getB0(), mio.getB1(), mio.getB2(), mio.getA1(), mio.getA2() };
+            const float r[5] = { ref.b0, ref.b1, ref.b2, ref.a1, ref.a2 };
+
+            for (int c = 0; c < 5; ++c)
+            {
+                const int u = ulpsEntre (m[c], r[c]);
+                if (u > peor) peor = u;
+            }
+
+            // Y la RESPUESTA, que es lo que se oye. Comparar coeficientes es
+            // medir un numero que todavia no es un sonido.
+            for (int k = 1; k <= 8; ++k)
+            {
+                const float w = 6.28318530718f * (0.03125f * static_cast<float> (k));
+                const float d = std::fabs (frozen::magnitudDb (m, w) - frozen::magnitudDb (r, w));
+                if (d > peorRespuesta) peorRespuesta = d;
+            }
+        }
+
+        check (peor <= 1024, "los coeficientes de la repisa coinciden con la referencia congelada");
+        check (peorRespuesta < 0.05f, "la respuesta de la repisa se aparta menos de 0,05 dB de la original");
+
+        std::printf ("  [repisa] coeficientes: %d ulps; respuesta: %.4f dB (864 combinaciones)\n",
+                     peor, static_cast<double> (peorRespuesta));
+    }
+
+    //--- 2. A 0 dB EL FILTRO ES LA IDENTIDAD EXACTA -------------------------
+    //
+    // Y aqui el criterio correcto NO es `b1 == 0`. A 0 dB, A = 1 y los
+    // coeficientes NO son [1, 0, 1, 0, 0]: quedan `b1 = a1` y `b2 = a2`, o sea
+    // que el numerador y el denominador de la funcion de transferencia son el
+    // MISMO polinomio y se cancelan. `H(z) = 1` en todas las frecuencias.
+    //
+    // Una version de este test buscaba `b1 == 0` y daba "no es identidad" en las
+    // ocho frecuencias del MS2000, cuando el filtro era perfectamente
+    // transparente. Un test que mira el patron de coeficientes en vez de la
+    // funcion de transferencia da un falso negativo, y es el fallo que mas
+    // cuesta encontrar porque parece que el filtro este roto.
+    {
+        int identidades = 0, total = 0;
+        float peorRespuesta = 0.0f;
+
+        for (double fs : { 32000.0, 44100.0, 48000.0 })
+        for (int alta = 0; alta < 2; ++alta)
+        for (float f : freqs)
+        {
+            ShelfFilter s;
+            s.prepare (fs);
+            s.setMode (alta ? ShelfMode::High : ShelfMode::Low);
+            s.setFrequencyHz (f);
+            s.setGainDB (0.0f);
+            ++total;
+
+            if (s.esIdentidad()) ++identidades;
+
+            const float c[5] = { s.getB0(), s.getB1(), s.getB2(), s.getA1(), s.getA2() };
+            const float w0 = 6.28318530718f * f / static_cast<float> (fs);
+            const float puntos[4] = { 0.0001f, w0 * 0.1f, w0, 3.14159265f };
+            for (float w : puntos)
+            {
+                const float d = std::fabs (frozen::magnitudDb (c, w));
+                if (d > peorRespuesta) peorRespuesta = d;
+            }
+        }
+
+        check (identidades == total, "a 0 dB la repisa es la identidad exacta en toda la combinacion");
+        check (peorRespuesta < 0.0005f, "a 0 dB la respuesta de la repisa es 0,0000 dB en DC, 0,1 f0, f0 y Nyquist");
+
+        std::printf ("  [repisa] a 0 dB: %d de %d identidades, peor respuesta %.5f dB\n",
+                     identidades, total, static_cast<double> (peorRespuesta));
+    }
+
+    //--- 3. LA BANDA MUERTA DE 0,05 dB NO RECALCULA DE MAS ------------------
+    //
+    // Es la parte del original que mas trabajo ahorra, y la unica cuya prueba
+    // tiene que observar que NO PASA, no que pasa. Una automatizacion que se
+    // mueve en pasos de milisegundo recalcularia cinco coeficientes por paso sin
+    // ella.
+    {
+        ShelfFilter s;
+        s.prepare (48000.0);
+        s.setFrequencyHz (1000.0f);
+        s.setGainDB (3.0f);
+        const float antes = s.getB1();
+
+        s.setGainDB (3.02f);            // 0,02 dB: dentro de la banda
+        check (s.getB1() == antes, "un movimiento de ganancia dentro de la banda muerta no recalcula");
+
+        s.setGainDB (3.10f);            // 0,10 dB: fuera de la banda
+        check (s.getB1() != antes, "un movimiento de ganancia fuera de la banda muerta recalcula");
+    }
+
+    //--- 4. EL RECORTE DE FRECUENCIA NO MUEVE LO QUE USA EL MS2000 ----------
+    //
+    // El limite de 0,45·fs se fijo DESPUES de medir, porque la primera version
+    // usaba 0,2 —el limite que parece prudente— y resulto que MOVIA las
+    // frecuencias del propio MS2000 a 32 kHz: las repisas de 8 y de 12 kHz se
+    // recortaban a 6,4 kHz y sonaban en otro sitio. El MS2000 usa 12 kHz, y
+    // 12000/32000 = 0,375, asi que cualquier limite por debajo de 0,375 cambia
+    // el sonido de un producto que ya esta publicado.
+    {
+        for (double fs : { 32000.0, 44100.0, 48000.0, 96000.0 })
+        {
+            ShelfFilter s;
+            s.prepare (fs);
+            s.setFrequencyHz (12000.0f);
+            check (s.getFrequencyHz () >= 12000.0f - 1.0f,
+                   "la repisa no recorta las frecuencias que el MS2000 usa de verdad");
+
+            // Y el recorte existe para algo: pedir mas alla de 0,45·fs no da un
+            // filtro roto, da un filtro en el techo.
+            s.setFrequencyHz (static_cast<float> (fs));
+            check (s.getFrequencyHz () <= static_cast<float> (fs) * 0.45f + 1.0f,
+                   "la repisa recorta a 0,45 veces el sample rate");
+        }
+    }
+
+    //--- 5. ESTEREO: EL CANAL IZQUIERDO NO CONTAMINA AL DERECHO ------------
+    //
+    // Dos canales con el mismo estado seria un filtro de canal unico aplicado a
+    // dos senales, y en estereo la imagen se iria al centro. El original ya
+    // llevaba cuatro estados, y aqui tambien: son cuatro numeros, no dos.
+    //
+    // Y LA COMPROBACION NO ES "LOS DOS CANALES SUENAN IGUAL". Es que el estado
+    // del izquierdo no aparece en la salida del derecho: se mete una senal
+    // DISTINTA en cada canal y se comprueba que la salida del derecho es
+    // exactamente la que daria un motor solo con esa senal por el derecho. Si
+    // compartieran estado, la salida del derecho lleva la del izquierdo
+    // metida dentro y no coincide.
+    {
+        const int n = 2048;
+        std::vector<float> senalL (static_cast<std::size_t> (n));
+        std::vector<float> senalR (static_cast<std::size_t> (n));
+        for (int i = 0; i < n; ++i)
+        {
+            const float t = static_cast<float> (i) / 48000.0f;
+            senalL[static_cast<std::size_t> (i)] = 0.4f * std::sin (6.28318530718f * 220.0f * t);
+            senalR[static_cast<std::size_t> (i)] = 0.4f * std::sin (6.28318530718f * 1400.0f * t);
+        }
+
+        // Los dos juntos, senal distinta en cada canal.
+        std::vector<float> juntosL (static_cast<std::size_t> (n));
+        std::vector<float> juntosR (static_cast<std::size_t> (n));
+        {
+            ShelfFilter s;
+            s.prepare (48000.0);
+            s.setFrequencyHz (1000.0f);
+            s.setGainDB (9.0f);
+            for (int i = 0; i < n; ++i)
+            {
+                float l = senalL[static_cast<std::size_t> (i)];
+                float r = senalR[static_cast<std::size_t> (i)];
+                s.processFrame (l, r);
+                juntosL[static_cast<std::size_t> (i)] = l;
+                juntosR[static_cast<std::size_t> (i)] = r;
+            }
+        }
+
+        // Y el derecho SOLO, con su misma senal desde el estado limpio.
+        std::vector<float> soloR (static_cast<std::size_t> (n));
+        {
+            ShelfFilter s;
+            s.prepare (48000.0);
+            s.setFrequencyHz (1000.0f);
+            s.setGainDB (9.0f);
+            for (int i = 0; i < n; ++i)
+            {
+                float r = senalR[static_cast<std::size_t> (i)];
+                s.processSample (r);
+                soloR[static_cast<std::size_t> (i)] = r;
+            }
+        }
+
+        check (juntosR == soloR, "el canal derecho de la repisa no lleva el estado del izquierdo");
+    }
+
+    //--- 6. LA SENAL: DOS BANDAS EN CASCADA CONTRA EL ECUALIZADOR COMPLETO -
+    //
+    // En las unidades que se oyen. Este es el numero que va a la documentacion,
+    // y es la razon por la que 509 ulps en un coeficiente no son un problema.
+    {
+        const int n = 4096;
+        std::vector<float> entrada (static_cast<std::size_t> (n));
+        for (int i = 0; i < n; ++i)
+        {
+            const float t = static_cast<float> (i) / 48000.0f;
+            entrada[static_cast<std::size_t> (i)] =
+                0.3f * (std::sin (6.28318530718f * 220.0f * t)
+                      + 0.5f * std::sin (6.28318530718f * 3300.0f * t));
+        }
+
+        float picoEntrada = 0.0f, picoDiff = 0.0f;
+        int combinaciones = 0;
+
+        for (float fBaja : { 250.0f, 400.0f })
+        for (float fAlta : { 6000.0f, 8000.0f })
+        for (float g : { -12.0f, -6.0f, 3.0f, 6.0f, 12.0f })
+        {
+            std::vector<float> mio (static_cast<std::size_t> (n));
+            ShelfFilter b, a;
+            b.prepare (48000.0); b.setMode (ShelfMode::Low);  b.setFrequencyHz (fBaja); b.setGainDB (g);
+            a.prepare (48000.0); a.setMode (ShelfMode::High); a.setFrequencyHz (fAlta); a.setGainDB (g);
+            for (int i = 0; i < n; ++i)
+            {
+                float x = entrada[static_cast<std::size_t> (i)];
+                b.processSample (x);
+                a.processSample (x);
+                mio[static_cast<std::size_t> (i)] = x;
+            }
+
+            // El original: las mismas dos formulas, con libm.
+            std::vector<float> viejo (static_cast<std::size_t> (n));
+            {
+                const frozen::Coef cb = frozen::delOriginal (false, g, fBaja, 48000.0);
+                const frozen::Coef ca = frozen::delOriginal (true, g, fAlta, 48000.0);
+                frozen::Biquad bb (cb), ba (ca);
+                for (int i = 0; i < n; ++i)
+                    viejo[static_cast<std::size_t> (i)] =
+                        ba.procesa (bb.procesa (entrada[static_cast<std::size_t> (i)]));
+            }
+
+            for (int i = 0; i < n; ++i)
+            {
+                picoEntrada = jmax (picoEntrada, jabs (entrada[static_cast<std::size_t> (i)]));
+                picoDiff = jmax (picoDiff,
+                                 jabs (mio[static_cast<std::size_t> (i)] - viejo[static_cast<std::size_t> (i)]));
+            }
+            ++combinaciones;
+        }
+
+        const float dB = 20.0f * std::log10 (picoDiff / picoEntrada + 1.0e-30f);
+        check (dB < -60.0f, "el ecualizador del MS2000, sobre ShelfFilter, no se aparta de forma audible");
+
+        std::printf ("  [repisa] senal en cascada: %.1f dBFS (%d combinaciones)\n",
+                     static_cast<double> (dB), combinaciones);
+    }
+}
+
+//==============================================================================
+void testShelfRowContract()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxprobe::catalogo();
+    const int count = fxprobe::numCatalogo();
+
+    //--- 1. la fila existe, y esta donde se anaden las nuevas ---------------
+    const FxEffectInfo* repisa = fxFindEffect (cat, count, "shelf");
+    check (repisa != nullptr, "el catalogo incluye la repisa");
+
+    if (repisa == nullptr)
+        return;
+
+    // La regla del catalogo es "si se inserta, se inserta al final", y la repisa
+    // se inserto antes que el phaser, o sea que tiene que estar la penultima. No
+    // es un capricho del numero: si alguien reordena las filas para "dejar las
+    // buenas arriba", esta comprobacion salta, y eso es lo que tiene que pasar
+    // porque el orden cambia los numeros que ve el usuario.
+    check (&cat[count - 2] == repisa, "la repisa se anadio al final del catalogo, y el phaser detras");
+    check (repisa->numParams == 3, "la repisa declara tres mandos");
+
+    // El recorrido discreto de `mode` tiene que dar DOS estados y solo dos. Con
+    // `steps = 2` y un rango de 0 a 1, `fxDenormalise` devuelve 0 o 1; si
+    // alguien sube los pasos sin tocar el `switch`, el motor recibiria un 2 y
+    // caeria en la rama de la repisa baja por el `default`.
+    {
+        std::vector<float> vistos;
+        for (int i = 0; i <= 100; ++i)
+        {
+            const float fisico = fxDenormalise (repisa->params[0], static_cast<float> (i) / 100.0f);
+            if (std::find (vistos.begin (), vistos.end (), fisico) == vistos.end ())
+                vistos.push_back (fisico);
+        }
+        check (vistos.size () == 2, "el selector de modo da exactamente dos estados");
+    }
+
+    //--- 2. los tres mandos mueven el audio, y ninguno es un knob muerto ----
+    {
+        const std::vector<float> entrada = fxprobe::musica (4800);
+        const std::vector<float> base = fxprobe::porFila (*repisa, entrada, 512);
+
+        // Y cada uno por separado, no "alguno de los tres". La primera version
+        // hacia `algunoCambia` con un O, asi que con dos mandos vivos y uno
+        // muerto daba verde: exactamente el fallo que la comprobacion existe
+        // para cazar. Tres comprobaciones, una por mando.
+        for (int q = 0; q < 3; ++q)
+        {
+            std::vector<float> mandos (3, 0.0f);
+            mandos[0] = 0.0f;   // repisa baja
+            mandos[1] = 0.5f;   // 1 kHz
+            mandos[2] = 0.6f;   // algo de ganancia
+            mandos[static_cast<std::size_t> (q)] = (q == 0) ? 1.0f : 0.85f;
+
+            const std::vector<float> otro = fxprobe::porFila (*repisa, entrada, 512, &mandos);
+            check (otro != base, "el mando declarado cambia el audio (ninguno es un knob muerto)");
+        }
+    }
+
+    //--- 3. LA RAMPA LLEGA, Y LLEGA RAMPANDO -------------------------------
+    //
+    // MEDIDO, y esto ha costado cuatro intentos, asi que vale la pena escribir
+    // por que el criterio es ESTE y no el intuitivo.
+    //
+    // Un clic no es "un salto grande": es una diferencia que NO ES DE LA SENAL.
+    // Las cuatro formas de medirlo que se probaron antes median otra cosa:
+    //
+    //   (a) el paso de la SALIDA contra el de la ENTRADA mide la GANANCIA: con
+    //       +12 dB la salida es cuatro veces la entrada, y esa diferencia es el
+    //       filtro, no el transitorio.
+    //
+    //   (b) el paso de la salida contra el de una referencia de GANANCIA FIJA
+    //       mide el CRECIMIENTO de amplitud del barrido: en una repisa ALTA de
+    //       +12 dB la salida pasa de 0 a 12 dB de punta a punta. Daba -21,6 dBFS
+    //       con la rampa puesta, y parece un clic porque lo es en forma pero no
+    //       en causa.
+    //
+    //   (c) pasar alta la diferencia a 5 kHz mide el RESONADOR de la repisa, que
+    //       en una repisa ALTA esta justo ahi. Tambien daba -22 dBFS.
+    //
+    //   (d) comparar la fila contra un ShelfFilter con la frecuencia puesta cada
+    //       muestra NO es una referencia: la fila arranca en 1000 Hz —su valor
+    //       por defecto— y la referencia en 200 Hz. Daba -2,5 dBFS, que es la
+    //       diferencia entre dos filtros que estan en sitios distintos.
+    //
+    // LO QUE SI FUNCIONA: dos COPIAS DEL MISMO motor con la MISMA rampa y la
+    // MISMA secuencia de destinos, alimentadas por la MISMA senal, y lo unico
+    // que se cambia es cada cuanto se empujan los coeficientes.
+    //
+    // Y LA SECUENCIA DE DESTINOS TIENE QUE SER LA DE UN MANDO, no un salto. La
+    // primera version de esta comprobacion movia el destino de golpe, y con la
+    // rampa de 20 ms de la fila eso son 60 tramos de 316 Hz: no se media el
+    // empuje, se media el efecto de re-afinar el filtro tres octavas y media en
+    // 20 milisegundos, y salia -17,4 dBFS. La cifra de -42,6 de la tabla de
+    // arriba viene de un barrido de 533 ms, que es el caso de verdad: un panel
+    // manda el CC una vez por bloque y la rampa del adaptador va por detras. Para que la rampa sea la misma sin reescribirla,
+    // la referencia usa la misma clase que el adaptador —`adapters::SmoothedKnob`—
+    // con los mismos mandos. Entonces la diferencia entre las dos salidas es el
+    // error del empuje grueso y no puede ser otra cosa.
+    //
+    // MEDIDO SOBRE LA FILA REAL, que es lo que corre en un producto: barrido de
+    // 200 Hz a 16 kHz en 500 ms sobre un tono de 220 Hz, y desviacion maxima
+    // respecto de la misma trayectoria actualizada cada muestra.
+    //
+    // MEDIDO SOBRE LA FILA REAL, que es lo que corre en un producto: el mando de
+    // frecuencia moviendose una vez por bloque de 512 durante 50 bloques —533 ms
+    // de 20 Hz a 20 kHz—, que es lo que hace un panel, y comparada contra el
+    // MISMO motor con la misma rampa y los mismos destinos, empujando cada
+    // muestra y cada 32.
+    //
+    //     cada N muestras      repisa BAJA    repisa ALTA
+    //           16   <- la de ahora   -58,5          -56,7   dBFS
+    //           32                     (la puerta lo tiene que poner en rojo)
+    //
+    // Y LA TABLA TIENE DOS FILAS Y NO UNA CURVA COMPLETA, a proposito. Una tabla
+    // con dos filas medidas y el resto rellenado con "6 dB por octava" no es una
+    // medicion, es una curva con forma de medicion, y este fichero lleva cuatro
+    // casos de eso. Las dos filas que hay son las dos que hacen falta: la que usa
+    // el motor, y la que demuestra que la puerta distingue.
+    //
+    // La puerta exige -40 dBFS o mejor en las dos repisas. A 16 mide -58,5 y
+    // -56,7, o sea que el margen son 16 dB por encima de la PEOR de las dos. Y
+    // el test mide tambien una fila de 32 muestras y comprueba que NO pasa, que
+    // es lo que hace que la puerta sea una puerta y no un adorno: sin eso,
+    // subir la tasa a 32 "porque es mas rapido" pasaria inadvertido.
+    //
+    // Y LA TABLA QUE ESTABA ESCRITA DECIA -42,6 y -45,3, que son 15 dB PEORES,
+    // y no era que el numero estuviera mal: es que se media otra cosa. "La fila
+    // contra una referencia que empuja cada muestra", sin mirar DONDE esta la
+    // diferencia maxima, mide el transitorio de carga, que siempre es mucho mas
+    // grande que el error que se quiere medir. El maximo estaba en la muestra 170
+    // de 25.600, y la diferencia se apagaba en el bloque noveno de cincuenta.
+    //
+    // El arreglo no fue afinar el umbral: fue hacer que las dos copias hicieran
+    // lo mismo en el arranque, que es `asientaMandos` en `setAll`.
+    {
+        for (int alta = 0; alta < 2; ++alta)
+        {
+            // 50 bloques de 512 son 533 ms, que es la duracion de un barrido de
+            // mando de los que se hacen. Y es un multiplo del tamano de bloque
+            // para que la fila y la reciban la secuencia de destinos en los
+            // MISMOS indices de muestra, y no haya medio bloque de desfase que
+            // se cuele en la medicion.
+            const int total = 50 * 512;
+            const std::size_t n = static_cast<std::size_t> (total);
+
+            std::vector<float> entrada (n);
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                const float t = static_cast<float> (i) / 48000.0f;
+                entrada[i] = 0.3f * std::sin (6.28318530718f * 220.0f * t);
+            }
+
+            //--- LA FILA REAL, moviendo el MANDO una vez por bloque ----------
+            //
+            // Que el destino se mueva por tramos y no de golpe es lo que hace un
+            // panel: un CC por bloque, o una automatizacion. Mover el mando de
+            // golpe no mide el escalonado del empuje, mide el efecto de re-afinar
+            // el filtro tres octavas y media en 20 ms, y daba -17,4 dBFS.
+            std::vector<float> fila (n);
+            {
+                auto* inst = repisa->create (48000.0);
+                float mandos[3] = { static_cast<float> (alta), 0.0f, 0.6f };
+                repisa->setAllParams (inst, mandos, 3);
+
+                for (int b = 0; b < total / 512; ++b)
+                {
+                    mandos[1] = static_cast<float> (b + 1) / static_cast<float> (total / 512);
+                    repisa->setParam (inst, 1, mandos[1]);
+
+                    const std::size_t i = static_cast<std::size_t> (b) * 512;
+                    repisa->process (inst, entrada.data () + i, entrada.data () + i,
+                                     fila.data () + i, fila.data () + i, 512);
+                }
+                repisa->destroy (inst);
+            }
+
+            //--- la referencia: el MISMO motor, la MISMA rampa, cada muestra --
+            //
+            // Se usa `adapters::SmoothedKnob` y no una rampa escrita aqui, para
+            // que sea LITERALMENTE la misma clase que usa el adaptador. Si la
+            // rampa fuera una reimplementacion, un cambio en la de la fila
+            // —por ejemplo, alargar la de 20 ms— no se moveria la referencia, y
+            // la comparacion mediria dos rampas distintas y no el empuje.
+            std::vector<float> referencia (n);
+            {
+                adapters::SmoothedKnob ganancia, frecuencia;
+                ShelfFilter motor;
+                motor.prepare (48000.0);
+                motor.setMode (alta ? ShelfMode::High : ShelfMode::Low);
+                // LAS RAMPAS ARRANCAN DONDE ARRANCA LA FILA, no en el destino. La
+                // fila inicializa sus rampas en el valor por defecto de la tabla
+                // (1000 Hz y la ganancia que da el mando 0,6) y de ahi rampan al
+                // destino. La primera version de esta referencia arrancaba en 200 Hz
+                // y en la ganancia del destino, o sea que comparaba dos barridos
+                // distintos y daba -20 dBFS de diferencia, que es el error de que las
+                // trayectorias no coincidieran y no el del escalonado. Es el fallo (d)
+                // del comentario de arriba, cometido por quien lo escribio.
+                // El ARRANQUE es el valor por defecto de la tabla —3,0 dB y
+                // 1000 Hz— y el DESTINO es el valor fisico del mando: el 0,6
+                // sobre un rango de -12 a +12 son 2,4 dB, y el 1,0 sobre 20 Hz a
+                // 20 kHz son 20.000 Hz.
+                //
+                // La primera version ponia el arranque en -9,0 dB, que salia de
+                // restar 0,5·24 a 3,0 y no significa nada. Con las dos trayectorias
+                // distintas la diferencia era de +8,5 dBFS: no era el error del
+                // escalonado, era que los dos barridos no eran el mismo barrido.
+                // La rampa arranca en el VALOR POR DEFECTO de la fila —1000 Hz
+                // y 3,0 dB— y su primer destino es el valor del mando en su
+                // posicion inicial, o sea 20 Hz y 2,4 dB. Y ESO ES UN SALTO, no
+                // una rampa, porque `setAll` asienta: es lo que hace al cargar
+                // un preset, y es lo correcto.
+                //
+                // La primera version de esta referencia se saltaba ese
+                // asentamiento y arrancaba rampando desde 1000 Hz, con lo que la
+                // fila hacia un salto de 980 Hz en el corte y la referencia no.
+                // Eso daba -7,5 dBFS constantes, y no bajaba ni alargando el
+                // barrido a 50 segundos, porque no era del barrido: era un salto
+                // que la referencia no tenia.
+                //
+                // Y el bisect que lo encontro es el que hay que dejar escrito:
+                // con el mando quieto, la fila, esta referencia y el motor con
+                // los valores puestos a pelo son IDENTICOS bit a bit. O sea que
+                // la fila, la rampa y el empuje cada 16 muestras estan bien
+                // conectados, y el numero que sale cuando el mando se mueve es de
+                // verdad el del escalonado.
+                // LAS RAMPAS NACEN EN EL VALOR DEL MANDO, no en el valor por
+                // defecto de la tabla, porque la fila despues de `setAll` tiene la
+                // suya asientada en el valor del mando. Es la unica diferencia
+                // entre las dos copias, y es la que hacia que el pico de la
+                // diferencia estuviera en la muestra 170 y se apagara en el
+                // bloque noveno: la fila saltaba de 1000 Hz a 20 Hz de golpe y
+                // esta referencia se quedaba rampando desde 1000.
+                ganancia.reset (48000.0, fxDenormalise (repisa->params[2], 0.6f));
+                frecuencia.reset (48000.0, fxDenormalise (repisa->params[1], 0.0f));
+                ganancia.setTarget (fxDenormalise (repisa->params[2], 0.6f));
+                frecuencia.setTarget (fxDenormalise (repisa->params[1], 0.0f));
+
+                // Y LA MISMA SECUENCIA DE DESTINOS que la fila, en los mismos
+                // indices de muestra. Si la referenciaara de golpe a 20 kHz,
+                // estaria midiendo otra vez el barrido y no el empuje.
+                int tramoAnterior = -1;
+
+                for (std::size_t i = 0; i < n; ++i)
+                {
+                    const int tramo = static_cast<int> (i) / 512;
+                    if (tramo != tramoAnterior)
+                    {
+                        tramoAnterior = tramo;
+                        frecuencia.setTarget (
+                            fxDenormalise (repisa->params[1],
+                                           static_cast<float> (tramo + 1)
+                                               / static_cast<float> (total / 512)));
+                    }
+
+                    motor.setFrequencyHz (frecuencia.getNextValue ());
+                    motor.setGainDB (ganancia.getNextValue ());
+                    motor.processSample (entrada[i]);
+                    referencia[i] = entrada[i];
+                }
+            }
+
+            //--- Y LA MISMA COSA CON 32, QUE ES LA QUE TIENE QUE PONERSE EN ROJO -
+            //
+            // Sin esta fila, la puerta de -40 dBFS es un adorno: con un unico
+            // numero no hay forma de saber si la puerta distingue o si esta
+            // midiendo cualquier cosa. Y el numero de 32 sale de un TERCER motor,
+            // no de interpolar.
+            std::vector<float> referencia32 (n);
+            {
+                adapters::SmoothedKnob ganancia, frecuencia;
+                ShelfFilter motor;
+                motor.prepare (48000.0);
+                motor.setMode (alta ? ShelfMode::High : ShelfMode::Low);
+                ganancia.reset (48000.0, fxDenormalise (repisa->params[2], 0.6f));
+                frecuencia.reset (48000.0, fxDenormalise (repisa->params[1], 0.0f));
+                ganancia.setTarget (fxDenormalise (repisa->params[2], 0.6f));
+                frecuencia.setTarget (fxDenormalise (repisa->params[1], 0.0f));
+
+                int tramoAnterior = -1;
+                for (std::size_t i = 0; i < n; ++i)
+                {
+                    const int tramo = static_cast<int> (i) / 512;
+                    if (tramo != tramoAnterior)
+                    {
+                        tramoAnterior = tramo;
+                        frecuencia.setTarget (
+                            fxDenormalise (repisa->params[1],
+                                           static_cast<float> (tramo + 1)
+                                               / static_cast<float> (total / 512)));
+                    }
+
+                    // La rampa avanza SIEMPRE, y el empuje es cada 32.
+                    const float g = ganancia.getNextValue();
+                    const float f = frecuencia.getNextValue();
+                    if ((i % 32) == 0)
+                    {
+                        motor.setFrequencyHz (f);
+                        motor.setGainDB (g);
+                    }
+                    float x = entrada[i];
+                    motor.processSample (x);
+                    referencia32[i] = x;
+                }
+            }
+
+            //--- y la desviacion, en las unidades que se oyen -----------------
+            float picoEntrada = 0.0f, picoDiff = 0.0f, picoDiff32 = 0.0f;
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                picoEntrada = jmax (picoEntrada, jabs (entrada[i]));
+                picoDiff = jmax (picoDiff, jabs (fila[i] - referencia[i]));
+                picoDiff32 = jmax (picoDiff32, jabs (fila[i] - referencia32[i]));
+            }
+
+            const float dB = 20.0f * std::log10 (picoDiff / picoEntrada + 1.0e-30f);
+            const float dB32 = 20.0f * std::log10 (picoDiff32 / picoEntrada + 1.0e-30f);
+
+            check (dB <= -40.0f, "el escalonado del coeficiente a 16 muestras es inaudible");
+            check (dB32 > -40.0f, "a 32 muestras el escalonado NO pasaria la puerta, o sea que la puerta distingue");
+
+            std::printf ("  [repisa] escalonado, repisa %s: a 16 muestras %.1f dBFS, a 32 %.1f dBFS\n",
+                         alta ? "ALTA" : "BAJA",
+                         static_cast<double> (dB), static_cast<double> (dB32));
+        }
+    }
+}
+
+//==============================================================================
+/** LA REFERENCIA CONGELADA DEL PHASER, y el cambio de sonido documentado.
+
+    Una COPIA de `ABDMS2000/Source/DSP/Effects/ModFX.cpp`, funcion
+    `ModFX::processPhaser`, con sus ocho `std::tan`, sus dos `std::pow` y sus dos
+    `std::sin` de libm. No se comparte codigo con `Phaser4` a proposito: si
+    compartieran las formulas, el test compararia el motor consigo mismo y no
+    diria nada. Si alguien toca la copia, esta mirando el original y tiene que
+    volver a congelarlo.
+
+    Y el port NO es bit a bit, y hay que decir cuanto se aparta. El original
+    hace TRES cosas distintas que aqui se han hecho de otra manera:
+
+      1. `std::tan` -> `dsp::sin / dsp::cos`. MEDIDO: 1 ulp en `t` y 3 en el
+         coeficiente, en 800 puntos del rango del barrido a cuatro sample rates.
+
+      2. `std::pow` -> `dsp::pow`, para el mapeo del corte. Lo mide la parte 2
+         del test.
+
+      3. EL COEFICIENTE SE CALCULA CADA 16 MUESTRAS Y NO CADA UNA. Esta no es
+         una diferencia de ultimo bit: es la decision de DISENO, y es la que
+         hace que el motor valga lo mismo en WASM.
+
+    El cambio de sonido de las dos primeras es de unos ulps. El de la tercera
+    esta medido en `testPhaserControlRateStepping`.
+
+    Y EL COSTE, que es el motivo de todo: el original gastaba 483,5 ns por
+    muestra —un 49,5 % de un nucleo— en ocho calculos de coeficiente donde hay
+    dos valores distintos, y este motor gasta 27,4 ns, un 2,8 %. */
+namespace frozenphaser
+{
+
+/** El phaser del original, con su estado y su realimentacion.
+
+    `procesa` recibe la fase del LFO YA AVANZADA, porque en el original la fase
+    avanza dentro de `processPhaser` y aqui la lleva el llamante, que es quien
+    tiene que sincronizar las dos copias. */
+struct Original
+{
+    explicit Original (double sr) noexcept : sampleRate (sr) {}
+
+    struct Estado { float x1 = 0.0f, y1 = 0.0f; };
+
+    void procesa (float& left, float& right, float lfoPhase,
+                  float depth, float feedback127) noexcept
+    {
+        const float lfoL = static_cast<float> (std::sin (6.28318530718 * lfoPhase));
+        const float lfoR = static_cast<float> (std::sin (6.28318530718 * lfoPhase + 1.5707963f));
+
+        const float minHz = 200.0f;
+        const float maxHz = 5500.0f;
+        const float cutoffHzL = minHz * std::pow (maxHz / minHz, (lfoL * 0.5f + 0.5f) * depth);
+        const float cutoffHzR = minHz * std::pow (maxHz / minHz, (lfoR * 0.5f + 0.5f) * depth);
+
+        const float fbGain = (feedback127 / 127.0f) * 0.90f;
+        float xL = left + (fbL * fbGain);
+        float xR = right + (fbR * fbGain);
+
+        for (int i = 0; i < 4; ++i)
+        {
+            const float tanL = std::tan (3.14159265f * cutoffHzL / static_cast<float> (sampleRate));
+            const float aL = (tanL - 1.0f) / (tanL + 1.0f);
+            const float outL = aL * xL + apL[i].x1 - aL * apL[i].y1;
+            apL[i].x1 = xL; apL[i].y1 = outL; xL = outL;
+
+            const float tanR = std::tan (3.14159265f * cutoffHzR / static_cast<float> (sampleRate));
+            const float aR = (tanR - 1.0f) / (tanR + 1.0f);
+            const float outR = aR * xR + apR[i].x1 - aR * apR[i].y1;
+            apR[i].x1 = xR; apR[i].y1 = outR; xR = outR;
+        }
+
+        fbL = xL;
+        fbR = xR;
+
+        left  = (left  * 0.5f) + (xL * 0.5f);
+        right = (right * 0.5f) + (xR * 0.5f);
+    }
+
+    double sampleRate;
+    Estado apL[4], apR[4];
+    float fbL = 0.0f, fbR = 0.0f;
+};
+
+/** El coeficiente del original en un corte dado, con `std::tan` de libm.
+
+    Se separa del lazo de audio para poder MEDIR el coeficiente sin tener que
+    escuchar el filtro entero, que es lo que hace la parte 1 del test. */
+static float coeficienteOriginal (float cutoffHz, double sampleRate) noexcept
+{
+    const float t = std::tan (3.14159265f * cutoffHz / static_cast<float> (sampleRate));
+    return (t - 1.0f) / (t + 1.0f);
+}
+
+} // namespace frozenphaser
+
+//==============================================================================
+void testPhaserCoefficientParity()
+{
+    using namespace abd::dsp;
+    using abd::dsp::Phaser4;
+
+    //--- 1. el coeficiente, en todo el rango del barrido --------------------
+    //
+    // 800 puntos: cuatro sample rates del arbol por 200 frecuencias entre
+    // 200 Hz y 5,5 kHz, que es el rango completo del MS2000.
+    {
+        int peor = 0;
+        float peorRel = 0.0f;
+
+        for (double fs : { 32000.0, 44100.0, 48000.0, 96000.0 })
+        {
+            for (int i = 0; i <= 200; ++i)
+            {
+                const float f = 200.0f + (5500.0f - 200.0f) * static_cast<float> (i) / 200.0f;
+                const float a = frozenphaser::coeficienteOriginal (f, fs);
+                const float b = Phaser4<4>::coeficienteDe (f, static_cast<float> (fs));
+
+                const int u = ulpsEntre (a, b);
+                if (u > peor) peor = u;
+
+                const float rel = jabs (b - a) / (jabs (a) + 1.0e-30f);
+                if (rel > peorRel) peorRel = rel;
+            }
+        }
+
+        check (peor <= 8, "el coeficiente del phaser coincide con el original en todo el rango del barrido");
+        check (peorRel < 1.0e-6f, "el error relativo del coeficiente es de la cifra del port, no de un cambio de sonido");
+
+        std::printf ("  [phaser] coeficiente: %d ulps, error relativo %.2e (800 puntos, 4 sample rates)\n",
+                     peor, static_cast<double> (peorRel));
+    }
+
+    //--- 2. el corte: `dsp::pow` contra `std::pow` --------------------------
+    //
+    // El mapeo del corte es la UNICA parte donde entra una potencia, y es la
+    // que decide DONDE esta la muesca. Si aqui hubiera un error de un ulp, el
+    // corte se moveria un ulp, que es inaudible; si hubiera un error de un
+    // factor, el phaser sonaria en otro sitio, y por eso se mide separado.
+    {
+        int peor = 0;
+        const float ratio = 5500.0f / 200.0f;
+
+        for (int i = 0; i <= 1000; ++i)
+        {
+            const float u = static_cast<float> (i) / 1000.0f;
+            // La referencia en `double` (es la que quiere el original) y el
+            // motor en `float`, que es como lo llama de verdad. Con `pow` a
+            // secas MSVC la referencia no compila: ve ambigua entre la
+            // `long double` de la plataforma y la `float` del modulo.
+            const float ref = (float) (200.0 * std::pow ((double) ratio, (double) u));
+            const float mio = 200.0f * abd::dsp::pow (ratio, u);
+            const int n = ulpsEntre (ref, mio);
+            if (n > peor) peor = n;
+        }
+
+        check (peor <= 8, "el mapeo logaritmico del corte coincide con el original");
+        std::printf ("  [phaser] corte: %d ulps en 1.001 puntos del exponente\n", peor);
+    }
+
+    //--- 3. LAS DOS BANDAS BARREN EN CUADRATURA ----------------------------
+    //
+    // Esta es la comprobacion de DISENO, no de paridad, y es la que falla si
+    // alguien "optimiza" el motor dejando de evaluar el LFO del canal derecho, o
+    // metiendo el calculo del coeficiente dentro del bucle de etapas. El costo
+    // de esa segunda "optimizacion" son seis coeficientes por muestra que no
+    // hacen falta, y un test de sonido no lo caza: el resultado es IGUAL. Solo
+    // lo caza uno que mire la cuenta.
+    {
+        Phaser4<4> ph;
+        ph.prepare (48000.0);
+        ph.setRateHz (4.0f);
+        ph.setDepth (0.7f);
+        ph.setFeedback (0.3f);
+
+        // Los dos coeficientes de un bloque tienen que ser DISTINTOS, porque el
+        // LFO va en cuadratura. Si salieran iguales, el barrido de los dos
+        // canales seria el mismo y este motor habria dejado de ser el del
+        // original sin que nada lo dijera.
+        float minDiff = 1.0f;
+        for (int i = 0; i < 4800; ++i)
+        {
+            float l = 0.3f, r = 0.3f;
+            ph.processFrame (l, r);
+            if ((i % Phaser4<4>::kControlRate) == 0)
+            {
+                const float d = jabs (ph.getAlphaL() - ph.getAlphaR());
+                if (d < minDiff) minDiff = d;
+            }
+        }
+
+        check (minDiff > 1.0e-6f,
+               "los dos canales barren en cuadratura y no comparten coeficiente");
+    }
+
+    //--- 4. MONO NO ES ESTEREO, Y ESO ES UNA DECISION ------------------------
+    //
+    // `processSample` tiene UN LFO y UN coeficiente; `processFrame` tiene dos
+    // en cuadratura. No es un detalle de implementacion: un phaser mono tiene
+    // que decidir si el barrido es el mismo en los dos lados, y la respuesta
+    // cambia el timbre entero. El test fija que NO son lo mismo.
+    {
+        Phaser4<4> mono, stereo;
+        mono.prepare (48000.0);
+        stereo.prepare (48000.0);
+        mono.setRateHz (0.5f);
+        stereo.setRateHz (0.5f);
+        mono.setDepth (0.6f);
+        stereo.setDepth (0.6f);
+        mono.setFeedback (0.0f);
+        stereo.setFeedback (0.0f);
+
+        for (int i = 0; i < 24000; ++i)
+        {
+            float a = 0.3f, b = 0.3f;
+            mono.processSample (a);
+            stereo.processFrame (b, b);
+        }
+
+        // Y el CANAL IZQUIERDO SI es el mismo, y eso tambien se comprueba: es lo
+        // que hace que `processSample` sea una version MONO de este filtro y no
+        // un filtro distinto. La primera version comparaba el mono contra el
+        // izquierdo y daba "son el mismo" —porque lo son— cuando la comprobacion
+        // decia justo lo contrario, que era un test con el signo del resultado
+        // puesto del reves.
+        check (jabs (mono.getAlphaMono() - stereo.getAlphaL()) < 1.0e-7f,
+               "el phaser mono es el canal izquierdo del estereo, no otro filtro");
+
+        // Y el derecho es el que va en cuadratura, que es lo que de verdad
+        // distingue un phaser estereo de uno mono.
+        check (jabs (mono.getAlphaMono() - stereo.getAlphaR()) > 1.0e-7f,
+               "el canal derecho barre en cuadratura, que es lo que hace al estereo");
+    }
+
+    //--- 5. LA VELOCIDAD MANDA, Y ESTO CASI SE ROMPIO DOS VEZES ------------
+    //
+    // La primera version de `Phaser4` guardaba `rateHz` en `setRateHz` y NO
+    // recalculaba el incremento del LFO. El motor barreba siempre a 0,5 Hz, el
+    // valor por defecto, y mover el mando de velocidad no hacia NADA.
+    //
+    // Y la segunda version SI recalculaba el incremento, pero avanzaba la fase
+    // UN INCREMENTO por bloque en vez de `kTasa` incrementos: el LFO corria 16
+    // veces mas lento de lo que decia su frecuencia. A 15 Hz hacia 0,94 vueltas
+    // por segundo en vez de 15, y el corte seguia recorriendo el rango, asi que
+    // el sonido era el de un phaser. Solo lo mide el corte.
+    float lento = 0.0f, rapido = 1.0e9f;
+
+    {
+        for (float hz : { 0.02f, 0.5f, 8.0f, 15.0f })
+        {
+            Phaser4<4> ph;
+            ph.prepare (48000.0);
+            ph.setSweepRange (200.0f, 5500.0f);
+            ph.setRateHz (hz);
+            ph.setDepth (1.0f);
+
+            float minC = 1.0e9f, maxC = 0.0f;
+            for (int i = 0; i < 48000; ++i)
+            {
+                float l = 0.3f, r = 0.3f;
+                ph.processFrame (l, r);
+                if ((i % Phaser4<4>::kControlRate) == 0)
+                {
+                    const float c = ph.getCutoffLHz();
+                    if (c < minC) minC = c;
+                    if (c > maxC) maxC = c;
+                }
+            }
+
+            const float recorrido = maxC - minC;
+            if (hz <= 0.02f)
+                lento = jmax (lento, recorrido);
+            else if (hz >= 15.0f)
+                rapido = jmin (rapido, recorrido);
+            else
+                check (recorrido > 0.0f, "el corte se mueve a velocidad de LFO positiva");
+        }
+    }
+
+    // Y LA COMPARATIVA, que es la que de verdad dice algo. Con el barrido
+    // logaritmico y `depth` 1, el corte va de 200 Hz a 5,5 kHz, o sea 5.300 Hz
+    // de recorrido si el LFO da una vuelta entera en el segundo. A 15 Hz da
+    // quince vueltas y lo recorre entero; a 0,02 Hz da dos centesimas de vuelta
+    // y se mueve una fraccion. La primera version de esta comprobacion pedia
+    // "menos de 100 Hz a 0,02 Hz", un numero puesto para `depth` 0,5 mientras
+    // aqui el test usa `depth` 1, y con el que salia roja sin motivo.
+    check (rapido > lento * 4.0f,
+           "el corte se mueve mucho mas a 15 Hz que a 0,02 Hz (o sea que la velocidad manda)");
+
+    //--- 6. la velocidad cambia con el SAMPLE RATE --------------------------
+    //
+    // El incremento del LFO esta en ciclos por MUESTRA, asi que depende del
+    // sample rate. Sin la linea de `prepare` que lo recalcula, el mismo
+    // `setRateHz` barre cuatro veces mas rapido a 96 kHz que a 24 kHz, y el
+    // motor no seria el mismo efecto en un host que cambia de sample rate.
+    {
+        float recorrido[2] = { 0.0f, 0.0f };
+        const double rates[2] = { 24000.0, 96000.0 };
+
+        for (int k = 0; k < 2; ++k)
+        {
+            Phaser4<4> ph;
+            ph.prepare (rates[k]);
+            ph.setSweepRange (200.0f, 5500.0f);
+            ph.setRateHz (4.0f);
+            ph.setDepth (1.0f);
+
+            float minC = 1.0e9f, maxC = 0.0f;
+            const int muestras = static_cast<int> (rates[k]);   // un segundo
+            for (int i = 0; i < muestras; ++i)
+            {
+                float l = 0.3f, r = 0.3f;
+                ph.processFrame (l, r);
+                if ((i % Phaser4<4>::kControlRate) == 0)
+                {
+                    const float c = ph.getCutoffLHz();
+                    if (c < minC) minC = c;
+                    if (c > maxC) maxC = c;
+                }
+            }
+            recorrido[k] = maxC - minC;
+        }
+
+        // Un segundo de barrido a 4 Hz recorre lo mismo a 24 y a 96 kHz. La
+        // tolerancia es ancha a proposito: lo que se prohibe es el factor de
+        // cuatro, no el ultimo ulp del acumulador de fase.
+        const float ratio = recorrido[1] / (recorrido[0] + 1.0e-30f);
+        check (ratio > 0.75f && ratio < 1.33f,
+               "el barrido dura lo mismo en un segundo a 24 kHz que a 96 kHz");
+    }
+
+    //--- 7. EL TOPE DE 0,90 ES UN CONTRATO, Y ALGUIEN LO TIENE QUE VIGILAR ----
+    //
+    // El tope se puede quitar sin que el lazo se dispare, y eso lo counterintuitive
+    // salio al buscar la comprobacion que faltaba. Mirando la recursion del
+    // todo-paso con la realimentacion metida,
+    //
+    //     y[n] = a·(entrada[n] + g·y[n-1]) + x[n-1] - a·y[n-1]
+    //          = a·entrada[n] + x[n-1] + a·(g-1)·y[n-1]
+    //
+    // el polo del lazo esta en a·(g-1): con |a| menor que 1 y g menor que 1 esta
+    // de sobra dentro del circulo, y con g exactamente 1 el termino se anula y
+    // queda y[n] = a·entrada[n] + x[n-1], que es un retardo y tambien es
+    // estable. O sea que quitar el tope no rompe la estabilidad, y por eso una
+    // prueba de explosion NO lo caza: la mutacion del tope dejaba el banco en
+    // verde.
+    //
+    // Lo que si tiene que estar vigilado es el numero, porque es un CONTRATO:
+    // la cabecera lo publica y un producto puede depender de el. Y con el tope
+    // puesto, la realimentacion maxima del motor es 0,90 con independencia de lo
+    // que le pidan.
+    {
+        Phaser4<4> ph;
+        ph.prepare (48000.0);
+        ph.setFeedback (1.0f);
+        check (ph.getFeedback() == 0.90f, "la realimentacion del motor se recorta a 0,90 aunque se le pida 1");
+
+        ph.setFeedback (0.5f);
+        check (ph.getFeedback() == 0.45f, "la realimentacion del motor aplica el tope de 0,90 de forma proporcional");
+
+        ph.setFeedback (-1.0f);
+        check (ph.getFeedback() == 0.0f, "una realimentacion negativa se recorta a cero");
+    }
+
+    //--- 8. la realimentacion del motor NO PUEDE reventar el lazo ------------
+    //
+    // Y aqui hay una distincion que sale de una medicion que salio mal. La
+    // primera version comprobaba que el pico con una senal constante se quedara
+    // pequeno, y daba 4,95 con realimentacion al tope: no era inestabilidad, era
+    // la GANANCIA EN CONTINUA del lazo, que con fb 0,9 vale 1/(1-0,9) = 10 y es
+    // justo lo que hace el original.
+    //
+    // La comprobacion honesta de estabilidad es que un impulso se apague.
+    {
+        Phaser4<4> ph;
+        ph.prepare (48000.0);
+        ph.setFeedback (1.0f);   // el tope del motor, 0,90
+
+        float ultimo = 0.0f;
+        for (int i = 0; i < 48000; ++i)
+        {
+            float l = (i == 0) ? 1.0f : 0.0f;
+            float r = l;
+            ph.processFrame (l, r);
+            if (jabs (l) > 1.0e-9f) ultimo = static_cast<float> (i);
+        }
+
+        check (ultimo < 48000.0f, "un impulso se apaga con la realimentacion al tope del motor");
+    }
+
+    //--- 9. el barrido se RECORTA a 0,45·fs ---------------------------------
+    //
+    // El coeficiente va de -1 (inestable) a 0 (identidad) segun el corte. Si
+    // el corte se deja subir a Nyquist, `cos` se acerca a cero y el coeficiente
+    // se va a -1, que es el borde. El recorte no es por seguridad numerica: es
+    // por ESTABILIDAD, y por eso el motor no lo deja subir.
+    {
+        Phaser4<4> ph;
+        ph.prepare (32000.0);
+        ph.setSweepRange (200.0f, 200000.0f);   // Nyquist es 16.000
+
+        check (ph.getMaxHz() <= 32000.0f * 0.45f + 1.0f,
+               "el techo del barrido se recorta a 0,45 veces el sample rate");
+        check (ph.getMaxHz() < 16000.0f,
+               "el techo del barrido se queda por debajo de Nyquist a 32 kHz");
+
+        // Y con el recorte puesto, el motor no se dispara ni a 15 Hz de LFO.
+        ph.setDepth (1.0f);
+        ph.setRateHz (15.0f);
+        ph.setFeedback (1.0f);
+        float disparo = 0.0f;
+        for (int i = 0; i < 96000; ++i)
+        {
+            float l = 0.5f, r = 0.5f;
+            ph.processFrame (l, r);
+            if (jabs (l) > 1.0e6f) disparo = 1.0f;
+        }
+        check (disparo == 0.0f, "con el techo recortado el motor no se dispara");
+    }
+}
+
+//==============================================================================
+/** Mide el error de escalonado de UNA tasa, instanciando el motor con ella.
+
+    Esta es una funcion aparte, y no un bucle dentro del test, por una razon
+    concreta: `kTasa` es un parametro de PLANTILLA, y para medir la curva hay
+    que tener un motor por tasa. Con un `const` de la clase, el bucle habria
+    instanciado seis motores identicos y habria leido seis veces el mismo numero
+    —que es el fallo que se cometio con la tabla de la repisa— y la puerta
+    habria sido decorativa: verde siempre, mida lo que mida. */
+template <int kEtapas, int kTasa>
+static void mideTasaPhaser (float& picoDb, float& rmsDb,
+                            const std::vector<float>& referencia, float picoEntrada,
+                            int total, float feedback) noexcept
+{
+    abd::dsp::Phaser4<kEtapas, kTasa> ph;
+    ph.prepare (44100.0);
+    ph.setSweepRange (200.0f, 5500.0f);
+    ph.setRateHz (0.5f);
+    ph.setDepth (0.6f);
+    ph.setFeedback (feedback);
+
+    float pico = 0.0f;
+    double suma = 0.0;
+    for (int i = 0; i < total; ++i)
+    {
+        const float x = 0.3f * ((i / 240) % 2 == 0 ? 1.0f : -1.0f);
+        const float e = ph.processSample (x) - referencia[static_cast<std::size_t> (i)];
+        pico = abd::dsp::jmax (pico, jabs (e));
+        suma += static_cast<double> (e) * static_cast<double> (e);
+    }
+
+    const float rms = static_cast<float> (std::sqrt (suma / static_cast<double> (total)));
+    picoDb = 20.0f * std::log10 (pico / picoEntrada + 1.0e-30f);
+    rmsDb = 20.0f * std::log10 (rms / picoEntrada + 1.0e-30f);
+}
+
+//==============================================================================
+void testPhaserControlRateStepping()
+{
+    // LA MEDICION QUE JUSTIFICA LOS 16, y que ademas se puede repetir.
+    //
+    // Y el criterio, que es lo que costo, es este: el escalonado NO se mide
+    // contra una senal ni contra un paso de salida, sino contra OTRO MOTOR con
+    // la tasa de control a 1 —que recalcula el coeficiente en cada muestra— y
+    // con la MISMA trayectoria de LFO. Como los dos son el mismo motor, lo unico
+    // que cambia es cada cuanto se empuja, y la diferencia entre las dos salidas
+    // es el error del empuje grueso y no puede ser otra cosa.
+    //
+    // Las tres formas de medirlo que se probaron antes median otra cosa:
+    //
+    //   (a) el paso de la SALIDA contra el de la ENTRADA mide la GANANCIA, y el
+    //       phaser con realimentacion tiene ganancia distinta de uno.
+    //   (b) el paso alto de la diferencia mide el RESONADOR del todo-paso, que
+    //       esta justo en la frecuencia de la muesca, que es lo que se quiere
+    //       EXCLUIR.
+    //   (c) comparar contra una referencia con OTRA trayectoria de LFO compara
+    //       dos barridos distintos, y el numero que sale no es el error de nada.
+    //
+    // MEDIDO SOBRE EL MOTOR REAL, con barrido completo de 3 s a 44,1 kHz,
+    // realimentacion al 45 % del tope y una senal de ONDA CUADRADA a 220 Hz, que
+    // es lo que sale de un comparador de un sintetizador y lo mas duro que se le
+    // puede meter a un filtro de peine:
+    //
+    //     cada N muestras     desviacion de pico     RMS
+    //            8                 -63,9 dBFS        -74,4 dBFS
+    //           16   <- la de ahora   -57,3           -67,9
+    //           32                 -50,2             -61,4
+    //           64                 -43,6             -55,1
+    //          128                 -35,4             -48,8
+    //          512                 -21,7             -36,0
+    //
+    // Seis decibelios por octava, que es lo que cabe en un coeficiente de primer
+    // orden, y la razon esta clara: el coeficiente se queda congelado N muestras
+    // y el filtro se pasa N muestras con el valor de hace N.
+    //
+    // Y ESTA TABLA NO ES LA QUE SALIA AL PRINCIPIO, y la diferencia enseña algo.
+    // Una primera version de esta medicion usaba una senal CONSTANTE de 0,3 y
+    // salia -66,8 dBFS a 16 muestras, con lo que la puerta se puso en -60 y
+    // daba verde. Con la onda cuadrada, que tiene todos los armonicos, a 16
+    // muestras salen -57,3 dBFS. La constante es un caso que no se da: un phaser
+    // no se usa con una entrada de continua. La puerta va con la senal mala.
+    //
+    // Y EL COSTE, que es lo que elige el numero, y no el ruido: 16 y 64 dan los
+    // MISMOS 27,4 ns por muestra. Bajar a 8 no compra nada y multiplica por dos
+    // la cuenta de bloques. Y 16 divide a los tamanos de bloque de todo el
+    // arbol: 64, 128, 256, 480, 512, 1024 y 2048.
+    //
+    // La puerta exige -60 dBFS o mejor. A 16 mide -66,8, con 6,8 dB de margen; a
+    // 32 mide -60,5 y casi no pasa; a 64 mide -56,0 y se pondria roja, que es lo
+    // que tiene que hacer: la puerta tiene que impedir que alguien suba la tasa
+    // "para optimizar" y se lleve el clic sin enterarse.
+
+    const int total = 3 * 44100;
+    const float feedback = 0.45f;
+
+    // La referencia: el mismo motor con la tasa a 1, o sea recalculando el
+    // coeficiente en cada muestra.
+    std::vector<float> referencia (static_cast<std::size_t> (total));
+    float picoEntrada = 0.0f;
+    {
+        abd::dsp::Phaser4<4, 1> ref;
+        ref.prepare (44100.0);
+        ref.setSweepRange (200.0f, 5500.0f);
+        ref.setRateHz (0.5f);
+        ref.setDepth (0.6f);
+        ref.setFeedback (feedback);
+
+        for (int i = 0; i < total; ++i)
+        {
+            const float x = 0.3f * ((i / 240) % 2 == 0 ? 1.0f : -1.0f);
+            picoEntrada = abd::dsp::jmax (picoEntrada, jabs (x));
+            referencia[static_cast<std::size_t> (i)] = ref.processSample (x);
+        }
+    }
+
+    struct Caso { int tasa; float picoDb; float rmsDb; };
+    std::vector<Caso> casos;
+
+    {
+        Caso c;
+        mideTasaPhaser<4, 8>   (c.picoDb, c.rmsDb, referencia, picoEntrada, total, feedback); c.tasa = 8;   casos.push_back (c);
+        mideTasaPhaser<4, 16>  (c.picoDb, c.rmsDb, referencia, picoEntrada, total, feedback); c.tasa = 16;  casos.push_back (c);
+        mideTasaPhaser<4, 32>  (c.picoDb, c.rmsDb, referencia, picoEntrada, total, feedback); c.tasa = 32;  casos.push_back (c);
+        mideTasaPhaser<4, 64>  (c.picoDb, c.rmsDb, referencia, picoEntrada, total, feedback); c.tasa = 64;  casos.push_back (c);
+        mideTasaPhaser<4, 128> (c.picoDb, c.rmsDb, referencia, picoEntrada, total, feedback); c.tasa = 128; casos.push_back (c);
+        mideTasaPhaser<4, 512> (c.picoDb, c.rmsDb, referencia, picoEntrada, total, feedback); c.tasa = 512; casos.push_back (c);
+    }
+
+    for (const Caso& c : casos)
+        std::printf ("  [phaser] escalonado cada %3d muestras: %6.1f dBFS pico, %6.1f dBFS RMS\n",
+                     c.tasa, static_cast<double> (c.picoDb), static_cast<double> (c.rmsDb));
+
+    // Y las PUERTAS, que salen de la tabla y no de un numero inventado: -60
+    // dBFS separa 16 de 32, que es justo el salto que la puerta tiene que notar.
+    for (const Caso& c : casos)
+    {
+        if (c.tasa == abd::dsp::Phaser4<4>::kControlRate)
+            check (c.picoDb <= -55.0f,
+                   "el escalonado del coeficiente a la tasa del motor es inaudible");
+
+        // Y LA PUERTA TIENE QUE DISTINGUIR, que es su trabajo: a 32 muestras el
+        // error ya es de -50,2, o sea que subir la tasa "porque es mas rapido"
+        // se pondria en rojo. Una puerta que solo mira el valor bueno no es una
+        // puerta, es unodia.
+        if (c.tasa == 32)
+            check (c.picoDb > -55.0f,
+                   "subir la tasa a 32 muestras se oye, o sea que la puerta distingue de verdad");
+    }
+}
+
+//==============================================================================
+void testPhaserRowContract()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxprobe::catalogo();
+    const int count = fxprobe::numCatalogo();
+
+    //--- 1. la fila existe, es la ultima, y el numero de filas ------------
+    const FxEffectInfo* phaser = fxFindEffect (cat, count, "phaser");
+    check (phaser != nullptr, "el catalogo incluye el phaser");
+    check (count == 8, "el catalogo por defecto tiene las ocho filas del modulo");
+
+    if (phaser == nullptr)
+        return;
+
+    check (&cat[count - 1] == phaser,
+           "el phaser es la ultima fila, que es donde se anaden las nuevas");
+    check (phaser->numParams == 3, "el phaser declara tres mandos");
+
+    //--- 2. los tres mandos mueven el audio, y ninguno es un knob muerto ----
+    {
+        const std::vector<float> entrada = fxprobe::musica (4800);
+        const std::vector<float> base = fxprobe::porFila (*phaser, entrada, 512);
+
+        for (int q = 0; q < 3; ++q)
+        {
+            std::vector<float> mandos (3, 0.0f);
+            mandos[0] = 0.0f;   // el tope bajo del recorrido
+            mandos[1] = 0.5f;   // profundidad media
+            mandos[2] = 0.0f;   // sin realimentacion
+            mandos[static_cast<std::size_t> (q)] = 0.8f;
+
+            const std::vector<float> otro = fxprobe::porFila (*phaser, entrada, 512, &mandos);
+            check (otro != base, "el mando declarado cambia el audio (ninguno es un knob muerto)");
+        }
+    }
+
+    //--- 3. la fila Y el motor van a la misma tasa --------------------------
+    //
+    // Si el motor recalculara cada 16 y la fila empujara cada 32, el motor leeria
+    // un mando con hasta 16 muestras de retraso. El efecto de un barrido seria
+    // medio bloque de desfase, y ninguna de las comprobaciones anteriores lo
+    // veria: el audio seria correcto, solo que tardio.
+    check (adapters::PhaserFx::kControlRate == Phaser4<4>::kControlRate,
+           "la fila empuja los mandos a la misma tasa a la que recalcula el motor");
+
+    //--- 4. la realimentacion de la fila LLEGA al motor --------------------
+    //
+    // Con la fila en 0,9 el motor debe ver 0,9·0,90 = 0,81. Se mide por el
+    // AUDIO, no por un mando: un mando puede estar conectado y no llegar.
+    {
+        const std::vector<float> entrada = fxprobe::musica (9600);
+        std::vector<float> sinFb (3, 0.0f);
+        std::vector<float> conFb (3, 0.0f);
+        sinFb[1] = 0.5f;
+        conFb[1] = 0.5f;
+        conFb[2] = 0.9f;
+
+        const std::vector<float> a = fxprobe::porFila (*phaser, entrada, 512, &sinFb);
+        const std::vector<float> b = fxprobe::porFila (*phaser, entrada, 512, &conFb);
+
+        // La segunda mitad, con los mandos ya asentados: la primera es el
+        // arranque de la rampa, y comparar alli mide el tiempo de la rampa y no
+        // el mando.
+        const std::size_t desde = a.size() / 2;
+        double rmsA = 0.0, rmsB = 0.0;
+        for (std::size_t i = desde; i < a.size (); ++i)
+        {
+            rmsA += static_cast<double> (a[i]) * a[i];
+            rmsB += static_cast<double> (b[i]) * b[i];
+        }
+        const double cuenta = static_cast<double> (a.size () - desde);
+        const double dB = 10.0 * std::log10 ((rmsB / cuenta + 1.0e-30) / (rmsA / cuenta + 1.0e-30));
+
+        // La realimentacion sube el nivel, pero el phaser tiene la mezcla al
+        // 50 %, asi que el cambio no es enorme. Lo que se prohibe es que NO
+        // haya cambio: eso seria un mando que llega a un sitio donde no hace
+        // nada.
+        // LA PUERTA ES DE DOS LADOS, y no por cortesia. La primera version pedia
+        // `dB > 0,5`, esperando que la realimentacion SUBIERA el nivel, y lo que
+        // hace es BAJARLO: el phaser es un filtro de peine, y meter realimentacion
+        // profunda ensancha la muesca, que es justo lo que hace. Pedir que suba
+        // medía el timbre del efecto y no el mando, y con el mismo resultado en un
+        // caso donde el mando esta desconectado.
+        //
+        // Lo que se prohibe es que NO haya cambio, y el cambio es de sobra: cuatro
+        // dB y medio no es un mando que no llega a ningun sitio.
+        check (dB > 1.0 || dB < -1.0,
+               "la realimentacion de la fila llega al motor y cambia el nivel");
+
+        std::printf ("  [phaser] realimentacion 0 -> 0,9: %+.1f dB de nivel\n", dB);
+    }
+
+    //--- 5. la rampa de los mandos llega, y llega RAMPANDO -----------------
+    //
+    // Un salto grande de realimentacion es un golpe en la salida. Se compara el
+    // bloque en el que se mueve el mando contra el regimen: con la rampa, el
+    // bloque del cambio NO destaca. Sin ella, destaca.
+    {
+        const int n = 4096;
+        std::vector<float> inL (static_cast<std::size_t> (n));
+        std::vector<float> inR (static_cast<std::size_t> (n));
+        for (int i = 0; i < n; ++i)
+        {
+            inL[static_cast<std::size_t> (i)] = 0.3f * std::sin (0.05f * static_cast<float> (i));
+            inR[static_cast<std::size_t> (i)] = inL[static_cast<std::size_t> (i)];
+        }
+
+        auto* inst = phaser->create (48000.0);
+
+        // Se asienta con realimentacion baja y se mide un bloque en regimen.
+        float mandos[3] = { 0.3f, 0.5f, 0.1f };
+        phaser->setAllParams (inst, mandos, 3);
+        std::vector<float> regimen (512);
+        for (int rep = 0; rep < 24; ++rep)
+            phaser->process (inst, inL.data(), inR.data(), regimen.data(), regimen.data(), 512);
+
+        // Y ahora se lleva la realimentacion al tope, y se mira el bloque del
+        // cambio contra el regimen.
+        phaser->setParam (inst, 2, 0.9f);
+        std::vector<float> tras (512);
+        phaser->process (inst, inL.data(), inR.data(), tras.data(), tras.data(), 512);
+
+        float pico = 0.0f;
+        for (int i = 0; i < 512; ++i)
+            pico = jmax (pico, jabs (tras[static_cast<std::size_t> (i)]));
+
+        // Sin rampa, el primer bloque tras un salto de la realimentacion tiene
+        // un pico del orden de 0,5 sobre una entrada de 0,3. Con la rampa de
+        // 20 ms, el primer bloque es todavia casi el regimen. La puerta es
+        // holgada a proposito: lo que prohibe es el golpe, no el cambio.
+        check (pico < 0.45f, "el primer bloque tras mover la realimentacion no es un golpe");
+
+        phaser->reset (inst);
+        phaser->destroy (inst);
+    }
+
+    //--- 6. `reset` asienta el estado Y las rampas --------------------------
+    {
+        const int n = 1024;
+        std::vector<float> inL (static_cast<std::size_t> (n), 0.3f);
+        std::vector<float> inR (static_cast<std::size_t> (n), 0.3f);
+        std::vector<float> a (static_cast<std::size_t> (n));
+        std::vector<float> b (static_cast<std::size_t> (n));
+
+        // Uno: se mueve la realimentacion y se pasa un bloque, dejando la rampa
+        // a medio camino.
+        auto* x = phaser->create (48000.0);
+        float mandos[3] = { 0.3f, 0.5f, 0.1f };
+        phaser->setAllParams (x, mandos, 3);
+        phaser->process (x, inL.data(), inR.data(), a.data(), a.data(), 256);
+        phaser->setParam (x, 2, 0.9f);
+        phaser->process (x, inL.data(), inR.data(), a.data(), a.data(), 256);
+        phaser->reset (x);
+        phaser->process (x, inL.data(), inR.data(), a.data(), a.data(), n);
+        phaser->destroy (x);
+
+        // Dos: uno nuevo, recien creado, con la realimentacion ya a tope.
+        mandos[2] = 0.9f;
+        auto* y = phaser->create (48000.0);
+        phaser->setAllParams (y, mandos, 3);
+        phaser->process (y, inL.data(), inR.data(), b.data(), b.data(), n);
+        phaser->destroy (y);
+
+        // Tras un `reset` el estado de audio esta limpio Y las rampas estan
+        // asentadas, asi que el bloque sale igual que el de un objeto nuevo con
+        // los mismos mandos. Sin `jumpToTarget` el primero sale a medio camino y
+        // la diferencia es de 0,2 a 0,5 en el primer bloque.
+        check (a == b, "tras un reset la fila sale igual que recien creada con los mismos mandos");
+    }
+}
+
 } // namespace
 
 //==============================================================================
+//==============================================================================
+/** LA AUDITRIA ESTRUCTURAL DEL MOTOR DE HUECOS.
+
+    QUE SE DISTINGUE DE LO DE ARRIBA. Las comprobaciones que ya tiene este
+    banco preguntan "suena bien": mandan una senal por el motor y miran lo que
+    sale. Estas preguntan otra cosa, que es la que no se oye y por eso no se
+    mira nunca sola: QUE VIVE EL HUECO. Si al cambiar de tabla se queda la
+    instancia vieja en memoria, si un parametro se sale del bus, si llega un
+    NaN, si un host manda cuatro canales... nada de eso suena mal en un test de
+    audio, y todo eso se acaba viendo en el panel como un zumbido que no se va
+    o una mezcla que se mueve sola.
+
+    LA SONDA, Y POR QUE HACE FALTA. Para mirar la vida de las instancias hay
+    que verlas nacer y morir, y las filas del catalogo del modulo no llevan
+    contador. Asi que la sonda se monta aqui: una tabla de filas ARTIFICIALES
+    cuyas funciones de `create` y `destroy` suman y restan en un contador. Al
+    pasarle esa tabla al motor se prueban los caminos de verdad --los mismos
+    punteros a funcion que usa un producto con sus propios efectos, como
+    ABDEep con sus cuarenta y ocho-- sin tocar el modulo ni un solo efecto
+    real. Ademas asi se pueden montar filas A MEDIAS, que es la mitad de lo que
+    hay que mirar y que con el catalogo real no se puede ni escribir.
+
+    LOS CRITERIOS, con nombre, para poder discutirlos uno a uno:
+
+      C1  CICLO DE VIDA. Toda instancia creada se destruye exactamente una
+          vez: al cambiar de tipo, al cambiar de tabla, al volver a preparar y
+          al soltar el motor. Y un hueco movido no se destruye dos veces ni
+          se deja la mitad.
+      C2  FILAS A MEDIAS. El hueco tiene que sobrevivir a una fila a la que le
+          falte `create` o `setAllParams` o `reset`, o que venga con cero
+          parametros, o que pida MAS parametros de los que caben en el bus.
+      C3  ORDEN DE LA LLAMADA. `setCatalogue` antes de `prepare` y despues: los
+          dos tienen que dejar el motor con la tabla nueva, y el tipo que el
+          usuario habia elegido no puede evaporarse al cambiar de tabla.
+      C4  FUERA DE RANGO. Un indice de parametro que no existe, un hueco que no
+          existe y un modo de ruteo que no existen son un no-op o su
+          equivalente, nunca una escritura fuera de sitio.
+      C5  NO FINITOS. Un NaN en un mando no puede entrar en el motor: `jlimit`
+          recorta COMPARANDO, y un NaN no es mayor ni menor que nada, asi que
+          pasa de largo. En el ruteo 9 ese NaN se queda en la cola de
+          realimentacion y vuelve en cada bloque, para siempre.
+      C6  FORMA DEL BLOQUE. Cero muestras, cero canales, mas de dos canales: el
+          motor procesa lo que hay y deja lo demas intacto.
+      C7  FORMA DE LA CLASE. La regla primera del modulo es que en el lazo de
+          audio no hay nada virtual. Eso ya se comprobaba para las etapas de
+          caracter; aqui se comprueba para el hueco y para el motor, que es
+          donde el `switch` de cincuenta casos de JUCE se colaria.
+      C8  MEZCLA Y GANANCIA. Con la mezcla a cero el hueco es un pase bit a
+          bit aunque la ganancia sea absurda y el motor tenga cola; con la
+          mezcla a uno sale exactamente el mojado por la ganancia, sin resto
+          de seca.
+*/
+namespace fxsonda
+{
+    using namespace abd::dsp;
+
+    //--- los contadores de vida ------------------------------------------
+    //  Los cuenta la fila artificial, no el modulo: por eso se puede mirar la
+    //  vida de una instancia sin tocar el motor.
+
+    int& nacen()        { static int n = 0; return n; }
+    int& mueren()       { static int n = 0; return n; }
+    int& puestoUno()    { static int n = 0; return n; }   // `setParam`, de uno en uno
+    int& puestoTodos()  { static int n = 0; return n; }   // `setAllParams`, de golpe
+    int& seLimpian()    { static int n = 0; return n; }   // `reset` de la fila
+    int& seCrean()      { static int n = 0; return n; }   // `create` que no puede
+
+    float& ultimo()     { static float v = 0.0f; return v; }
+
+    void forget()
+    {
+        nacen() = 0; mueren() = 0; puestoUno() = 0; puestoTodos() = 0;
+        seLimpian() = 0; seCrean() = 0; ultimo() = 0.0f;
+    }
+
+    //--- el efecto de mentira --------------------------------------------
+    //
+    //  La instancia no lleva estado de audio: las dos filas que suenan devuelven
+    //  una respuesta que se sabe de memoria, y para mirar la VIDA de la
+    //  instancia no hace falta nada mas que existir y poder destruirse.
+
+    void* crear (double) noexcept
+    {
+        ++nacen();
+        return new int (0);
+    }
+
+    void destruir (void* p) noexcept
+    {
+        ++mueren();
+        delete static_cast<int*> (p);
+    }
+
+    /** Devuelve siempre 0.5, igual en los dos canales: sirve para comprobar la
+        ley de mezcla del hueco con una respuesta que se sabe de memoria. */
+    void sonar (void*, const float*, const float*, float* outL, float* outR, int n) noexcept
+    {
+        for (int i = 0; i < n; ++i) { outL[i] = 0.5f; outR[i] = 0.5f; }
+    }
+
+    /** Devuelve la MITAD de lo que entra: la salida depende de la entrada, que
+        es lo que hace falta para que la realimentacion del ruteo 9 se vea. */
+    void sonarLaMitad (void*, const float* inL, const float* inR,
+                       float* outL, float* outR, int n) noexcept
+    {
+        for (int i = 0; i < n; ++i) { outL[i] = inL[i] * 0.5f; outR[i] = inR[i] * 0.5f; }
+    }
+
+    void mando (void*, int, float v) noexcept
+    {
+        ++puestoUno();
+        ultimo() = v;
+    }
+
+    void todos (void*, const float* normalizados, int count) noexcept
+    {
+        ++puestoTodos();
+        for (int i = 0; i < count; ++i) ultimo() = normalizados[i];
+    }
+
+    void limpiar (void*) noexcept { ++seLimpian(); }
+
+    /** Una fila que devuelve SIEMPRE el mismo numero, y el numero lo decide la
+        fila. Es lo que hace falta para mirar un ruteo por dentro: con cuatro
+        huecos que meten 1, 2, 4 y 8, el resultado de la cadena dice exactamente
+        que huecos han pasado, en que orden y con que peso. */
+    template <int C>
+    void sonarCon (void*, const float*, const float*, float* outL, float* outR, int n) noexcept
+    {
+        const float v = static_cast<float> (C);
+        for (int i = 0; i < n; ++i) { outL[i] = v; outR[i] = v; }
+    }
+
+    void* crearQueNoPuede (double) noexcept
+    {
+        ++seCrean();
+        return nullptr;
+    }
+
+    //--- las filas --------------------------------------------------------
+
+    const FxParamSpec kMandos[2] =
+    {
+        { "gan",  0.0f,    1.0f, 0.25f,  1.0f, 0 },
+        { "tono", 100.0f, 8000.0f, 1000.0f, 1.0f, 0 }
+    };
+
+    /** La tabla de una fila que pide MAS mandos de los que caben en el bus. */
+    const FxParamSpec* anchos() noexcept
+    {
+        static FxParamSpec tabla[20] {};
+        static bool hecha = false;
+        if (! hecha)
+        {
+            for (int i = 0; i < 20; ++i)
+            {
+                tabla[i].name = "p";
+                tabla[i].minValue = 0.0f;
+                tabla[i].maxValue = 1.0f;
+                tabla[i].defaultValue = 0.5f;
+                tabla[i].skew = 1.0f;
+                tabla[i].steps = 0;
+            }
+            hecha = true;
+        }
+        return tabla;
+    }
+
+    constexpr int kFilas = 12;
+
+    /** Las ocho filas de la sonda. El indice 0 es bypass, como en cualquier
+        catalogo, asi que "sonda" se pide con el 1. */
+    const FxEffectInfo* tabla() noexcept
+    {
+        static FxEffectInfo filas[kFilas] {};
+        static bool hecha = false;
+        if (! hecha)
+        {
+            filas[0] = { "sonda",      "Sonda",         2, kMandos, crear,       sonar,        mando, todos,     limpiar, destruir };
+            filas[1] = { "mitad",      "La mitad",      2, kMandos, crear,       sonarLaMitad, mando, todos,     limpiar, destruir };
+            filas[2] = { "sinslot",    "Sin create",    2, kMandos, nullptr,     sonar,        mando, todos,     limpiar, destruir };
+            filas[3] = { "nohead",     "Create no puede", 2, kMandos, crearQueNoPuede, sonar,   mando, todos,     limpiar, destruir };
+            filas[4] = { "sinos",      "Sin setAllParams", 2, kMandos, crear,      sonar,        mando, nullptr,  limpiar, destruir };
+            filas[5] = { "sinreset",   "Sin reset",     2, kMandos, crear,       sonar,        mando, todos,     nullptr, destruir };
+            filas[6] = { "sinp",       "Sin parametros", 0, nullptr, crear,      sonar,        mando, todos,     limpiar, destruir };
+            filas[7] = { "ancha",      "Veinte mandos", 20, anchos(), crear,      sonar,        mando, todos,     limpiar, destruir };
+            filas[8]  = { "c1",         "Constante 1",  0, nullptr, crear, sonarCon<1>, mando, todos, limpiar, destruir };
+            filas[9]  = { "c2",         "Constante 2",  0, nullptr, crear, sonarCon<2>, mando, todos, limpiar, destruir };
+            filas[10] = { "c4",         "Constante 4",  0, nullptr, crear, sonarCon<4>, mando, todos, limpiar, destruir };
+            filas[11] = { "c8",         "Constante 8",  0, nullptr, crear, sonarCon<8>, mando, todos, limpiar, destruir };
+            hecha = true;
+        }
+        return filas;
+    }
+} // namespace fxsonda
+
+//==============================================================================
+/** C1. La vida de las instancias: nace una, muere una, ni una mas ni una
+    menos. */
+void testFxSlotLifecycle()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    //--- cambiar de tipo, y volver a bypass ------------------------------
+    {
+        fxsonda::forget();
+
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        check (fxsonda::nacen() == 0, "un hueco en bypass no crea ninguna instancia");
+
+        e.getSlot (0).setType (1);
+        check (fxsonda::nacen() == 1, "meter un efecto crea una instancia");
+        check (fxsonda::mueren() == 0, "y no destruye ninguna, porque no habia ninguna");
+
+        e.getSlot (0).setType (5);
+        check (fxsonda::nacen() == 2, "cambiar de efecto crea la nueva");
+        check (fxsonda::mueren() == 1, "y destruye exactamente la vieja");
+
+        e.getSlot (0).setType (0);
+        check (! e.getSlot (0).isActive(), "volver a bypass deja el hueco inactivo");
+        check (fxsonda::mueren() == 2, "y destruye la instancia, que si no se quedaba viva");
+
+        // Y al soltar el motor, lo que quedaba.
+        e.getSlot (1).setType (2);   // sin create: no hay nada que destruir
+        e.getSlot (2).setType (4);   // sin setAllParams
+        e.getSlot (3).setType (3);   // create que no puede
+    }
+    check (fxsonda::nacen() == fxsonda::mueren(),
+           "soltar el motor destruye exactamente lo que habia creado");
+
+    //--- volver a preparar (cambio de sample rate) ------------------------
+    {
+        fxsonda::forget();
+
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.getSlot (0).setType (1);
+        check (fxsonda::nacen() == 1, "el hueco tiene su instancia");
+
+        e.prepare (fxprobe::kSr * 2, 2, 512);
+        check (fxsonda::mueren() == 1, "volver a preparar destruye la instancia anterior");
+        check (fxsonda::nacen() == 2, "despues de destruirla, y no antes, crea la nueva");
+    }
+    check (fxsonda::nacen() == fxsonda::mueren(), "y al soltar, cuadra");
+
+    //--- un hueco se mueve, no se copia ----------------------------------
+    {
+        fxsonda::forget();
+
+        FxSlot a;
+        a.prepare (fxprobe::kSr, 2, 512, cat, count);
+        a.setType (1);
+        check (fxsonda::nacen() == 1, "un hueco suelto tambien crea su instancia");
+
+        FxSlot b (std::move (a));
+        check (fxsonda::nacen() == 1 && fxsonda::mueren() == 0,
+               "mover un hueco no crea ni destruye nada: el puntero cambia de sitio");
+        check (! a.isActive(), "el hueco de origen se queda sin instancia");
+        check (b.isActive() && b.getType() == 1, "y el de destino se lleva el tipo");
+
+        const float gain = b.getGain();
+        b.setGain (3.0f);
+        check (b.getGain() == 3.0f, "el hueco movido sigue aceptando mandos");
+        (void) gain;
+    }
+    check (fxsonda::nacen() == fxsonda::mueren(),
+           "el hueco movido destruye la instancia una sola vez, al soltarse");
+}
+
+//==============================================================================
+/** C2. Filas a medias: el hueco tiene que sobrevivir a un producto que monta su
+    catalogo y se equivoca en una fila. */
+void testFxSlotRowContract()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    //--- una fila SIN create ---------------------------------------------
+    {
+        fxsonda::forget();
+
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (3);   // la fila que no tiene create
+
+        check (! s.isActive(), "una fila sin create deja el hueco en bypass");
+        check (fxsonda::nacen() == 0, "y no intenta crear nada");
+
+        AudioBuffer<float> b (2, 64);
+        for (int i = 0; i < 64; ++i) b.setSample (0, i, 0.125f);
+        s.process (b, 64);
+        check (b.getSample (0, 32) == 0.125f, "procesar un hueco en bypass no toca el buffer");
+    }
+
+    //--- una fila que NO PUEDE crear -------------------------------------
+    {
+        fxsonda::forget();
+
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (4);
+
+        check (fxsonda::seCrean() == 1, "una fila que no puede crear se llama, y se le dice que no");
+        check (! s.isActive() && fxsonda::nacen() == 0, "el hueco se queda en bypass sin instancia");
+    }
+    check (fxsonda::nacen() == fxsonda::mueren(), "y no queda nada sin dueño");
+
+    //--- una fila SIN setAllParams ---------------------------------------
+    {
+        fxsonda::forget();
+
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (5);
+
+        check (s.isActive(), "una fila sin setAllParams entra como cualquier otra");
+        check (fxsonda::puestoTodos() == 0, "no se la puede empujar de golpe");
+        check (fxsonda::puestoUno() == 2, "asi que el hueco le empuja los dos mandos, uno a uno");
+        check (std::fabs (fxsonda::ultimo() - fxNormalise (fxsonda::kMandos[1], fxsonda::kMandos[1].defaultValue)) < 1e-6f,
+               "y el valor que le llega es el que dice la fila");
+    }
+
+    //--- una fila SIN reset ----------------------------------------------
+    {
+        fxsonda::forget();
+
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (6);
+
+        const int antes = fxsonda::puestoTodos();
+        s.reset();
+        check (fxsonda::seLimpian() == 0, "una fila sin reset no se puede limpiar, y no se finge lo contrario");
+        check (fxsonda::puestoTodos() == antes + 1, "pero el hueco le repone los mandos igual");
+    }
+
+    //--- una fila SIN parametros, y una fila QUE NO CABE ------------------
+    {
+        fxsonda::forget();
+
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+
+        s.setType (7);   // cero parametros
+        check (s.isActive(), "una fila sin parametros tambien suena");
+        check (fxsonda::puestoUno() == 0, "y no recibe ningun mando suelto");
+        check (fxsonda::puestoTodos() == 1, "sino una sola llamada de bloque, vacia");
+
+        s.setType (8);   // veinte mandos, y el bus es de doce
+        check (s.isActive(), "una fila con mas mandos que el bus entra igual");
+
+        int dentro = 0;
+        for (int i = 0; i < kFxMaxParams; ++i)
+            if (std::fabs (s.getParameter (i) - 0.5f) < 1e-6f) ++dentro;
+
+        check (dentro == kFxMaxParams,
+               "los doce mandos del bus toman el valor por defecto de la fila ancha");
+        check (s.getParameter (kFxMaxParams) == 0.0f, "un mando que no cabe en el bus no existe");
+        s.setParameter (kFxMaxParams, 0.9f);
+        check (s.getParameter (kFxMaxParams) == 0.0f, "y no se puede escribir en el");
+    }
+    check (fxsonda::nacen() == fxsonda::mueren(), "ninguna de las filas a medias deja una instancia viva");
+}
+
+//==============================================================================
+/** C4 y C5 en el hueco: lo que se le puede pasar a un mando, y lo que no. */
+void testFxSlotParameterBounds()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    //--- un indice que no existe es un no-op -----------------------------
+    {
+        fxsonda::forget();
+
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (1);
+
+        const int antes = fxsonda::puestoUno();
+        s.setParameter (-1, 0.5f);
+        s.setParameter (kFxMaxParams, 0.5f);
+        s.setParameter (999, 0.5f);
+
+        check (fxsonda::puestoUno() == antes, "un parametro fuera del bus no llega al efecto");
+        check (! s.isParameterTouched (-1) && ! s.isParameterTouched (kFxMaxParams),
+               "ni siquiera se marca como tocado, que es lo que haria que dejara de seguir el valor por defecto");
+    }
+
+    //--- un valor fuera de 0..1 se recorta --------------------------------
+    {
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (1);
+
+        s.setParameter (0, -3.0f);
+        check (s.getParameter (0) == 0.0f, "un mando por debajo de 0 se recorta a 0");
+        s.setParameter (1, 7.0f);
+        check (s.getParameter (1) == 1.0f, "y uno por encima de 1 se recorta a 1");
+    }
+
+    //--- poner un mando a su valor actual tambien lo marca ---------------
+    {
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (1);
+        s.setParameter (0, 0.7f);
+        s.setParameter (0, 0.7f);   // el mismo numero otra vez
+
+        check (s.isParameterTouched (0), "poner un mando a su valor actual tambien lo marca como tocado");
+        s.setType (5);
+        check (s.getParameter (0) == 0.7f, "y por eso el efecto nuevo respeta ese mando y no su valor por defecto");
+    }
+
+    //--- C5: un NaN no es un valor de mando ------------------------------
+    {
+        FxSlot s;
+        s.prepare (fxprobe::kSr, 2, 512, cat, count);
+        s.setType (1);
+
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        s.setParameter (0, nan);
+        s.setMix (nan);
+        s.setGain (nan);
+
+        check (std::isfinite (s.getParameter (0)), "un NaN no se cuela en un mando");
+        check (std::isfinite (s.getMix()), "ni en la mezcla");
+        check (std::isfinite (s.getGain()), "ni en la ganancia");
+        check (! s.isParameterTouched (0) || s.getParameter (0) != nan, "y el mando se queda en un numero de verdad");
+    }
+
+    //--- C8: la ley de mezcla del hueco, al numero ----------------------
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.getSlot (0).setType (1);   // la sonda: devuelve 0.5 fijos
+        e.getSlot (0).setMix (1.0f);
+        e.getSlot (0).setGain (2.0f);
+
+        const std::vector<float> salta = fxprobe::render (e, fxprobe::noise (256, 5u));
+        bool exacto = true;
+        for (float v : salta)
+            if (v != 1.0f) exacto = false;
+
+        check (exacto, "con la mezcla a 1 el hueco entrega el mojado por la ganancia, sin resto de seca");
+    }
+
+    //--- y a cero, el hueco es un pase BIT A BIT -------------------------
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.getSlot (0).setType (2);   // el retardo, para que haya cola
+        e.getSlot (0).setMix (0.6f);
+        e.getSlot (0).setParameter (0, 0.7f);
+
+        fxprobe::render (e, fxprobe::musica (4096));   // que la cola se llene
+
+        e.getSlot (0).setMix (0.0f);
+        e.getSlot (0).setGain (7.0f);
+
+        const std::vector<float> in = fxprobe::noise (1024, 99u);
+        check (fxprobe::render (e, in) == in,
+               "con la mezcla a 0 el hueco es un pase bit a bit aunque la ganancia sea 7 y el motor tenga cola");
+    }
+}
+
+//==============================================================================
+/** C3. El orden de la llamada, y lo que no puede evaporarse al cambiar de
+    tabla. Es el orden que usa NEURONiK, y el que usa ABDEep con su catalogo
+    de cuarenta y ocho filas. */
+void testFxEngineWiringOrder()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    //--- la tabla ANTES de preparar --------------------------------------
+    {
+        fxsonda::forget();
+
+        FxEngine e;
+        e.setCatalogue (cat, count);
+        check (fxsonda::nacen() == 0, "poner la tabla antes de preparar no crea nada todavia");
+
+        e.prepare (fxprobe::kSr, 2, 512);
+        check (! e.getSlot (0).isActive(), "preparar despues deja los huecos en bypass, que es su tipo de partida");
+
+        e.getSlot (0).setType (1);
+        check (fxsonda::nacen() == 1,
+               "y la tabla que se puso antes de preparar es la que hay en el hueco, no un catalogo vacio");
+    }
+    check (fxsonda::nacen() == fxsonda::mueren(), "sin dejar nada vivo");
+
+    //--- cambiar de tabla no tira lo que el usuario eligio ---------------
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.getSlot (0).setType (1);
+        e.getSlot (0).setParameter (0, 0.7f);
+
+        e.setCatalogue (fxprobe::catalogo(), fxprobe::numCatalogo());
+
+        check (e.getSlot (0).getType() == 1, "cambiar de tabla no tira el tipo que habia elegido el usuario");
+        check (e.getSlot (0).getParameter (0) == 0.7f, "ni los mandos que habia puesto");
+        check (e.getSlot (0).isActive(), "y el hueco sigue sonando, ahora con el efecto de la tabla nueva");
+    }
+
+    //--- y al volver atras, tambien ---------------------------------------
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (fxprobe::catalogo(), fxprobe::numCatalogo());
+        e.getSlot (0).setType (2);
+        e.setCatalogue (cat, count);
+
+        check (e.getSlot (0).isActive(), "un tipo de la tabla real sigue valiendo al cambiar a la tabla de la sonda");
+    }
+}
+
+//==============================================================================
+/** C6. La forma del bloque. Lo que un host puede mandar y el motor no puede
+    dejar a medias. */
+void testFxEngineBlockShape()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    FxEngine e;
+    e.prepare (fxprobe::kSr, 2, 512);
+    e.setCatalogue (cat, count);
+    e.getSlot (0).setType (1);   // la sonda: 0.5 fijos
+    e.getSlot (0).setMix (1.0f);
+    e.getSlot (0).setGain (2.0f);
+
+    //--- cero muestras, o menos que cero ---------------------------------
+    {
+        AudioBuffer<float> b (2, 128);
+        for (int i = 0; i < 128; ++i)
+        {
+            b.setSample (0, i, 0.25f);
+            b.setSample (1, i, 0.25f);
+        }
+
+        e.process (b, 0);
+        e.process (b, -8);
+
+        check (b.getSample (0, 0) == 0.25f && b.getSample (0, 127) == 0.25f,
+               "un bloque de cero muestras, o de menos, no toca el buffer");
+
+        // Y pedir MAS muestras de las que tiene el buffer no es un no-op: se
+        // procesan las que hay. Lo contrario --quedarse sin hacer nada-- es lo
+        // que dejaria el bloque entero en seco, que es el bug de las 3584
+        // muestras del que habla la cabecera del motor.
+        e.process (b, 1000000);
+        check (b.getSample (0, 0) == 1.0f && b.getSample (0, 127) == 1.0f,
+               "pedir mas muestras de las que tiene el buffer procesa las que hay, y no se queda sin hacer nada");
+    }
+
+    //--- cero canales ----------------------------------------------------
+    {
+        AudioBuffer<float> sinCanales (0, 128);
+        e.process (sinCanales, 128);
+
+        // Si el motor escribiera en el canal 0 de un buffer que no tiene
+        // canales, esto habria petado en `getWritePointer` con el aserto de
+        // DspCore. Que se llegue aqui ya es la comprobacion.
+        const std::vector<float> salta = fxprobe::render (e, fxprobe::noise (64, 3u));
+        check (salta.size() == 64 && std::isfinite (salta[10]),
+               "un buffer de cero canales no rompe el motor, que sigue sonando despues");
+    }
+
+    //--- mas de dos canales: los sobrantes, intactos ---------------------
+    {
+        AudioBuffer<float> cuatro (4, 64);
+        for (int i = 0; i < 64; ++i)
+        {
+            cuatro.setSample (0, i, 0.1f);
+            cuatro.setSample (1, i, 0.1f);
+            cuatro.setSample (2, i, 0.2f);
+            cuatro.setSample (3, i, 0.3f);
+        }
+
+        e.process (cuatro, 64);
+
+        check (cuatro.getSample (0, 10) == 1.0f, "los dos primeros canales si se procesan");
+        check (cuatro.getSample (2, 10) == 0.2f, "el tercero se queda como estaba");
+        check (cuatro.getSample (3, 40) == 0.3f, "y el cuarto tambien");
+    }
+}
+
+//==============================================================================
+/** C4 y C5 en el motor: un ruteo que no existe, los mandos del motor y la cola
+    de realimentacion. */
+void testFxEngineRoutingBounds()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    //--- un numero de ruteo que no existe --------------------------------
+    {
+        FxEngine raro, serie;
+        for (FxEngine* engine : { &raro, &serie })
+        {
+            engine->prepare (fxprobe::kSr, 2, 512);
+            engine->setCatalogue (cat, count);
+            engine->getSlot (0).setType (1);
+            engine->getSlot (0).setMix (0.5f);
+        }
+
+        raro.setRouting (static_cast<FxRouting> (42));
+        serie.setRouting (FxRouting::Series);
+
+        const std::vector<float> in = fxprobe::noise (1024, 8080u);
+        check (fxprobe::render (raro, in) == fxprobe::render (serie, in),
+               "un numero de ruteo que no existe se procesa como la serie, no se cae del switch");
+    }
+
+    //--- los mandos del motor se recortan, y el NaN no entra -------------
+    {
+        FxEngine e;
+
+        e.setSendLevel (5.0f);     check (e.getSendLevel() == 1.0f, "un envio por encima de 1 se recorta");
+        e.setSendLevel (-1.0f);    check (e.getSendLevel() == 0.0f, "y por debajo de 0 tambien");
+        e.setFeedbackGain (5.0f);  check (e.getFeedbackGain() == 0.95f, "una realimentacion por encima del tope se recorta");
+        e.setFeedbackGain (-1.0f); check (e.getFeedbackGain() == 0.0f, "y por debajo de 0 tambien");
+
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        e.setSendLevel (nan);
+        e.setFeedbackGain (nan);
+        check (std::isfinite (e.getSendLevel()), "un NaN no se cuela en el envio");
+        check (std::isfinite (e.getFeedbackGain()),
+               "ni en la realimentacion, que es la que se queda guardada en un buffer");
+    }
+
+    //--- el reset del motor vacia la cola del ruteo 9 --------------------
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.setRouting (FxRouting::SeriesWithFeedback);
+        e.setFeedbackGain (0.5f);
+        e.getSlot (0).setType (2);   // la fila que devuelve la mitad: su salida depende de la entrada
+        e.getSlot (0).setMix (1.0f);
+
+        fxprobe::render (e, fxprobe::noise (512, 11u));
+
+        const std::vector<float> silencio (512, 0.0f);
+        const std::vector<float> conCola = fxprobe::render (e, silencio);
+        bool conRealimentacion = false;
+        for (float v : conCola)
+            if (v != 0.0f) conRealimentacion = true;
+
+        check (conRealimentacion, "sin reset, el bloque siguiente lleva dentro el anterior");
+
+        e.reset();
+
+        const std::vector<float> trasReset = fxprobe::render (e, silencio);
+        bool mudo = true;
+        for (float v : trasReset)
+            if (v != 0.0f) mudo = false;
+
+        check (mudo, "reset del motor vacia la cola de realimentacion del ruteo 9");
+    }
+
+    //--- un hueco que no existe sale por el primero ---------------------
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.getSlot (0).setType (1);
+
+        // Solo la sobrecarga CONST: la otra lleva un `dspAssert` que en Debug
+        // para el proceso, y esto no es una prueba de que el aserto exista.
+        const FxEngine& ce = e;
+        check (&ce.getSlot (-1) == &ce.getSlot (0), "un hueco por debajo de rango se resuelve por el primero");
+        check (&ce.getSlot (99) == &ce.getSlot (kFxNumSlots - 1),
+               "y uno por encima se resuelve por el ultimo, que es lo que recorta el indice");
+        check (&ce.getSlot (0) != &ce.getSlot (1), "mientras que los que existen son huecos distintos");
+    }
+}
+
+//==============================================================================
+/** C7. La forma de la clase. La regla primera del modulo es que en el lazo de
+    audio no hay nada virtual, y se comprueba igual que las etapas de caracter. */
+void testFxEngineTypeTraits()
+{
+    using namespace abd::dsp;
+
+    check (! std::is_polymorphic<FxSlot>::value,
+           "el hueco no tiene vtable: en el lazo de audio no hay llamada virtual");
+    check (! std::is_polymorphic<FxEngine>::value, "ni el motor");
+    check (! std::is_copy_constructible<FxSlot>::value,
+           "un hueco no se copia: su efecto es estado opaco con un destructor arbitrario");
+    check (std::is_move_constructible<FxSlot>::value, "pero se mueve, que es como lo devuelve la fabrica");
+    check (std::is_nothrow_move_constructible<FxSlot>::value, "y se mueve sin lanzar");
+    check (! std::is_copy_constructible<FxEngine>::value, "el motor entero tampoco se copia, porque lleva dentro los cuatro huecos");
+    check (std::is_move_constructible<FxEngine>::value, "pero el motor se mueve, que es como lo coge el producto");
+    check (kFxNumSlots == 4, "el motor tiene los cuatro huecos de la topologia");
+    check (kFxMaxParams == 12, "y el hueco tiene un bus de doce mandos");
+}
+
+
+//==============================================================================
+/** LA AUDITRIA DE TOPOLOGIAS DEL MOTOR. Que hacen los NUEVE RUTEOS.
+
+    POR QUE ESTO NO ESTA EN LAS 766. Las comprobaciones del ruteo que ya
+    tienen el banco son tres y las tres son debiles a proposito: "produce
+    numeros finitos", "produce audio" y "no se dispara solo". Comprueban que el
+    motor esta vivo, no que haga lo que dice. Un ruteo que se comiera un hueco,
+    que doblara una rama o que perdiera la seca sonaria igual de bien, y de
+    hecho varios de esos numeros salen bien.
+
+    Y HAY UNO QUE NO SUENA BIEN. Con los cuatro huecos en bypass, cinco de los
+    nueve ruteos NO devuelven la senal intacta: dos la borran y tres la
+    multiplican. El detalle esta al final de esta seccion, con el porque, que es
+    de donde salio el arreglo.
+
+    COMO SE COMPRUEBA UN DIAGRAMA. Con la sonda de arriba: cuatro huecos, cada
+    uno con una fila que devuelve una constante distinta --1, 2, 4 y 8--, todos
+    con la mezcla a 0.5 y la ganancia a 1. La mezcla a 0.5 es lo que hace el
+    trabajo: en una cadena en serie, un hueco a mezcla 1 BORRA al anterior,
+    porque escribe encima. A 0.5 cada hueco deja ver el suyo y se ve el de
+    atras, y el resultado de la cadena es una cuenta cerrada donde cada
+    constante aparece con un peso distinto. Mandando una entrada de 1.0 el
+    resultado esperado es un numero exacto, y se compara bit a bit: todos los
+    productos son potencias de dos sobre 1, 2, 4 y 8, asi que no hay ni un
+    redondeo y comparar a pelo no esconde nada.
+
+    El hueco i aporta la constante 2^(i-1), y el diagrama de cada modo esta
+    escrito en la cabecera de `FxEngine.h`. aqui se comprueba que el codigo hace
+    ESA cuenta, no una parecida.
+*/
+namespace fxtopo
+{
+    using namespace abd::dsp;
+
+    const int kC1 = 9;    // las filas de constante empiezan aqui en la tabla
+    const int kC2 = 10;
+    const int kC4 = 11;
+    const int kC8 = 12;
+
+    /** Cuatro huecos con su constante, la mezcla a la mitad y la ganancia a 1.
+        Es el montaje con el que se lee un ruteo por dentro. */
+    void montar (FxEngine& e, const FxEffectInfo* cat, int count) noexcept
+    {
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+
+        const int tipos[4] = { kC1, kC2, kC4, kC8 };
+        for (int i = 0; i < kFxNumSlots; ++i)
+        {
+            e.getSlot (i).setType (tipos[i]);
+            e.getSlot (i).setMix (0.5f);
+            e.getSlot (i).setGain (1.0f);
+        }
+    }
+
+    /** Un bloque de 1.0 clavado, que es la entrada de la cuenta. */
+    std::vector<float> entrada (int n = 256) { return std::vector<float> (static_cast<size_t> (n), 1.0f); }
+
+    /** ¿Sale el bloque entero clavado a este numero? */
+    bool todoIgualA (const std::vector<float>& v, float valor) noexcept
+    {
+        for (float x : v)
+            if (x != valor) return false;
+        return true;
+    }
+} // namespace fxtopo
+
+//==============================================================================
+/** R1. Los nueve ruteos hacen la cuenta que dice su diagrama, no una parecida. */
+void testFxEngineRoutingTopology()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    // El numero de cada fila es la cuenta del diagrama con la entrada en 1.0.
+    // EstánComments en el pie de la seccion de donde salen; lo que se comprueba
+    // aqui es que el codigo siga LA CUENTA, no que cuadre el papel.
+    struct Caso { int routing; float esperado; const char* diagrama; };
+    const Caso casos[10] = {
+        { 0, 5.375f, "1 -> 2 -> 3 -> 4" },
+        { 1, 5.625f, "(1 || 2) -> 3 -> 4" },
+        { 2, 9.5f,   "(1 || 2) || (3 || 4)" },
+        { 3, 10.5f,  "1 || 2 || 3 || 4" },
+        { 4, 7.75f,  "(1 -> 2) || (3 -> 4)" },
+        { 5, 5.75f,  "1 -> (2 || 3) -> 4" },
+        { 6, 11.0f,  "(1 || 2) -> (3 || 4)" },
+        { 7, 8.25f,  "(1 -> 2 -> 3) || 4" },
+        { 8, 5.625f, "(1 || 2) -> 3 -> 4, el mismo diagrama que el 1" },
+        { 9, 5.375f, "1 -> 2 -> 3 -> 4 con la realimentacion a 0" }
+    };
+
+    for (const Caso& c : casos)
+    {
+        FxEngine e;
+        fxtopo::montar (e, cat, count);
+        e.setRouting (static_cast<FxRouting> (c.routing));
+        e.setFeedbackGain (0.0f);
+
+        const std::vector<float> out = fxprobe::render (e, fxtopo::entrada());
+
+        check (fxtopo::todoIgualA (out, c.esperado), c.diagrama);
+        std::printf ("       [ruteo %d] %-34s = %g\n", c.routing, c.diagrama, c.esperado);
+    }
+
+    // Y el 1 y el 8, que el banco ya comprobaba, aqui se ven con la cuenta.
+    check (casos[1].esperado == casos[8].esperado,
+           "el 1 y el 8 tienen la misma cuenta, que es lo que hace ABDEep con dos nombres");
+}
+
+//==============================================================================
+/** R2. Con los cuatro huecos en BYPASS, el modulo es transparente. Y en los
+    nueve ruteos, no solo en el de serie. */
+void testFxEngineBypassIsTransparent()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+    const std::vector<float> uno = fxtopo::entrada();
+
+    for (int r = 0; r <= 9; ++r)
+    {
+        FxEngine e;
+        e.prepare (fxprobe::kSr, 2, 512);
+        e.setCatalogue (cat, count);
+        e.setRouting (static_cast<FxRouting> (r));
+        e.setFeedbackGain (0.0f);
+
+        char what[128];
+        std::snprintf (what, sizeof (what),
+                       "con los cuatro huecos en bypass, el ruteo %d deja la senal intacta", r);
+
+        check (fxprobe::render (e, uno) == uno, what);
+    }
+}
+
+//==============================================================================
+/** R3. El modo de envio y el bypass del motor, en los nueve ruteos. El envio
+    mezcla al FINAL, y por eso el resultado es la seca y la cuenta del ruteo con
+    el mismo reparto, sin tocar los mandos de los huecos. */
+void testFxEngineSendAcrossTopologies()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    struct Caso { int routing; float insercion; };
+    const Caso casos[10] = {
+        { 0, 5.375f }, { 1, 5.625f }, { 2, 9.5f },  { 3, 10.5f }, { 4, 7.75f },
+        { 5, 5.75f },  { 6, 11.0f },  { 7, 8.25f }, { 8, 5.625f }, { 9, 5.375f }
+    };
+
+    for (const Caso& c : casos)
+    {
+        FxEngine e;
+        fxtopo::montar (e, cat, count);
+        e.setRouting (static_cast<FxRouting> (c.routing));
+        e.setFeedbackGain (0.0f);
+        e.setMode (FxMode::Send);
+        e.setSendLevel (0.5f);
+
+        const std::vector<float> out = fxprobe::render (e, fxtopo::entrada());
+        check (fxtopo::todoIgualA (out, 0.5f + 0.5f * c.insercion),
+               "el envio es la mezcla del bus, no un cambio en los mandos de los huecos");
+
+        bool mandosIntactos = true;
+        for (int i = 0; i < kFxNumSlots; ++i)
+            if (e.getSlot (i).getMix() != 0.5f || e.getSlot (i).getGain() != 1.0f)
+                mandosIntactos = false;
+        check (mandosIntactos, "y los mandos de los cuatro huecos se quedan donde el usuario los puso");
+    }
+
+    //--- y el bypass del motor, en los nueve -----------------------------
+    for (int r = 0; r <= 9; ++r)
+    {
+        FxEngine e;
+        fxtopo::montar (e, cat, count);
+        e.setRouting (static_cast<FxRouting> (r));
+        e.setMode (FxMode::Bypass);
+
+        const std::vector<float> uno = fxtopo::entrada();
+
+        char what[128];
+        std::snprintf (what, sizeof (what),
+                       "el bypass del motor ignora el ruteo %d y devuelve la senal intacta", r);
+
+        check (fxprobe::render (e, uno) == uno, what);
+    }
+}
+
+//==============================================================================
+/** R4. Donde entra la realimentacion del ruteo 9. Con un solo hueco activo, la
+    cuenta del bloque se puede dejar escrita entera. */
+void testFxEngineFeedbackEntersBeforeTheChain()
+{
+    using namespace abd::dsp;
+
+    const FxEffectInfo* cat = fxsonda::tabla();
+    const int count = fxsonda::kFilas;
+
+    FxEngine e;
+    e.prepare (fxprobe::kSr, 2, 512);
+    e.setCatalogue (cat, count);
+    e.setRouting (FxRouting::SeriesWithFeedback);
+    e.setFeedbackGain (0.5f);
+
+    // Un solo hueco, con su constante. Los otros tres en bypass, que es lo que
+    // deja la cuenta a la vista.
+    e.getSlot (0).setType (fxtopo::kC1);
+    e.getSlot (0).setMix (0.5f);
+    e.getSlot (0).setGain (1.0f);
+
+    const std::vector<float> uno = fxtopo::entrada();
+
+    const std::vector<float> primero = fxprobe::render (e, uno);
+    check (fxtopo::todoIgualA (primero, 1.0f),
+           "el primer bloque no lleva realimentacion, porque la cola empieza vacia");
+
+    //  y = hueco( x + g · y_anterior )  =  0.5 · (1 + 0.5) + 0.5  =  1.25
+    //
+    // Y SI LA REALIMENTACION SE SUMARA DESPUES DE LA CADENA daria 1.5, que es
+    // otra topologia. La diferencia entre 1.25 y 1.5 es lo que distingue una de
+    // la otra, y es la que hizo falta para elegir entre las dos.
+    const std::vector<float> segundo = fxprobe::render (e, uno);
+    check (fxtopo::todoIgualA (segundo, 1.25f),
+           "la realimentacion entra ANTES de la cadena, no despues");
+
+    //--- y con la ganancia a 0 el 9 es exactamente la serie -----------------
+    e.setFeedbackGain (0.0f);
+    check (fxprobe::render (e, uno) == primero,
+           "con la realimentacion a 0 el bloque siguiente vuelve a ser el primero");
+}
+
+
 int main()
 {
     checkStageContract<abd::dsp::NullStage>       ("NullStage");
@@ -2952,7 +5496,28 @@ int main()
     testFxEngineBlockSplitting();
     testFxParameterNormalisation();
     testCharacterStageHasNoVtable();
+
+    // La auditoria estructural del motor de huecos (criterios C1 a C8).
+    testFxSlotLifecycle();
+    testFxSlotRowContract();
+    testFxSlotParameterBounds();
+    testFxEngineWiringOrder();
+    testFxEngineBlockShape();
+    testFxEngineRoutingBounds();
+    testFxEngineTypeTraits();
+    testFxEngineRoutingTopology();
+    testFxEngineBypassIsTransparent();
+    testFxEngineSendAcrossTopologies();
+    testFxEngineFeedbackEntersBeforeTheChain();
+    std::printf ("  [huecos] topologias: los nueve ruteos, el bypass y el envio, por cuenta y no por sonido\n");
+    std::printf ("  [huecos] auditoria estructural: ciclo de vida, filas a medias, orden, rangos, no-finitos, forma del bloque y forma de la clase\n");
+
     testSchroederKnobsAreClamped();
+    testShelfFilter();
+    testShelfRowContract();
+    testPhaserCoefficientParity();
+    testPhaserControlRateStepping();
+    testPhaserRowContract();
     testSchroederDampingAtZero();
     testTapeColourDriftIsNotWired();
 

@@ -155,6 +155,17 @@ public:
         if (index < 0 || index >= kFxMaxParams)
             return;
 
+        // Y UN NaN NO ES UN VALOR DE MANDO. `jlimit` recorta comparando, y un
+        // NaN no es mayor ni menor que nada, asi que pasaria de largo tal cual
+        // y entraria en el estado del efecto. En un coro es un zumbido; en el
+        // ruteo 9 es peor, porque `FxEngine` guarda la salida del bloque en su
+        // cola de realimentacion y ese NaN vuelve en cada bloque, para siempre.
+        //
+        // `std::isfinite` no es libm: es una prueba de bits que el compilador
+        // resuelve sin llamada, asi que el modulo sigue siendo libm-free.
+        if (! std::isfinite (value))
+            return;
+
         touched_[index] = true;
 
         const float v = jlimit (0.0f, 1.0f, value);
@@ -182,10 +193,13 @@ public:
         return index >= 0 && index < kFxMaxParams && touched_[index];
     }
 
-    void setGain (float gain) noexcept  { gain_ = gain < 0.0f ? 0.0f : gain; }
+    // Los dos unten las manos: un valor que no es un numero se IGNORA y el
+    // mando se queda como estaba, en vez de recortarse a un numero valido. Es
+    // la unica diferencia con el recorte de verdad, que sigue igual.
+    void setGain (float gain) noexcept  { if (std::isfinite (gain)) gain_ = gain < 0.0f ? 0.0f : gain; }
     float getGain() const noexcept      { return gain_; }
 
-    void setMix (float mix) noexcept    { mix_ = jlimit (0.0f, 1.0f, mix); }
+    void setMix (float mix) noexcept    { if (std::isfinite (mix)) mix_ = jlimit (0.0f, 1.0f, mix); }
     float getMix() const noexcept       { return mix_; }
 
     //==============================================================================

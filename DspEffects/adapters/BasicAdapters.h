@@ -44,6 +44,8 @@
 #include "DspEffects/DspSchroederReverb.h"
 #include "DspEffects/FxRegistry.h"
 #include "DspEffects/JunoBBD.h"
+#include "DspEffects/ShelfFilter.h"
+#include "DspEffects/Phaser4.h"
 #include "DspEffects/characters/BbdNoise.h"
 #include "DspEffects/profiles/JunoBbdProfile.h"
 
@@ -409,6 +411,13 @@ class SaturationFx
 public:
     static constexpr int kNumParams = 1;
 
+    /** La rampa del `drive`, en segundos. Vive aqui y no como literal en
+        `create` porque un test de NEURONiK mide CUANTO tarda el drive en
+        asentarse (ver `Tests/ModulationDest17DriveTest.cpp`) y necesita el
+        numero de aqui, no una copia que se separa el dia que este valor
+        cambie. */
+    static constexpr double kDriveRampSeconds = 0.005;
+
     static const FxParamSpec* specs() noexcept
     {
         // Solo un mando. El segundo era `bias`, y `Saturation::processSample` no
@@ -434,7 +443,7 @@ public:
         // detras de un slot con su propia mezcla, y 20 ms de rampa en el `drive`
         // se oyen como un golpe de ganancia al mover el mando. Los 20 ms de
         // NEURONiK son de su cadena entera, no de este parametro.
-        self->smoother_.reset (sampleRate, 0.005);
+        self->smoother_.reset (sampleRate, kDriveRampSeconds);
         self->smoother_.setCurrentAndTargetValue (self->target_);
         return self;
     }
@@ -667,4 +676,480 @@ private:
     Knobs knobs { specs(), kNumParams };
 };
 
+//==============================================================================
+/** REPISA. La fila mas simple del catalogo y la unica cuya subida de valor es
+    un SEGUNDO de lo que cuestan las otras: un biquad son diez multiplicaciones.
+
+    Y AQUI ESTA LA DECISION QUE NO ES OBVIA: los mandos se suavizan y se empujan
+    al motor CADA 16 MUESTRAS, no en cada bloque y no en cada muestra.
+
+    - Por bloque es un salto cada 512, y se oye.
+    - Por muestra es peor que eso: recalcular los coeficientes son cinco
+      transcendentales, y MEDIDO son 194 ns por muestra, o sea el 20,7% de un
+      nucleo a 48 kHz para un biquad. Es el precio de un filtro.
+    - Cada 16 mide 17,9 ns (0,18%) y cada 32 mide 20,7 ns (0,21%). ENTRE LOS
+      DOS NO HAY DIFERENCIA REAL: la maquina estaba midiendo por debajo del
+      ruido, y el mas bajo no cuesta nada.
+
+    LA MEDICION DEL CLIC HAY QUE HACERLA BIEN, y la primera vez no se hizo. Se
+    comparaba el "excedente" -cuanto salta la salida por encima de lo que saltaba
+    la ENTRADA- con un barrido de frecuencia de 200 Hz a 16 kHz. Con +12 dB de
+    repisa alta la salida CRECE durante el barrido, porque a 200 Hz la repisa da
+    0 dB y a 16 kHz da 12: el "excedente" medido era sobre todo la senal
+    creciendo. Por eso parecia que empujar los coeficientes cada 256 muestras
+    "sonaba" mucho peor que cada 32, y no sonaba: crecia.
+
+    Un giro de mando de verdad son unos cientos de Hz por segundo, no 800 Hz por
+    milisegundo: un barrido de 20 Hz a 20 kHz en 20 ms es un caso que no se da.
+
+    Y LA CIFRA DE ESTA TARASA NO ESTA AQUI A PROPOSITO, y antes si lo estaba: ocho
+    numeros, dos velocidades y cuatro tasas, de una medicion hecha con el criterio
+    del "excedente" que los dos parrafos de arriba acaban de declarar incorrecto.
+    No se pueden verificar con el metodo bueno, asi que no se escriben. El banco
+    mide el caso con el criterio correcto —el motor contra si mismo con la misma
+    rampa y los mismos destinos, y lo unico que cambia es cada cuanto se empuja—
+    y lo imprime en cada ejecucion, junto con una fila de 32 muestras que
+    comprueba que la puerta pone en rojo. Ahi estan los numeros, y se actualizan
+    solos.
+
+    Y 16 DIVIDE a los tamanos de bloque de todo el arbol: 64, 128, 256, 480, 512,
+    1024 y 2048. El contador NO se reinicia en cada bloque a proposito: si se
+    reiniciara, con un bloque de 384 muestras la division no cuadra y el empuje
+    se moveria de fase cada bloque, que es la forma de que dos bloques iguales
+    den dos sonidos distintos.
+
+    Y LA BANDA MUERTA DE 0,05 dB DEL MOTOR SE CONSERVA, y aqui tiene un segundo
+    trabajo, medido: con el barrido de GANANCIA la tasa de control da igual
+    (x1,00 del paso en regimen desde 1 hasta 128 muestras), porque la banda
+    muerta ya cuantiza sola la rampa. El motor solo recalcula cuando la ganancia
+    se ha movido de verdad, que es justo lo que se queria de ella. El mando que
+    SI nota la tasa es el de frecuencia, y por eso la puerta del rampado del
+    test mide ESE y no el de ganancia.
+
+    EL MANDO DE MODO NO SE SUAVIZA, y es deliberado. Es un selector discreto
+    entre dos repisas: el paso de una a otra cambia la funcion de transferencia
+    entera, y suavizarlo daria un filtro que no es ni bajo ni alto durante la
+    transicion, o sea un filtro que no existe. El original de MS2000 tampoco lo
+    suaviza. */
+class ShelfEqFx
+{
+public:
+    static constexpr int kNumParams = 3;
+
+    /** Cada cuanto se empuja el mando al motor, en muestras. MEDIDO: el coste
+        deja de distinguir entre 16 y 32, y el clic del barrido de frecuencia
+        es el que manda. Ver la cabecera. */
+    static constexpr int kControlRate = 16;
+
+    static const FxParamSpec* specs() noexcept
+    {
+        // `freq` es CONTINUA y va de 20 Hz a 20 kHz, y no una tabla de cuatro
+        // pasos como la de ABDMS2000. Las tablas de 4 pasos (160/250/400/600 y
+        // 4000/6000/8000/12000 Hz) son politica de producto y se quedan en el
+        // producto, que es la misma regla que el rango de 0,10 a 8 Hz del coro.
+        //
+        // El techo de 20 kHz esta POR ENCIMA de 0,45·fs a cualquier sample rate
+        // del arbol menos a 32 kHz, donde el motor lo recorta a 14,4 kHz. Se
+        // deja el techo alto a proposito: el motor recorta y el filtro sigue
+        // siendo un filtro, mientras que un techo de 14 kHz en la fila obligaria
+        // a un producto que trabaja a 96 kHz a no poder pedir 16 kHz.
+        //
+        // El sesgo de 0,5 es el que da recorrido util: en 20 Hz a 20 kHz, la
+        // mitad baja del rango (20 Hz a 1 kHz) cae en el 0,22 del recorrido, y
+        // sin sesgo caia en el 0,05 — la zona donde un filtro de graves no se
+        // puede afinar.
+        static const FxParamSpec table[kNumParams] = {
+            { "mode",  0.0f,     1.0f,    0.0f,  1.00f, 2 },   // baja, alta
+            { "freq",  20.0f, 20000.0f, 1000.0f,  0.50f, 0 },   // Hz
+            { "gain", -12.0f,    12.0f,    3.0f,  1.00f, 0 }    // dB
+        };
+        return table;
+    }
+
+    static void* create (double sampleRate) noexcept
+    {
+        auto* self = new ShelfEqFx();
+        self->prepare (sampleRate);
+        return self;
+    }
+
+    static void destroy (void* instance) noexcept { delete static_cast<ShelfEqFx*> (instance); }
+
+    static void reset (void* instance) noexcept
+    {
+        // El estado de audio del motor Y las rampas. Sin lo segundo, el primer
+        // bloque despues de un `reset` de host sale con los mandos a medio
+        // camino: el usuario no lo ha pedido y suena como un golpe de ganancia.
+        auto* self = static_cast<ShelfEqFx*> (instance);
+        self->engine_.reset();
+        self->ganancia_.jumpToTarget();
+        self->frecuencia_.jumpToTarget();
+        self->aplicaMandos (self->ganancia_.getTarget(), self->frecuencia_.getTarget());
+    }
+
+    static void setParam (void* instance, int index, float value) noexcept
+    {
+        static_cast<ShelfEqFx*> (instance)->setParam (index, value);
+    }
+
+    static void setAll (void* instance, const float* v, int count) noexcept
+    {
+        auto* self = static_cast<ShelfEqFx*> (instance);
+        for (int i = 0; i < count && i < kNumParams; ++i)
+            self->setParam (i, v[i]);
+        self->asientaMandos();
+    }
+
+    static void process (void* instance, const float* inL, const float* inR,
+                         float* outL, float* outR, int n) noexcept
+    {
+        auto* self = static_cast<ShelfEqFx*> (instance);
+
+        for (int i = 0; i < n; ++i)
+        {
+            // La rampa avanza SIEMPRE, incluso en las muestras en las que no se
+            // empuja nada al motor. Si solo se leyera en las de control, la
+            // rampa seria 32 veces mas rapida en un bloque de 32 muestras que
+            // en uno de 512, y el mismo barrido sonaria distinto segun el
+            // tamanio de bloque del host.
+            const float ganancia = self->ganancia_.getNextValue();
+            const float frecuencia = self->frecuencia_.getNextValue();
+
+            // Lo que llega al motor es DONDE ESTA LA RAMPA, no su destino. La
+            // primera version empujaba `getTarget()` —el valor final— y el
+            // suavizado no hacia nada: el motor se comia el salto entero en la
+            // primera muestra de control, que es exactamente el tictac que el
+            // suavizado existe para evitar. Un suavizado que no se aplica al
+            // motor es peor que no tenerlo, porque ademas cuesta una rampa por
+            // muestra y da la sensacion de que el problema esta resuelto.
+            //
+            // Y EL CONTADOR TIENE QUE VOLVER A CERO, con un `++` y un `>=`, no
+            // con un `++ == 0`: el `== 0` solo es cierto en la primera muestra de
+            // la vida del objeto, y en la segunda no vuelve a ser cierto nunca.
+            // Con eso el empuje pasaba una vez —en `prepare`— y los tres mandos
+            // se quedaban clavados en su valor por defecto para siempre: mover
+            // la ganancia no hacia NADA. No lo cazaba ningun test de sonido
+            // porque el resultado final era el correcto, solo que ya no
+            // respondia; hace falta un test que mueva el mando y compare.
+            if (++self->cuenta_ >= kControlRate)
+            {
+                self->cuenta_ = 0;
+                self->aplicaMandos (ganancia, frecuencia);
+            }
+
+            float l = inL[i];
+            float r = inR[i];
+            self->engine_.processFrame (l, r);
+            outL[i] = l;
+            outR[i] = r;
+        }
+    }
+
+private:
+    void prepare (double sampleRate) noexcept
+    {
+        engine_.prepare (sampleRate);
+
+        // 20 ms, la rampa que ya usan los envoltorios que este sustituye.
+        ganancia_.reset (sampleRate, 3.0f);
+        frecuencia_.reset (sampleRate, 1000.0f);
+
+        // El contador arranca ATRASADO, para que la primera muestra ya empuje
+        // los mandos. Ver la nota del phaser: un coeficiente atascado un bloque
+        // entero es un bloque entero de filtro equivocado. Aqui el efecto es
+        // menor, porque en `prepare` los mandos ya estan en su sitio, pero el
+        // mismo razonamiento vale y el mismo numero lo hace.
+        cuenta_ = kControlRate - 1;
+        aplicaMandos (ganancia_.getTarget(), frecuencia_.getTarget());
+    }
+
+    void setParam (int index, float value) noexcept
+    {
+        const float p = knobs.to (index, value);
+
+        switch (index)
+        {
+            case 0: modo_ = (p < 0.5f) ? ShelfMode::Low : ShelfMode::High; break;
+            case 1: frecuencia_.setTarget (p); break;
+            case 2: ganancia_.setTarget (p);  break;
+            default: break;
+        }
+    }
+
+
+    /** Asienta las rampas en su destino.
+
+        Y SOLO desde `setAll`, que es la via de CARGA DE UN PRESET. Un preset es
+        una discontinuidad por naturaleza: el host lo carga y espera oirlo, no
+        ver un fundido desde los valores por defecto de la fila. `setParam` sigue
+        rampando, porque esa es la via de la automatizacion y de un panel.
+
+        Sin esto, un objeto recien creado con los mandos puestos por `setAll`
+        salia rampando desde el valor por defecto, y despues de un `reset` salia
+        ya en el valor: o sea que cargar un preset y reiniciar el host sonaban
+        distinto, que es el tipo de cosa que solo se nota en una comparacion A/B
+        y que nadie encuentra porque "los dos suenan bien".
+    */
+    void asientaMandos() noexcept
+    {
+        ganancia_.jumpToTarget();
+        frecuencia_.jumpToTarget();
+    }
+
+    /** Empuja al motor la posicion ACTUAL de las rampas.
+
+        Se llama con el destino en `prepare` y en `reset` —donde no hay rampa
+        todavia, porque no ha pasado ninguna muestra— y con la posicion
+        interpolada en el lazo de audio. */
+    void aplicaMandos (float ganancia, float frecuencia) noexcept
+    {
+        engine_.setMode (modo_);
+        engine_.setFrequencyHz (frecuencia);
+        engine_.setGainDB (ganancia);
+    }
+
+    ShelfFilter engine_;
+    Knobs knobs { specs(), kNumParams };
+    SmoothedKnob ganancia_;
+    SmoothedKnob frecuencia_;
+    ShelfMode modo_ = ShelfMode::Low;
+
+    /** Cuenta las muestras desde el ultimo empuje, y NO se reinicia por bloque.
+        Ver la nota de la cabecera: reiniciarla haria que el punto de empuje
+        dependiera del tamanio de bloque del host. */
+    int cuenta_ = 0;
+};
+
+//==============================================================================
+/** PHASER. La fila del `Phaser4` de la cabecera, que es donde vive el barrido.
+
+    Y AQUI LA FILA NO HACE CASO NADA, que es lo que hace el phaser compartible:
+    el motor ya calcula el coeficiente por bloque, asi que el adaptador no tiene
+    ni que patronizar el barrido ni guardar la fase del LFO. Solo empuja tres
+    mandos, y los tres se suavizan porque los tres mueven la senal de golpe:
+
+      - `rate`  cambia el incremento de la fase del LFO. Sin rampa, un salto
+                salta la fase, y un salto de fase en un LFO es un clic.
+      - `depth` cambia el exponente del barrido, o sea el corte. Sin rampa, el
+                notch se teletransporta de un sitio a otro.
+      - `feedback` cambia la ganancia del lazo, que es lo mas immediate de los
+                tres: el lazo se asienta en un par de muestras.
+
+    LOS MANDOS EN UNIDADES FISICAS, y el mapeo del MS2000 se queda en el MS2000.
+    Su `modFxSpeed` es un entero de 0 a 127 que se mapea a
+    `0.02 · 750^(n/127)` Hz, o sea un recorrido LOGARITMICO de tres decadas. Una
+    fila comun no puede llevar ese mapeo dentro y seguir siendo una fila
+    generica, asi que la fila habla en hercios y quien quiera el tacto del MS2000
+    mapea en su producto, que es la misma regla que las tablas de 4 pasos de la
+    repisa.
+
+    LA TASA DE EMPUJE ES LA DEL MOTOR, no una del adaptador. Se escribe
+    `Phaser4::kControlRate` y no un 16, para que las dos cosas que tienen que
+    caer juntas no puedan separarse: si el motor recalculara en 16 y el adaptador
+    empujara en 32, el motor leeria un mando con hasta 16 muestras de retraso, y
+    el efecto de un barrido seria medio bloque de desfase. La unica forma de que
+    eso pase es cambiar el numero del motor sin cambiar el del adaptador, y por
+    eso el numero vive en el motor y el adaptador lo lee.
+
+    Y LOS TRES MANDOS SE SUAVIZAN A 20 ms, la misma rampa que la repisa, y por
+    el mismo motivo de siempre: 20 ms es lo que tardan los envoltorios que estos
+    adaptadores sustituyen, y un efecto que se mueve mas rapido que su envoltorio
+    suena a que el envoltorio se ha roto. */
+class PhaserFx
+{
+public:
+    static constexpr int kNumParams = 3;
+
+    /** Cada cuanto se empuja el mando al motor. NO es un numero propio: es el
+        del motor, para que el mando llegue en la misma muestra en la que el
+        motor recalcula el coeficiente. */
+    static constexpr int kControlRate = Phaser4<4>::kControlRate;
+
+    static const FxParamSpec* specs() noexcept
+    {
+        // `rate` en hercios, de 0,02 a 15, que es el rango del MS2000 y tambien
+        // el del motor. El sesgo de 0,45 da recorrido util abajo: sin el, la
+        // mitad baja del recorrido (0,02 a 7,5 Hz, que es donde vive un LFO de
+        // barrido) caeria en el 0,20, y con un sesgo de 1,0 la mitad alta
+        // —de 7,5 a 15 Hz, que ya se oye como trémolo— caeria en el 0,64. Con
+        // 0,45 las dos mitades tienen recorrido.
+        //
+        // Y LOS TRES VALORES POR DEFECTO NO SON LOS DEL MS2000, que es lo que
+        // se pondria a hacer, y el motivo es una puerta del propio modulo: el
+        // banco exige que ningun mando por defecto caiga fuera de 0,15 a 0,95 del
+        // recorrido normalizado, porque un mando cuyo valor de fabrica esta en
+        // el 0,05 del recorrido es un mando que no se puede usar —el producto se
+        // abre con el efecto casi en su minimo.
+        //
+        // Los del MS2000 no lo cumplen. Su velocidad de fabrica son 40/127, que
+        // con este rango y este sesgo cae en 0,12 de recorrido; y su
+        // realimentacion de fabrica es 0, que es el extremo de verdad.
+        //
+        // Y ESO NO ES UN DEFECTO DEL MS2000. Alli la realimentacion a cero es lo
+        // correcto, porque un phaser no tiene por que resonar al abrirse. Lo
+        // que cambia de un sitio a otro es la fila: una fila generica se abre en
+        // el sitio donde un usuario la encuentra, y un producto que quiera sus
+        // valores de fabrica los pasa por `setParam` en su arranque, que es lo
+        // que ya hace SynthEngine con los suyos. La fila no es el producto.
+        //
+        // Los tres de aqui, y donde caen:
+        //
+        //     rate      0,60 Hz   ->  0,23 del recorrido
+        //     depth     0,50      ->  0,50
+        //     feedback  0,25      ->  0,25
+        //
+        // El 0,25 de realimentacion es un cuarto del tope del motor (0,90), o
+        // sea 0,225: se oye el barrido abriéndose sin que la resonacion se
+        // lleve el sinal, que es como arranca un phaser.
+        static const FxParamSpec table[kNumParams] = {
+            { "rate",     0.02f, 15.00f, 0.60f, 0.45f, 0 },  // Hz
+            { "depth",    0.00f,  1.00f, 0.50f, 1.00f, 0 },  // exponente del barrido
+            { "feedback", 0.00f,  1.00f, 0.25f, 1.00f, 0 }   // 0..1; el tope de 0,90 es del motor
+        };
+        return table;
+    }
+
+    static void* create (double sampleRate) noexcept
+    {
+        auto* self = new PhaserFx();
+        self->prepare (sampleRate);
+        return self;
+    }
+
+    static void destroy (void* instance) noexcept { delete static_cast<PhaserFx*> (instance); }
+
+    static void reset (void* instance) noexcept
+    {
+        // El estado del motor Y las rampas, por el mismo motivo que en la
+        // repisa: sin lo segundo, el primer bloque despues de un `reset` de
+        // host sale con los mandos a medio camino.
+        auto* self = static_cast<PhaserFx*> (instance);
+        self->engine_.reset();
+        self->rate_.jumpToTarget();
+        self->depth_.jumpToTarget();
+        self->feedback_.jumpToTarget();
+        self->aplicaMandos (self->rate_.getTarget(), self->depth_.getTarget(),
+                            self->feedback_.getTarget());
+    }
+
+    static void setParam (void* instance, int index, float value) noexcept
+    {
+        static_cast<PhaserFx*> (instance)->setParam (index, value);
+    }
+
+    static void setAll (void* instance, const float* v, int count) noexcept
+    {
+        auto* self = static_cast<PhaserFx*> (instance);
+        for (int i = 0; i < count && i < kNumParams; ++i)
+            self->setParam (i, v[i]);
+        self->asientaMandos();
+    }
+
+    static void process (void* instance, const float* inL, const float* inR,
+                         float* outL, float* outR, int n) noexcept
+    {
+        auto* self = static_cast<PhaserFx*> (instance);
+
+        for (int i = 0; i < n; ++i)
+        {
+            // La rampa avanza SIEMPRE, tambien en las muestras en las que no se
+            // empuja nada, por el motivo que ya esta escrito en la repisa: si
+            // solo se leyera en las de control, la rampa seria 16 veces mas
+            // rapida en un bloque de 16 muestras que en uno de 512.
+            const float rate = self->rate_.getNextValue();
+            const float depth = self->depth_.getNextValue();
+            const float feedback = self->feedback_.getNextValue();
+
+            // Lo que llega al motor es DONDE ESTA LA RAMPA, no su destino. Si se
+            // empujara `getTarget()`, el suavizado no haria nada: el motor se
+            // comeria el salto entero el primer bloque, que es exactamente el
+            // tictac que el suavizado existe para evitar.
+            //
+            // Y el contador TIENE QUE VOLVER A CERO con un `>=` y no con un
+            // `== 0`, que solo es cierto en la primera muestra de la vida del
+            // objeto. Con el `== 0` los tres mandos se quedaban clavados en su
+            // valor por defecto y moverlos no hacia NADA.
+            if (++self->cuenta_ >= kControlRate)
+            {
+                self->cuenta_ = 0;
+                self->aplicaMandos (rate, depth, feedback);
+            }
+
+            float l = inL[i];
+            float r = inR[i];
+            self->engine_.processFrame (l, r);
+            outL[i] = l;
+            outR[i] = r;
+        }
+    }
+
+private:
+    void prepare (double sampleRate) noexcept
+    {
+        engine_.prepare (sampleRate);
+
+        // 20 ms, la misma rampa que la repisa.
+        rate_.reset (sampleRate, 0.60f);
+        depth_.reset (sampleRate, 0.50f);
+        feedback_.reset (sampleRate, 0.25f);
+
+        cuenta_ = kControlRate - 1;
+        aplicaMandos (rate_.getTarget(), depth_.getTarget(), feedback_.getTarget());
+    }
+
+    void setParam (int index, float value) noexcept
+    {
+        const float p = knobs.to (index, value);
+
+        switch (index)
+        {
+            case 0: rate_.setTarget (p);     break;
+            case 1: depth_.setTarget (p);    break;
+            case 2: feedback_.setTarget (p); break;
+            default: break;
+        }
+    }
+
+
+    /** Asienta las rampas en su destino.
+
+        Y SOLO desde `setAll`, que es la via de CARGA DE UN PRESET. Un preset es
+        una discontinuidad por naturaleza: el host lo carga y espera oirlo, no
+        ver un fundido desde los valores por defecto de la fila. `setParam` sigue
+        rampando, porque esa es la via de la automatizacion y de un panel.
+
+        Sin esto, un objeto recien creado con los mandos puestos por `setAll`
+        salia rampando desde el valor por defecto, y despues de un `reset` salia
+        ya en el valor: o sea que cargar un preset y reiniciar el host sonaban
+        distinto, que es el tipo de cosa que solo se nota en una comparacion A/B
+        y que nadie encuentra porque "los dos suenan bien".
+    */
+    void asientaMandos() noexcept
+    {
+        rate_.jumpToTarget();
+        depth_.jumpToTarget();
+        feedback_.jumpToTarget();
+    }
+
+    /** Empuja al motor la posicion ACTUAL de las rampas. */
+    void aplicaMandos (float rate, float depth, float feedback) noexcept
+    {
+        engine_.setRateHz (rate);
+        engine_.setDepth (depth);
+        engine_.setFeedback (feedback);
+    }
+
+    Phaser4<4> engine_;
+    Knobs knobs { specs(), kNumParams };
+    SmoothedKnob rate_;
+    SmoothedKnob depth_;
+    SmoothedKnob feedback_;
+
+    /** Cuenta las muestras desde el ultimo empuje, y NO se reinicia por bloque.
+        Ver la nota de la repisa: reiniciarla haria que el punto de empuje
+        dependiera del tamano de bloque del host. */
+    int cuenta_ = 0;
+};
+
 } // namespace abd::dsp::adapters
+

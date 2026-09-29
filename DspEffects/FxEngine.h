@@ -38,11 +38,19 @@
     Y EL MODO FX, que no es un ruteo sino donde se engancha: 0 insert, 1 send,
     2 bypass.
 
-    UNA ADVERTENCIA SOBRE EL MODO 1 Y EL 8. Hacen EXACTAMENTE lo mismo. No es un
-    descuido pendiente de arreglar: en ABDEep ya eran el mismo diagrama con dos
-    nombres, y un panel que losofferseparados es una decision de interface, no
-    de motor. Se conservan los dos numeros porque cambiar el significado de un
-    numero que un panel ya muestra es peor que la duplicidad.
+    UNA ADVERTENCIA SOBRE EL MODO 1 Y EL 8. Aqui hacen EXACTAMENTE lo mismo, los
+    dos `(1 || 2) -> 3 -> 4`, y se conservan los dos numeros porque cambiar el
+    significado de un numero que un panel ya muestra es peor que la duplicidad.
+
+    OJO, QUE "HACEN LO MISMO" ES DE AQUI, NO DE ALLI. Se comprobo contra el
+    codigo de ABDEep (`FXEngine_Routing.cpp`) y alli NO son el mismo diagrama:
+    su modo 8 si es `(1∥2)→3→4`, y su modo 1 es `(1∥2)→(3∥4)`, que aqui es el
+    6. O sea que el numero de ABDEep y el de aqui no son el mismo catalogo: el 1
+    de ABDEep es el 6 de aqui y el 8 de ABDEep es el 1 de aqui. Y el 1 de ABDEep
+    promedia la pareja (`1 / activos`) mientras que aqui se suma. Las dos
+    diferencias estan escritas porque son el tipo de cosa que se da por buena
+    sin mirar y luego pesa: un preset migrado de un producto al otro no suena
+    igual por el numero del modo, y porque la suma y la media no son lo mismo.
 
   ==============================================================================
 */
@@ -142,12 +150,14 @@ public:
     void setMode (FxMode m) noexcept { mode_ = m; }
     FxMode getMode() const noexcept { return mode_; }
 
-    /** Nivel de envio, para `FxMode::Send`. */
-    void setSendLevel (float level) noexcept { sendLevel_ = jlimit (0.0f, 1.0f, level); }
+    /** Nivel de envio, para `FxMode::Send`. Un valor que no es un numero se
+        ignora: en el 9 la realimentacion se queda en un buffer y ahi un NaN no
+        se va nunca. */
+    void setSendLevel (float level) noexcept { if (std::isfinite (level)) sendLevel_ = jlimit (0.0f, 1.0f, level); }
     float getSendLevel() const noexcept     { return sendLevel_; }
 
     /** Ganancia de la realimentacion global del ruteo 9. */
-    void setFeedbackGain (float gain) noexcept { feedbackGain_ = jlimit (0.0f, 0.95f, gain); }
+    void setFeedbackGain (float gain) noexcept { if (std::isfinite (gain)) feedbackGain_ = jlimit (0.0f, 0.95f, gain); }
     float getFeedbackGain() const noexcept    { return feedbackGain_; }
 
     void reset() noexcept
@@ -270,6 +280,14 @@ private:
 
     void processInPlace (AudioBuffer<float>& buffer, int channels, int n) noexcept
     {
+        // Sin ningun efecto en la cadena no se toca el buffer. En el modo de
+        // envio tambien: si no hay nada que enviar, la mezcla final es
+        // `seca·(1−nivel) + mojada·nivel` con las dos cosas iguales, que es la
+        // seca; devolverla sin tocar es exactamente ese numero y sin gastar el
+        // paso de copia.
+        if (! hayEfectoEnLaCadena())
+            return;
+
         if (mode_ == FxMode::Send)
         {
             processSend (buffer, channels, n);
@@ -283,13 +301,48 @@ private:
             case FxRouting::DualSeriesParallel:   routeDualSeriesParallel (buffer, n); break;
             case FxRouting::SeriesSplitMiddle:    routeSeriesSplitMiddle (buffer, n); break;
             case FxRouting::ParallelPairsSeries:  routeParallelPairsSeries (buffer, n); break;
+            case FxRouting::ParallelFront:
+            case FxRouting::ParallelFrontSeries:  routeParallelFrontSeries (buffer, n); break;
             case FxRouting::SeriesChainPlusOne:   routeSeriesChainPlusOne (buffer, n); break;
             case FxRouting::SeriesWithFeedback:   routeSeriesWithFeedback (buffer, n); break;
             case FxRouting::Series:
-            case FxRouting::ParallelFront:
-            case FxRouting::ParallelFrontSeries:
             default:                              routeSeries (buffer, n); break;
         }
+    }
+
+    /**
+        SI NO HAY NINGUN EFECTO EN LA CADENA, EL MODULO ES TRANSPARENTE.
+
+        Y NO ES UNA PIEDADAD: sin este paso, cinco de los nueve ruteos
+        devolvian la senal ROTA con los cuatro huecos en bypass, y no lo hacia
+        cualquiera. El 2 y el 6 la BORRAN -- la salida es silencio -- y el 4 y el
+        7 la multiplican por tres, y el 5 por dos. Medido con una entrada de
+        1.0: sale 0, 0, 3, 2 y 3.
+
+        La causa es que los cinco ruteos acaban en `copyTo (acumulador, buffer)`.
+        El acumulador lo siembran con una suma de ramas paralelas, y una rama
+        que no tiene ningun efecto NO aporta la seca: `runParallel` se salta los
+        huecos inactivos. Asi que el acumulador se queda sin la entrada, y al
+        volcarlo al buffer la signal se va con el.
+
+        O sea: enrutando "dos parejas en paralelo" y dejando el rack vacio, el
+        plugin se queda mudo. Y no lo hacia ver ningun test porque el unico que
+        miraba el bypass lo miraba con el ruteo de serie, que es el unico que no
+        pasa por el acumulador.
+
+        Y POR QUE SE ARREGLA AQUI Y NO EN LOS CINQUE RUTEOS. Metiendo la seca
+        en cada rama parallel[a] para que la cuenta cuadre, cada preset con
+        efectos en paralelo sonaria OTRA cosa: es cambiar el sonido de lo que ya
+        esta en produccion. Con este paso solo cambia el caso en el que no hay
+        ningun efecto en la cadena, que antes era silencio o un multiplicador.
+    */
+    bool hayEfectoEnLaCadena() const noexcept
+    {
+        for (int i = 0; i < kFxNumSlots; ++i)
+            if (slots_[i].isActive())
+                return true;
+
+        return false;
     }
 
     /**
@@ -318,11 +371,11 @@ private:
             case FxRouting::DualSeriesParallel:   routeDualSeriesParallel (buffer, n); break;
             case FxRouting::SeriesSplitMiddle:    routeSeriesSplitMiddle (buffer, n); break;
             case FxRouting::ParallelPairsSeries:  routeParallelPairsSeries (buffer, n); break;
+            case FxRouting::ParallelFront:
+            case FxRouting::ParallelFrontSeries:  routeParallelFrontSeries (buffer, n); break;
             case FxRouting::SeriesChainPlusOne:   routeSeriesChainPlusOne (buffer, n); break;
             case FxRouting::SeriesWithFeedback:   routeSeriesWithFeedback (buffer, n); break;
             case FxRouting::Series:
-            case FxRouting::ParallelFront:
-            case FxRouting::ParallelFrontSeries:
             default:                              routeSeries (buffer, n); break;
         }
 
@@ -343,6 +396,31 @@ private:
     {
         for (int i = 0; i < kFxNumSlots; ++i)
             slots_[i].process (buffer, n);
+    }
+
+    /** (1 || 2) -> 3 -> 4: pareja en paralelo delante, y los dos de atras en
+        serie.
+
+        ESTE ERA EL BUG QUE NO SE OIA. Los modos 1 y 8 estan desde el principio
+        escritos en la cabecera de este fichero como "(1 || 2) -> 3 -> 4", y en
+        el `switch` caian en el `default` de la serie: hacian 1 -> 2 -> 3 -> 4.
+        La pareja del principio no se oia nunca, porque la serie la tapaba. No
+        lo cazaba ningun test porque los que habia solo pedian numeros finitos y
+        que el 1 y el 8 dieran lo mismo --y lo dang, siendo los dos la misma
+        serie. Lo que faltaba era comprobar la CUENTA de cada modo, y con una
+        sonda de cuatro constantes se ve a la primera: el diagrama pide 5.625 y
+        el motor daba 5.375, que es exactamente lo que da la serie.
+
+        Que la suma de la pareja sea una suma y no una media es decision de este
+        modulo y no se cambia aqui: ver la nota sobre ABDEep al final de la
+        cabecera, que reparte los numeros de otra manera. */
+    void routeParallelFrontSeries (AudioBuffer<float>& buffer, int n) noexcept
+    {
+        runParallel (buffer, accum_, 0, 1, n);
+        copyTo (accum_, buffer, n);
+
+        slots_[2].process (buffer, n);
+        slots_[3].process (buffer, n);
     }
 
     /** (1 || 2) || (3 || 4): dos parejas en paralelo. */

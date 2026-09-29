@@ -5,11 +5,12 @@
     El catalogo de los efectos que YA estan en ABDShared. Namespace abd::dsp,
     modulo ABDShared::DspEffects.
 
-    QUE ES. Una tabla de seis filas —coro, delay, reverb de FreeVerb,
-    saturacion, reverberador de Schroeder y coro BBD— y las dos funciones que
-    la consultan. Es el "dejar disponibles todos los efectos migrados" en una
+    QUE ES. Una tabla de ocho filas —coro, delay, reverb de FreeVerb,
+    saturacion, reverberador de Schroeder, coro BBD, repisa y phaser— y las dos
+    funciones
+    que la consultan. Es el "dejar disponibles todos los efectos migrados" en una
     linea: un producto incluye esta cabecera, pasa el resultado a
-    `FxEngine::setCatalogue` y ya tiene los seis en los cuatro slots.
+    `FxEngine::setCatalogue` y ya tiene los ocho en los cuatro slots.
 
     POR QUE ES UNA FUNCION Y NO UN ARRAY GLOBAL. El modulo entero es header-only.
     Un `static const FxEffectInfo tabla[]` en una cabecera seria una variable
@@ -26,12 +27,28 @@
     tres sitios. Un catalogo con una entrada de mas que el recuento es el modo
     bonito de que el ultimo efecto del panel no exista.
 
-    Y ESTOS SEIS, NO SETENTA. El unico criterio para entrar aqui es que el motor
+    Y ESTOS OCHO, NO SETENTA. El unico criterio para entrar aqui es que el motor
     este EN este modulo. Los 48 efectos privados de ABDEep no entran todavia: son
     codigo JUCE, y meterlos exigiria que este modulo dejara de ser libm-free y
     JUCE-free, que es justo lo que sostiene la paridad nativa <-> WASM de
     ABDNeural. Un producto con esos 48 monta su propia tabla y le anade estas
-    seis filas al final.
+    ocho filas al final.
+
+    LA REPISA ES UNA PIEZA, NO UN ECUALIZADOR. La fila expone UNA repisa con
+    un selector de modo, y no las dos en cascada del ecualizador de ABDMS2000.
+    Es la misma razon por la que el motor se llama `ShelfFilter` y no
+    `Equalizer`: un ecualizador con dos bandas y un Q fijo no es un ecualizador,
+    es un preset. Con la pieza suelta, un producto que quiera tres bandas pone
+    tres filas iguales en tres slots, y uno que quiera un Q variable lo tiene
+    en cuanto haga falta. Las tablas de 4 pasos del MS2000 se quedan en el
+    MS2000, que es donde son politica.
+
+    EL PHASER TAMBIEN ES UNA PIEZA, y por el mismo motivo de la repisa: la fila
+    no emula al MS2000, expone velocidad, profundidad y realimentacion. Lo que
+    el MS2000 tiene de particular -el barrido de 200 Hz a 5,5 kHz, los cuatro
+    todo-pasos, el 50 % de mezcla humeda- son los valores por defecto del motor,
+    no los parametros de la fila, y un producto que quiera un barrido mas ancho
+    llama a `setSweepRange` y no toca la fila.
 
   ==============================================================================
 */
@@ -50,10 +67,10 @@ namespace abd::dsp
 
     EL ORDEN ES POLITICA, y por eso es de este fichero y no del motor. El
     criterio es el que usa un usuario delante de un menu: los que se usan todos
-    los dias primero, y el BBD al final porque es el menos usual. Insertar uno
-    nuevo en medio cambia los numeros de todos los de despues, que es lo que
-    haria que "el 4" significara una cosa el lunes y otra el martes. Si se
-    inserta, se inserta al final. */
+    los dias primero, y el BBD, la repisa y el phaser al final porque son los
+    menos usuales. Insertar uno nuevo en medio cambia los numeros de todos los de
+    despues, que es lo que haria que "el 4" significara una cosa el lunes y otra
+    el martes. Si se inserta, se inserta al final. */
 inline const FxEffectInfo* fxDefaultCatalogue (int& count) noexcept
 {
     static const FxEffectInfo table[] = {
@@ -91,7 +108,29 @@ inline const FxEffectInfo* fxDefaultCatalogue (int& count) noexcept
           adapters::BbdChorusFx::specs(),
           adapters::BbdChorusFx::create, adapters::BbdChorusFx::process,
           adapters::BbdChorusFx::setParam, adapters::BbdChorusFx::setAll,
-          adapters::BbdChorusFx::reset,  adapters::BbdChorusFx::destroy }
+          adapters::BbdChorusFx::reset,  adapters::BbdChorusFx::destroy },
+
+        // Al final, por la regla del orden de este fichero. Y es la septima
+        // fila, con lo que el "indice del ultimo efecto existe" del test del
+        // catalogo pasa a valer para la repisa y no para el BBD.
+        { "shelf",       "Shelf EQ",       adapters::ShelfEqFx::kNumParams,
+          adapters::ShelfEqFx::specs(),
+          adapters::ShelfEqFx::create, adapters::ShelfEqFx::process,
+          adapters::ShelfEqFx::setParam, adapters::ShelfEqFx::setAll,
+          adapters::ShelfEqFx::reset,  adapters::ShelfEqFx::destroy },
+
+        // El phaser es la octava fila, y la ultima, y por la misma razon que la
+        // repisa: es un efecto que no todo el mundo usa y se anade al final.
+        //
+        // Y el nombre es "Phaser", no "MS2000 Phaser" ni "4-stage Phaser": la
+        // fila no emula a ninguna maquina, y el numero de etapas es un
+        // parametro de plantilla del motor. Un producto que quiera seis etapas
+        // monta su propia fila con `Phaser4<6>`; esta es la de cuatro.
+        { "phaser",      "Phaser",         adapters::PhaserFx::kNumParams,
+          adapters::PhaserFx::specs(),
+          adapters::PhaserFx::create, adapters::PhaserFx::process,
+          adapters::PhaserFx::setParam, adapters::PhaserFx::setAll,
+          adapters::PhaserFx::reset,  adapters::PhaserFx::destroy }
     };
 
     count = static_cast<int> (sizeof (table) / sizeof (table[0]));
