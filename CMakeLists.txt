@@ -106,6 +106,22 @@ endif()
 #   DspChorus.h     - modulated delay-line chorus engine (per-sample API)
 #   DspDelay.h      - feedback delay engine (per-sample API)
 #   DspSaturation.h - atan soft clipping (stateless shape)
+#
+# And the ones whose sound is tied to a MACHINE. Those arrive through the
+# injected-policy contract (EffectPolicy.h): the engine is a template over a
+# data-only device PROFILE and a CHARACTER STAGE, so one engine serves every
+# device and a device is a table of numbers instead of a class of its own.
+#   EffectPolicy.h            - the contract: what a profile is, what a stage is
+#   MultiHeadEcho.h           - multi-head tape echo engine (per-sample)
+#   RingMod.h                 - ring modulator engine (per-sample)
+#   DspSchroederReverb.h      - Schroeder-Moorer 4 comb + 3 all-pass (stereo FRAME)
+#   JunoBBD.h                 - Juno bucket-brigade chorus engine (stereo FRAME)
+#   characters/TapeColour.h   - asymmetric tape curve + hiss
+#   characters/DiodeBridge.h  - diode-bridge soft clip
+#   characters/BbdNoise.h     - 6-pole floor noise + drip + clock click for the BBD
+#   profiles/Re201Profile.h   - the Space Echo RE-201 as pure data
+#   profiles/ReverbProfile.h  - the ten DeepMind 12 reverbs as pure data
+#   profiles/JunoBbdProfile.h - the J60/J106 as pure data
 # The engines take their parameters per sample on purpose: parameter smoothing
 # and the mapping from the product's controls stay in the consumer, so the move
 # does not change a single sample of the product (ABDNeural keeps its wrappers
@@ -123,11 +139,31 @@ target_compile_features(ABDShared_DspEffects INTERFACE cxx_std_17)
 
 target_link_libraries(ABDShared_DspEffects INTERFACE ABDShared::DspCore)
 
+# Standalone unit tests for the module (no JUCE), same switch convention as
+# DspCore and SynthCore. What they guard is mostly the POLICY contract rather
+# than a tuning: a stage that grows a dependency on the engine, or an engine
+# that stops reading its injected colour, are both silent failures that no
+# amount of tuning regression would catch.
+option(ABDSHAREDCODE_BUILD_DSPEFFECTS_TESTS "Build DspEffects standalone tests" ON)
+if(ABDSHAREDCODE_BUILD_DSPEFFECTS_TESTS)
+    add_executable(ABDShared_DspEffects_Tests
+        DspEffects/DspEffectsTests.cpp
+    )
+    target_link_libraries(ABDShared_DspEffects_Tests PRIVATE ABDShared_DspEffects)
+    target_compile_features(ABDShared_DspEffects_Tests PRIVATE cxx_std_17)
+endif()
+
 # --- LutDSP Module ---
 # Header-only LUT evaluation and analogue modelling (namespace abd::lutdsp):
-# LutEvaluatorSimd (SSE intrinsics), AnalogLutFilterModule, VoiceDispersionModel,
-# VoiceAllocator and JunoBBD. No compiled sources: consumers only need the
+# LutEvaluatorSimd (SSE intrinsics), AnalogLutFilterModule, VoiceDispersionModel
+# and VoiceAllocator. No compiled sources: consumers only need the
 # include path (the SIMD headers compile per-TU, so there is nothing to link).
+#
+# NOTE: a JunoBBD.h used to live here. It was a PLACEHOLDER for the bucket
+# brigade chorus, it was never adopted by anyone, and the engine that replaced it
+# is DspEffects/JunoBBD.h (a real JUNiO601 port, proven sample-for-sample by
+# ABDJUNiO601/Tests/ChorusBBDParityTest.cpp). The draft sits in
+# _Deprecados/LutDSP-JunoBBD.h with a #error in it; it is not source code.
 # WASM note: LutEvaluatorSimd.h compiles under Emscripten with the recipe
 # -msimd128 -D__SSE__ -D__SSE2__ -include immintrin.h (see ABDCZ101/wasm),
 # which maps the SSE intrinsics onto WASM SIMD128.
@@ -288,6 +324,8 @@ target_sources(ABDShared_HardwareMidiDetect INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/JuceHardwareMidiPicker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/HardwareMidiPickerResourceProvider.h
     ${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/HardwareMidiPickerResourceProvider.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/MidiEndpointSafetyPolicy.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/HardwareMidiDetect/MidiEndpointSafetyPolicy.cpp
 )
 
 target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE

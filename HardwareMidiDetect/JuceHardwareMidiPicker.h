@@ -168,6 +168,8 @@ private:
             obj->setProperty("isSysExVerified", d.isSysExVerified);
             obj->setProperty("modelImage", juce::String(d.modelImage));
             obj->setProperty("brandLogo", juce::String(d.brandLogo));
+            obj->setProperty("endpointKind", static_cast<int>(d.endpointKind));
+            obj->setProperty("kindLabel", juce::String(d.kindLabel));
             list.add(juce::var(obj));
         }
         juce::String js = "if (window.__setDetectedDevices) window.__setDetectedDevices(" + juce::JSON::toString(juce::var(list)) + ");";

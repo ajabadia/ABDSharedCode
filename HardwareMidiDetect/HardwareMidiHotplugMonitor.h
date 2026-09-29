@@ -12,6 +12,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include "HardwareContract.h"
 #include "HardwareMidiDetector.h"
+#include "MidiEndpointSafetyPolicy.h"
 #include <vector>
 #include <functional>
 
@@ -104,11 +105,18 @@ public:
                     }
                 }
 
+                DefaultMidiEndpointClassifier classifier;
+                const auto kind = classifier.classify(outDev);
+                const auto label = getEndpointKindLabel(kind);
+
                 auto match = HardwareMidiDetector::matchFromPortNames(inDev, outDev, registeredContracts);
                 if (match.has_value())
                 {
+                    auto dev = *match;
+                    dev.endpointKind = kind;
+                    dev.kindLabel = label;
                     if (onDevicePlugged)
-                        onDevicePlugged(*match);
+                        onDevicePlugged(dev);
                 }
                 else
                 {
@@ -117,6 +125,8 @@ public:
                     genericDev.displayName = outDev.name.toStdString();
                     genericDev.outDevice = outDev;
                     genericDev.inDevice = inDev;
+                    genericDev.endpointKind = kind;
+                    genericDev.kindLabel = label;
                     if (onDevicePlugged)
                         onDevicePlugged(genericDev);
                 }

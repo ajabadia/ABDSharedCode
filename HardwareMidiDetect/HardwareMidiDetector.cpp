@@ -82,6 +82,23 @@ std::vector<juce::MidiMessage> HardwareMidiDetector::buildDetectionQueries(const
     return queries;
 }
 
+std::vector<juce::MidiMessage> HardwareMidiDetector::buildDetectionQueries(
+    const std::vector<HardwareContract>& contracts,
+    const MidiEndpointDescriptor& endpoint,
+    const MidiEndpointSafetyPolicy& policy,
+    const BroadcastInquiryAuthorization& auth)
+{
+    // Evaluate safety policy: zero inquiries if not strictly Allowed
+    const auto decision = evaluateUniversalInquiryEligibility(endpoint, policy, auth);
+    if (decision != SysExInquiryDecision::Allowed)
+    {
+        return {};
+    }
+
+    return buildDetectionQueries(contracts);
+}
+
+
 bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                                               DiscoveredDevice& outDevice,
                                               const std::vector<HardwareContract>& contracts)
@@ -122,6 +139,7 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                     bestDev.manufacturer = c.midiIdentity.manufacturer;
                     bestDev.model = c.midiIdentity.model;
                     bestDev.isSysExVerified = true;
+                    bestDev.identityState = HardwareMidiIdentityState::IdentityVerified;
                 }
             }
         }
@@ -193,6 +211,7 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                     bestDev.manufacturer = c.midiIdentity.manufacturer;
                     bestDev.model = c.midiIdentity.model;
                     bestDev.isSysExVerified = true;
+                    bestDev.identityState = HardwareMidiIdentityState::IdentityVerified;
 
                     int revOffset = modelOffset + static_cast<int>(modelBytes.size());
                     if (size >= revOffset + 4)
@@ -214,6 +233,7 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                 bestDev.manufacturer = c.midiIdentity.manufacturer;
                 bestDev.model = c.midiIdentity.model;
                 bestDev.isSysExVerified = true;
+                bestDev.identityState = HardwareMidiIdentityState::IdentityVerified;
             }
         }
     }
@@ -225,6 +245,38 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
     }
 
     return false;
+}
+
+SharedDiscoveryIdentityResult HardwareMidiDetector::classifyIdentityReply(
+    const juce::MidiMessage& msg,
+    const std::vector<HardwareContract>& contracts)
+{
+    if (!msg.isSysEx())
+        return SharedDiscoveryIdentityResult::unavailable();
+
+    const auto* data = msg.getSysExData();
+    const int size = msg.getSysExDataSize();
+
+    if (data == nullptr || size < 4)
+        return SharedDiscoveryIdentityResult::unavailable();
+
+    // Check if it is a valid Universal Identity Reply: F0 7E <devId> 06 02 ... F7
+    const bool isUniversalReply = (data[0] == 0x7E && data[2] == 0x06 && data[3] == 0x02);
+
+    DiscoveredDevice dev;
+    if (parseIdentityReply(msg, dev, contracts))
+    {
+        return SharedDiscoveryIdentityResult::verified();
+    }
+
+    // If it is a syntactically valid Universal Identity Reply but none of the contracts matched,
+    // this is an explicit contradiction / mismatch.
+    if (isUniversalReply)
+    {
+        return SharedDiscoveryIdentityResult::mismatch();
+    }
+
+    return SharedDiscoveryIdentityResult::unavailable();
 }
 
 std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const juce::MidiDeviceInfo& inDev,
@@ -253,6 +305,10 @@ std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const j
                     dev.manufacturer = c.midiIdentity.manufacturer;
                     dev.model = c.midiIdentity.model;
                     dev.isSysExVerified = false;
+                    dev.identityState = HardwareMidiIdentityState::PortAvailable;
+                    DefaultMidiEndpointClassifier classifier;
+                    dev.endpointKind = classifier.classify(outDev);
+                    dev.kindLabel = getEndpointKindLabel(dev.endpointKind);
                     bestDevice = dev;
                 }
             }
@@ -271,6 +327,7 @@ std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const j
                 dev.manufacturer = c.midiIdentity.manufacturer;
                 dev.model = c.midiIdentity.model;
                 dev.isSysExVerified = false;
+                dev.identityState = HardwareMidiIdentityState::PortAvailable;
                 bestDevice = dev;
             }
         }
@@ -299,11 +356,24 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
     if (midiOutputs.isEmpty())
         return discovered;
 
-    auto queries = buildDetectionQueries(registeredContracts);
+    DefaultMidiEndpointClassifier classifier;
 
     for (int outIdx = 0; outIdx < midiOutputs.size(); ++outIdx)
     {
         const auto& outDevInfo = midiOutputs[outIdx];
+        const auto kind = classifier.classify(outDevInfo);
+        const MidiEndpointDescriptor ep {
+            outDevInfo.identifier.toStdString(),
+            outDevInfo.name.toStdString(),
+            kind
+        };
+
+        // SS4: Exclude virtual endpoints from automatic discovery sweeps if disallowed by policy
+        if (!isAutomaticDiscoveryAllowed(ep, config.endpointSafetyPolicy))
+        {
+            continue;
+        }
+
         juce::MidiDeviceInfo inDevInfo;
         bool hasInput = false;
 
@@ -322,48 +392,65 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
             hasInput = true;
         }
 
-        auto outPort = juce::MidiOutput::openDevice(outDevInfo.identifier);
-        if (outPort == nullptr) continue;
-
-        std::unique_ptr<juce::MidiInput> inPort;
-        if (hasInput)
-        {
-            inPort = juce::MidiInput::openDevice(inDevInfo.identifier, this);
-            if (inPort != nullptr)
-            {
-                {
-                    const juce::ScopedLock sl(scanLock);
-                    currentScanResults.clear();
-                }
-                inPort->start();
-            }
-        }
-
-        for (const auto& q : queries)
-            outPort->sendMessageNow(q);
-
-        juce::Thread::sleep(std::clamp(timeoutMs, 50, 600));
-
         bool foundSysEx = false;
-        {
-            const juce::ScopedLock sl(scanLock);
-            if (!currentScanResults.empty())
-            {
-                for (auto& item : currentScanResults)
-                {
-                    item.inDevice = inDevInfo;
-                    item.outDevice = outDevInfo;
-                    item.portIndex = outIdx;
-                    discovered.push_back(item);
-                }
-                foundSysEx = true;
-            }
-        }
 
-        if (inPort != nullptr)
+        // SS4.1: Only attempt device opening and SysEx inquiry if caller explicitly requested inquiry
+        // AND safety policy evaluation results in Allowed
+        if (config.performIdentityInquiry)
         {
-            inPort->stop();
-            inPort.reset();
+            const auto decision = evaluateUniversalInquiryEligibility(ep, config.endpointSafetyPolicy, config.inquiryAuthorization);
+            if (decision == SysExInquiryDecision::Allowed)
+            {
+                auto queries = buildDetectionQueries(registeredContracts, ep, config.endpointSafetyPolicy, config.inquiryAuthorization);
+                if (!queries.empty())
+                {
+                    auto outPort = juce::MidiOutput::openDevice(outDevInfo.identifier);
+                    if (outPort != nullptr)
+                    {
+                        std::unique_ptr<juce::MidiInput> inPort;
+                        if (hasInput)
+                        {
+                            inPort = juce::MidiInput::openDevice(inDevInfo.identifier, this);
+                            if (inPort != nullptr)
+                            {
+                                {
+                                    const juce::ScopedLock sl(scanLock);
+                                    currentScanResults.clear();
+                                }
+                                inPort->start();
+                            }
+                        }
+
+                        for (const auto& q : queries)
+                            outPort->sendMessageNow(q);
+
+                        juce::Thread::sleep(std::clamp(timeoutMs, 50, 600));
+
+                        {
+                            const juce::ScopedLock sl(scanLock);
+                            if (!currentScanResults.empty())
+                            {
+                                for (auto& item : currentScanResults)
+                                {
+                                    item.inDevice = inDevInfo;
+                                    item.outDevice = outDevInfo;
+                                    item.portIndex = outIdx;
+                                    item.endpointKind = kind;
+                                    item.kindLabel = getEndpointKindLabel(kind);
+                                    discovered.push_back(item);
+                                }
+                                foundSysEx = true;
+                            }
+                        }
+
+                        if (inPort != nullptr)
+                        {
+                            inPort->stop();
+                            inPort.reset();
+                        }
+                    }
+                }
+            }
         }
 
         if (!foundSysEx && hasInput && config.includeHeuristic)
@@ -373,6 +460,8 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
             {
                 auto dev = heuristicDev.value();
                 dev.portIndex = outIdx;
+                dev.endpointKind = kind;
+                dev.kindLabel = getEndpointKindLabel(kind);
                 discovered.push_back(dev);
             }
         }

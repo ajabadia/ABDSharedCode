@@ -21,6 +21,84 @@ namespace abd::hwid
 {
 
 /**
+ * @enum HardwareMidiIdentityState
+ * @brief Five-state preflight identity classification model for hardware MIDI detection.
+ *
+ * Semantics:
+ * - PortAvailable: Endpoint enumerated and available at OS level; no identity assertion made.
+ * - IdentityVerified: SysEx identity evidence received and strictly matches contract.
+ * - IdentityUnavailable: Insufficient identity evidence: inquiry not requested, unsupported,
+ *   timed out, or unparseable.
+ * - IdentityMismatch: SysEx identity reply received, but contradicts expected contract.
+ * - UserConfirmedUnverified: Reserved exclusively for application layer (ABDAudioLab) with operator.
+ *   CRITICAL INVARIANT: ABDSharedCode NEVER constructs, assigns, returns or persists this state.
+ */
+enum class HardwareMidiIdentityState
+{
+    PortAvailable = 0,
+    IdentityVerified,
+    IdentityUnavailable,
+    IdentityMismatch,
+    UserConfirmedUnverified
+};
+
+/**
+ * @brief Centralized legacy converter for backward compatibility with isSysExVerified.
+ * Invariants:
+ * - IdentityVerified <===> isSysExVerified == true
+ * - All other states <===> isSysExVerified == false
+ */
+[[nodiscard]] constexpr bool toLegacyIsSysExVerified(HardwareMidiIdentityState state) noexcept
+{
+    return state == HardwareMidiIdentityState::IdentityVerified;
+}
+
+/**
+ * @brief Executable invariant: checks whether a state can be emitted by ABDSharedCode shared discovery.
+ * Returns false for UserConfirmedUnverified.
+ */
+[[nodiscard]] constexpr bool isSharedDiscoveryEmittable(HardwareMidiIdentityState state) noexcept
+{
+    return state != HardwareMidiIdentityState::UserConfirmedUnverified;
+}
+
+/**
+ * @brief Strong factory for shared discovery identity outcomes.
+ * Guarantees at compile-time and run-time that ABDSharedCode discovery can only ever instantiate
+ * the four permissible shared states.
+ */
+class SharedDiscoveryIdentityResult
+{
+public:
+    static constexpr SharedDiscoveryIdentityResult portAvailable() noexcept
+    {
+        return SharedDiscoveryIdentityResult(HardwareMidiIdentityState::PortAvailable);
+    }
+
+    static constexpr SharedDiscoveryIdentityResult verified() noexcept
+    {
+        return SharedDiscoveryIdentityResult(HardwareMidiIdentityState::IdentityVerified);
+    }
+
+    static constexpr SharedDiscoveryIdentityResult unavailable() noexcept
+    {
+        return SharedDiscoveryIdentityResult(HardwareMidiIdentityState::IdentityUnavailable);
+    }
+
+    static constexpr SharedDiscoveryIdentityResult mismatch() noexcept
+    {
+        return SharedDiscoveryIdentityResult(HardwareMidiIdentityState::IdentityMismatch);
+    }
+
+    [[nodiscard]] constexpr HardwareMidiIdentityState getState() const noexcept { return state_; }
+    [[nodiscard]] constexpr bool isSysExVerified() const noexcept { return toLegacyIsSysExVerified(state_); }
+
+private:
+    explicit constexpr SharedDiscoveryIdentityResult(HardwareMidiIdentityState s) noexcept : state_(s) {}
+    HardwareMidiIdentityState state_;
+};
+
+/**
  * @struct MidiIdentityContract
  * @brief The MIDI identity claim of a hardware device.
  * @detail Fields map 1:1 to the "midiIdentification" object in the shared

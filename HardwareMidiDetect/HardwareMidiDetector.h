@@ -18,6 +18,7 @@
 #include <optional>
 #include <map>
 #include "HardwareContract.h"
+#include "MidiEndpointSafetyPolicy.h"
 
 namespace abd::hwid
 {
@@ -42,6 +43,15 @@ struct DetectionConfig
 
     /** If true, only return devices verified via SysEx response (ignore heuristic). */
     bool requireSysExVerified = false;
+
+    /** Safety policy governing virtual ports and broadcast SysEx (SS4/SS4.1). */
+    MidiEndpointSafetyPolicy endpointSafetyPolicy {};
+
+    /** Master flag: whether to transmit identity inquiry SysEx (default false for safety). */
+    bool performIdentityInquiry { false };
+
+    /** Explicit caller authorization for broadcast inquiries. */
+    BroadcastInquiryAuthorization inquiryAuthorization {};
 };
 
 /**
@@ -68,8 +78,17 @@ struct DiscoveredDevice
     /** MIDI channel (1-16) if determinable. 0 = unknown. */
     uint8_t midiChannel { 0 };
 
-    /** True if verified via SysEx response; false if name heuristic only. */
+    /** True if verified via SysEx response; false if name heuristic only (Legacy API). */
     bool isSysExVerified { false };
+
+    /** Additive 5-state identity classification for SS3. */
+    HardwareMidiIdentityState identityState { HardwareMidiIdentityState::PortAvailable };
+
+    /** Physical vs virtual vs unknown classification (SS4). */
+    MidiEndpointKind endpointKind { MidiEndpointKind::Unknown };
+
+    /** UI Badge / Label for display (e.g. "[USB]", "[DIN]", "[Virtual]", "[Unknown]"). */
+    std::string kindLabel { "[Unknown]" };
 
     /** Relative path to model image (e.g. "models/korg-ms2000.png"). */
     std::string modelImage;
@@ -115,6 +134,13 @@ public:
                                    const std::vector<HardwareContract>& contracts);
 
     /**
+     * @brief Classify an incoming SysEx reply into a typed SharedDiscoveryIdentityResult (SS3).
+     */
+    static SharedDiscoveryIdentityResult classifyIdentityReply(
+        const juce::MidiMessage& msg,
+        const std::vector<HardwareContract>& contracts);
+
+    /**
      * @brief Heuristic name matcher for fallback detection against contract port matches.
      */
     static std::optional<DiscoveredDevice> matchFromPortNames(const juce::MidiDeviceInfo& inDev,
@@ -134,6 +160,16 @@ public:
      * @return SysEx messages to send, in order.
      */
     static std::vector<juce::MidiMessage> buildDetectionQueries(const std::vector<HardwareContract>& contracts);
+
+    /**
+     * @brief Policy-aware query builder (SS4.1).
+     * Returns queries ONLY if the endpoint and authorization satisfy safety policy.
+     */
+    static std::vector<juce::MidiMessage> buildDetectionQueries(
+        const std::vector<HardwareContract>& contracts,
+        const MidiEndpointDescriptor& endpoint,
+        const MidiEndpointSafetyPolicy& policy,
+        const BroadcastInquiryAuthorization& auth);
 
     /**
      * @brief Helper to convert a whitespace-delimited hex string into a byte vector.
