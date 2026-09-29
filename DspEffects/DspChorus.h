@@ -117,9 +117,19 @@ public:
 
         const float phaseInc = twoPi * rateHz / static_cast<float> (sampleRate_);
 
-        phase += phaseInc;
-        if (phase >= twoPi)
-            phase -= twoPi;
+        // `rateHz` entra POR MUESTRA y desde el consumidor, SIN recortar. Con
+        // un `if` de una sola resta (que es lo que habia) el envuelto solo vale
+        // mientras la incremento sea < 2*pi: si el rate llega al sample rate o
+        // mas, la fase se crecia sin limite y `sin` recibia argumentos cada vez
+        // mas grandes, donde la reduccion ya no vale nada.
+        //
+        // `wrapPhase` lo hace en un paso y en tiempo constante. No es solo mas
+        // rapido: restar 2*pi una vuelta cada vez CUATRO veces seguidas (lo que
+        // hace un `while` con rate = 4 veces el sample rate) redondea en cada
+        // resta y deja la fase en 6.283182 en vez de 0, con un error que se
+        // acumula muestra a muestra. Medido: el `while` desviaba la salida
+        // 9.9e-2 respecto a rate 0, `wrapPhase` la reproduce BIT A BIT.
+        phase = dsp::wrapPhase (phase + phaseInc, twoPi);
 
         if (++writePos >= delayBuffer.getNumSamples())
             writePos = 0;

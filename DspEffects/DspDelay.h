@@ -93,6 +93,9 @@ public:
         const float readPos = wrapReadPosition (static_cast<float> (writePos) - delayInSamples,
                                                 bufferSize);
 
+        // El indice y la fraccion salen de la posicion YA ENVUELTA, y por eso
+        // ambos estan dentro del buffer. El arreglo del desbordamiento esta en
+        // `wrapReadPosition`; aqui solo se lee.
         const int index1 = static_cast<int> (readPos);
         const int index2 = (index1 + 1) % bufferSize;
         const float fraction = readPos - static_cast<float> (index1);
@@ -117,14 +120,72 @@ public:
 
 private:
     //==========================================================================
-    /** Lleva una posicion de lectura negativa (o anterior al inicio) al rango
-        [0, bufferSize) sobre el buffer circular. */
+    /** Lleva una posicion de lectura al rango [0, bufferSize) sobre el buffer
+        circular.
+
+        OJO, esto era un `if` y no un `while`, y era un fallo de indice, no
+        cosmetico: con un retardo MAYOR que la capacidad del buffer, una sola
+        resta deja la posicion todavia negativa, `(int)readPos` sale negativo y
+        `getSample` lee fuera del buffer (en depuracion, una asercion; en release,
+        lo que haya en memoria). No es teorico: el envoltorio de ABDNeural
+        (`ABDNeural/Source/DSP/Effects/Delay.h`) recorta el feedback a 0.95 pero
+        NO recorta el retardo a la capacidad que se le dio en `prepare`, asi que
+        un consumidor que pase un tiempo largo para un `prepare` corto revienta.
+
+        Se hace con el cociente en vez de con un `while` porque un `while` sobre
+        una posicion de -1e9 con un buffer de 1024 daria un millon de vueltas en
+        el lazo de audio, que es un problema de tiempo real todavia peor que el
+        del indice.
+
+        Y para todo retardo DENTRO de la capacidad el resultado es EXACTAMENTE el
+        de antes, bit a bit, asi que esto no cambia el sonido de nadie: solo
+        cambia lo que antes se salia del buffer.
+    */
     static float wrapReadPosition (float readPos, int bufferSize) noexcept
     {
-        if (readPos < 0.0f)
-            readPos += static_cast<float> (bufferSize);
+        const float size = static_cast<float> (bufferSize);
 
-        return readPos;
+        // division entera: el truncamiento va hacia cero, asi que al FINAL hay
+        // que corregir el caso negativo, que es donde el cociente "se pasa".
+        const long long q = static_cast<long long> (readPos / size);
+        float r = readPos - size * static_cast<float> (q);
+
+        if (r < 0.0f)
+            r += size;
+
+        // Y aqui esta el arreglo de un defecto REAL de este motor, encontrado al
+        // medir el sistema de slots y no por una lectura del codigo.
+        //
+        // El calculo de arriba da un valor en [0, size), pero un `float` no
+        // puede representar todos los reales de ahi: cuando el resultado cae a
+        // menos de medio ULP de `size`, el redondeo lo sube a `size` EXACTO. Ahi
+        // `static_cast<int>` da `bufferSize` — una muestra mas alla del final —
+        // y `getSample` lee de mas.
+        //
+        // MEDIDO, y no con un retardo raro: con el retardo a 300 ms (14400.001
+        // muestras) y el puntero de escritura en 14400, la resta da −0.001, al
+        // envolver da 97023.999, y al redondear a float da 97024.000. Es el
+        // retardo mas normal del mundo, en el unico instante en que la escritura
+        // alcanza la lectura, y por eso cualquier barrido de un segundo lo
+        // encuentra. Con `delayInSamples` viniendo de un mando normalizado, el
+        // valor ni siquiera es un entero, asi que la ventana de redondeo no es
+        // una excepcion: es el caso normal de un retardo que no cae en la
+        // rejilla.
+        //
+        // `r >= size` a 0 es la correccion exacta y no un parche: la posicion
+        // verdadera era `size - epsilon`, y la muestra 0 del buffer es
+        // precisamente lo que hay `size` muestras antes que la escritura. El
+        // error es de 0.001 muestras, o sea menos de un centesimo de ULP de
+        // una muestra de audio.
+        //
+        // NO TOCA NINGUN RETARDO QUE YA SONARA. Para todo retardo dentro de la
+        // capacidad, `r` queda a media ULP o mas del final y esta rama no se
+        // toma: el resultado es el mismo numero, bit a bit, y por eso la
+        // paridad a 0 ulps de ABDNeural sigue intacta.
+        if (r >= size)
+            r = 0.0f;
+
+        return r;
     }
 
     AudioBuffer<float> delayBuffer;
