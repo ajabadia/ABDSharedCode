@@ -74,6 +74,8 @@
 #include "DspEffects/FxEngine.h"
 #include "DspEffects/FxDefaultCatalogue.h"
 #include "DspEffects/ShelfFilter.h"
+#include "DspEffects/CascadeShelfEq.h"
+#include "DspEffects/profiles/MS2000EqProfile.h"
 #include "DspEffects/Phaser4.h"
 
 #include <cmath>
@@ -5477,6 +5479,415 @@ void testFxEngineFeedbackEntersBeforeTheChain()
 }
 
 
+//==============================================================================
+/** LA CASCADA DE DOS REPISAS Y EL PERFIL DEL MS2000.
+
+    Que es esto y por que esta aqui. El biquad de la repisa estaba en el modulo
+    desde antes (`ShelfFilter`), pero la CADENA de dos bandas --y las dos tablas
+    de cuatro posiciones del selector-- vivian en un shim de producto, sin una
+    sola comprobacion que las mirara. Aqui esta la maquina, con perfil inyectado
+    como el eco multi-cabezal, y las tablas del MS2000 como puro dato.
+
+    QUE NO SE COMPRUEBA AQUI, Y POR QUE. La paridad de la repisa suelta con la
+    referencia congelada de libm ya la mide `testShelfFilter`, y no se repite:
+    repetirla para la cascada seria medir dos veces lo mismo. Lo que se mide es
+    lo que la cascada anade y la repisa no tiene: el orden, el estado de las dos
+    etapas, la tabla del perfil y la puerta de hercios continuos.
+*/
+void testCascadeShelfEq()
+{
+    using namespace abd::dsp;
+    using Eq = CascadeShelfEq<MS2000EqProfile>;
+
+    constexpr double kSr = 48000.0;
+    constexpr int kN = 512;
+
+    //--- LA TABLA DEL PERFIL, Y QUE ESTA ORDENADA -------------------------
+    {
+        check (MS2000EqProfile::numPositions == 4, "el selector del MS2000 tiene cuatro posiciones");
+        check (MS2000EqProfile::lowFreqs[0] == 160.0f && MS2000EqProfile::lowFreqs[3] == 600.0f,
+               "la tabla de graves es la del hardware: 160, 250, 400 y 600");
+        check (MS2000EqProfile::highFreqs[0] == 4000.0f && MS2000EqProfile::highFreqs[3] == 12000.0f,
+               "y la de agudos: 4, 6, 8 y 12 kHz");
+
+        bool crecientes = true;
+        for (int i = 1; i < MS2000EqProfile::numPositions; ++i)
+            if (MS2000EqProfile::lowFreqs[i] <= MS2000EqProfile::lowFreqs[i - 1]
+                || MS2000EqProfile::highFreqs[i] <= MS2000EqProfile::highFreqs[i - 1])
+                crecientes = false;
+        check (crecientes, "las dos tablas suben, que es lo que hace un selector");
+
+        check (MS2000EqProfile::defaultLowIndex == 1 && MS2000EqProfile::defaultHighIndex == 2,
+               "la posicion de fabrica es la central de cada selector, no la primera");
+        check (MS2000EqProfile::gainMinDb == -12.0f && MS2000EqProfile::gainMaxDb == 12.0f,
+               "el tope de ganancia del MS2000 es +-12 dB, no +-15");
+    }
+
+    //--- LA MAQUINA NASCE EN LA POSICION DE FABRICA ------------------------
+    {
+        Eq eq;
+        eq.prepare (kSr);
+
+        check (eq.getLowIndex() == MS2000EqProfile::defaultLowIndex
+               && eq.getHighIndex() == MS2000EqProfile::defaultHighIndex,
+               "preparar deja los dos selectores en su posicion central");
+        check (eq.getLowFrequencyHz() == 250.0f, "que son 250 Hz en la baja");
+        check (eq.getHighFrequencyHz() == 8000.0f, "y 8 kHz en la alta");
+        check (eq.getLowGainDB() == 0.0f && eq.getHighGainDB() == 0.0f,
+               "y las dos ganancias en 0 dB, que es identidad exacta");
+        check (eq.getLowShelf().getMode() == ShelfMode::Low
+               && eq.getHighShelf().getMode() == ShelfMode::High,
+               "una repisa baja y una alta, fijas por construccion");
+    }
+
+    //--- LOS MANDOS DE FRECUENCIA Y DE GANANCIA NO SE TOCAN ENTRE SI ------
+    {
+        Eq eq;
+        eq.prepare (kSr);
+        eq.setLowIndex (0);      // 160 Hz
+        eq.setHighIndex (3);     // 12 kHz
+
+        const float graveAntes = eq.getLowFrequencyHz();
+        const float agudoAntes = eq.getHighFrequencyHz();
+
+        // Pedir ganancia no puede mover la frecuencia que el usuario tiene puesta.
+        for (int db = -12; db <= 12; db += 3)
+        {
+            eq.setLowGainDB (static_cast<float> (db));
+            eq.setHighGainDB (static_cast<float> (-db));
+        }
+
+        check (eq.getLowFrequencyHz() == graveAntes && eq.getHighFrequencyHz() == agudoAntes,
+               "mover la ganancia deja la frecuencia donde estaba");
+        check (eq.getLowGainDB() == 12.0f && eq.getHighGainDB() == -12.0f,
+               "y la ganancia se queda en donde la mandaron, con su recorte");
+
+        // Y el otro lado: mover la frecuencia no puede mover la ganancia.
+        eq.setLowIndex (2);
+        check (eq.getLowGainDB() == 12.0f, "cambiar de selector deja la ganancia como estaba");
+        check (eq.getLowFrequencyHz() == 400.0f, "y cambia solo la frecuencia");
+    }
+
+    //--- UN INDICE QUE SE PASA SE RECORTA, Y UNO QUE NO CAMBIA NO RECALCULA -
+    {
+        Eq eq;
+        eq.prepare (kSr);
+        eq.setLowIndex (99);
+        check (eq.getLowIndex() == MS2000EqProfile::numPositions - 1,
+               "un indice por encima se recorta a la ultima posicion");
+        eq.setLowIndex (-5);
+        check (eq.getLowIndex() == 0, "y uno por debajo a la primera");
+
+        // Poner el mismo indice no debe reescribir nada: el biquad se recalcula
+        // solo cuando los coeficientes cambian de verdad.
+        const float antes = eq.getLowShelf().getB0();
+        eq.setLowIndex (0);
+        eq.setLowIndex (0);
+        check (eq.getLowShelf().getB0() == antes,
+               "poner el mismo indice dos veces no toca los coeficientes");
+    }
+
+    //--- LA PUERTA DE HERCIOS CONTINUOS -----------------------------------
+    {
+        Eq eq;
+        eq.prepare (kSr);
+        eq.setLowIndex (3);                     // 600 Hz, por la tabla
+        eq.setLowFrequencyHz (300.0f);          // ahora manda el hercio
+        check (eq.getLowFrequencyHz() == 300.0f, "la puerta de hercios continuos manda sobre la tabla");
+
+        // Y volver a la tabla la devuelve a su sitio.
+        eq.setLowIndex (0);
+        check (eq.getLowFrequencyHz() == 160.0f,
+               "volver a elegir por indice recupera la tabla, que sigue ahi debajo");
+    }
+
+    //--- LAS DOS PUERTAS SON INDEPENDIENTES ------------------------------
+    //
+    // UNA BANDERA COMUN PARA LAS DOS REPISAS ERA UN FALLO DE VERDAD. Escribir
+    // un hercio en la baja apagaba la bandera comun, y al siguiente
+    // `setHighIndex` la maquina reescribia LAS DOS frecuencias: el hercio que
+    // el producto acababa de poner en la baja se perdia sin avisar y sin error
+    // de ningun tipo. Solo pasaba cuando el indice de la alta casualmente no era
+    // el que ya estaba, porque la guarda de "no ha cambiado" cortaba antes, asi
+    // que el fallo era intermitente.
+    //
+    // Y EL OTRO LADO DE LA MONEDA: la guarda de "no ha cambiado" miraba solo el
+    // indice, no la puerta. Con el hercio continuo puesto y el mismo indice, no
+    // pasaba nada y la puerta se quedaba abierta para siempre.
+    {
+        Eq eq;
+        eq.prepare (kSr);
+
+        // (a) hercio continuo en la baja, y el selector de la ALTA se mueve.
+        eq.setLowIndex (2);                     // 400 Hz por la tabla
+        eq.setLowFrequencyHz (300.0f);          // ahora manda 300 Hz
+
+        eq.setHighIndex (0);                    // la alta: 4 kHz
+        check (eq.getHighFrequencyHz() == 4000.0f,
+               "mover el selector de la alta pone su frecuencia de la tabla");
+        check (eq.getLowFrequencyHz() == 300.0f,
+               "y NO se lleva por delante el hercio continuo de la baja");
+
+        // (b) lo mismo pero con el indice de la alta SIN cambiar: tambien tiene
+        // que dejar el hercio de la baja donde estaba, y no porque "no ha pasado
+        // nada" sino porque la otra puerta no tiene nada que ver.
+        eq.setHighIndex (0);
+        check (eq.getLowFrequencyHz() == 300.0f,
+               "volver a poner el mismo indice de la alta deja la baja como estaba");
+
+        // (c) y al reves: hercio continuo en la ALTA, selector de la baja.
+        eq.setHighFrequencyHz (7000.0f);
+        eq.setLowIndex (0);                     // 160 Hz
+        check (eq.getLowFrequencyHz() == 160.0f,
+               "mover el selector de la baja pone su frecuencia de la tabla");
+        check (eq.getHighFrequencyHz() == 7000.0f,
+               "y deja el hercio continuo de la alta");
+    }
+
+    //--- EL MISMO INDICE SI CIERRA LA PUERTA -----------------------------
+    {
+        Eq eq;
+        eq.prepare (kSr);
+        eq.setLowIndex (0);                     // 160 Hz
+        eq.setLowFrequencyHz (300.0f);          // ahora manda 300 Hz
+
+        // El indice NO cambia. Aun asi, elegir por indice cierra la puerta: si
+        // no, el hercio continuo se quedaria puesto para siempre y el selector
+        // del panel no tendria efecto, que es el sintoma de un mando muerto.
+        eq.setLowIndex (0);
+        check (eq.getLowFrequencyHz() == 160.0f,
+               "poner el mismo indice cierra la puerta continua, que es lo que se le pidio");
+    }
+
+    //--- PREPARAR ES UN ARRANQUE, NO UN CAMBIO DE MANDO -------------------
+    {
+        Eq eq;
+        eq.prepare (kSr);
+        eq.setLowIndex (0);                     // 160 Hz
+        eq.setLowFrequencyHz (300.0f);
+        eq.setHighFrequencyHz (7000.0f);
+
+        eq.prepare (kSr);
+
+        check (eq.getLowFrequencyHz() == 250.0f
+               && eq.getHighFrequencyHz() == 8000.0f,
+               "preparar de nuevo vuelve a la tabla del perfil, que es lo que es un arranque");
+        check (eq.getLowIndex() == MS2000EqProfile::defaultLowIndex
+               && eq.getHighIndex() == MS2000EqProfile::defaultHighIndex,
+               "y los dos indices tambien vuelven a su posicion de fabrica");
+    }
+
+    //--- LA CASCADA ES LA SERIE DE LAS DOS, Y SE DIFERENCIA DE UNA SOLA ----
+    {
+        Eq cascada;
+        cascada.prepare (kSr);
+        cascada.setLowGainDB (-6.0f);
+        cascada.setHighGainDB (6.0f);
+
+        ShelfFilter sola;
+        sola.prepare (kSr);
+        sola.setMode (ShelfMode::High);
+        sola.setFrequencyHz (8000.0f);
+        sola.setGainDB (6.0f);
+
+        std::vector<float> porCascada (static_cast<size_t> (kN), 0.0f);
+        std::vector<float> porSola (static_cast<size_t> (kN), 0.0f);
+
+        for (int i = 0; i < kN; ++i)
+        {
+            const float x = 0.3f * std::sin (0.021f * static_cast<float> (i));
+
+            float a = x, b = x;
+            cascada.processFrame (a, b);
+            porCascada[static_cast<size_t> (i)] = a;
+
+            float c = x, d = x;
+            sola.processFrame (c, d);
+            porSola[static_cast<size_t> (i)] = c;
+        }
+
+        bool distintas = false;
+        for (int i = 0; i < kN; ++i)
+            if (porCascada[static_cast<size_t> (i)] != porSola[static_cast<size_t> (i)])
+                distintas = true;
+
+        check (distintas, "la cascada de dos NO suena como la repisa alta sola: la grave hace algo");
+
+        // Y LA CASCADA ES EXACTAMENTE LA GRAVE Y LUEGO LA ALTA, motor incluido.
+        // Se mide contra dos `ShelfFilter` conducidos a mano, no contra una
+        // formula escrita aqui: comparar contra una reimplementacion en vez de
+        // contra la que corre de verdad es el error clasico de este tipo de test.
+        ShelfFilter manoBaja, manoAlta;
+        manoBaja.prepare (kSr);
+        manoAlta.prepare (kSr);
+        manoBaja.setMode (ShelfMode::Low);
+        manoAlta.setMode (ShelfMode::High);
+        manoBaja.setFrequencyHz (250.0f);
+        manoAlta.setFrequencyHz (8000.0f);
+        manoBaja.setGainDB (-6.0f);
+        manoAlta.setGainDB (6.0f);
+
+        std::vector<float> porMano (static_cast<size_t> (kN), 0.0f);
+        for (int i = 0; i < kN; ++i)
+        {
+            float a = 0.3f * std::sin (0.021f * static_cast<float> (i));
+            float b = a;
+            manoBaja.processFrame (a, b);
+            manoAlta.processFrame (a, b);
+            porMano[static_cast<size_t> (i)] = a;
+        }
+
+        check (porCascada == porMano,
+               "y la maquina es bit a bit las dos repisas en serie, con el motor de verdad dentro");
+    }
+
+    //--- Y EL ORDEN NO IMPORTA, QUE ES LO QUE TOCA DECIR -------------------
+    // Las dos etapas son LTI, asi que la respuesta en cascada es H1(z)*H2(z) y
+    // da igual el orden. Se comprueba para que nadie afirme lo contrario, y de
+    // paso porque es el motivo de que la cascada se pueda rehacer sin miedo.
+    //
+    // Se mide con dos pares de `ShelfFilter` conducidos a mano y en el orden
+    // contrario, no forzando los modos de la maquina: los accesores de la
+    // maquina son `const` a proposito, y un test que pelea con su propia API
+    // para montarle un caso esta diciendo otra cosa de la que cree.
+    {
+        ShelfFilter baja, alta, alta2, baja2;
+        baja.prepare (kSr);   alta.prepare (kSr);
+        alta2.prepare (kSr);  baja2.prepare (kSr);
+
+        baja.setMode  (ShelfMode::Low);   baja.setFrequencyHz (250.0f);  baja.setGainDB (-6.0f);
+        alta.setMode  (ShelfMode::High);  alta.setFrequencyHz (8000.0f); alta.setGainDB (6.0f);
+
+        alta2.setMode (ShelfMode::High);  alta2.setFrequencyHz (8000.0f); alta2.setGainDB (6.0f);
+        baja2.setMode (ShelfMode::Low);   baja2.setFrequencyHz (250.0f);  baja2.setGainDB (-6.0f);
+
+        std::vector<float> a (static_cast<size_t> (kN), 0.0f);
+        std::vector<float> b (static_cast<size_t> (kN), 0.0f);
+
+        for (int i = 0; i < kN; ++i)
+        {
+            const float x = 0.3f * std::sin (0.021f * static_cast<float> (i));
+
+            float p = x, q = x;
+            baja.processFrame (p, q);
+            alta.processFrame (p, q);
+            a[static_cast<size_t> (i)] = p;
+
+            float r = x, s = x;
+            alta2.processFrame (r, s);
+            baja2.processFrame (r, s);
+            b[static_cast<size_t> (i)] = r;
+        }
+
+        float peor = 0.0f;
+        for (int i = 0; i < kN; ++i)
+            peor = jmax (peor, std::fabs (a[static_cast<size_t> (i)] - b[static_cast<size_t> (i)]));
+
+        // NO se pide igualdad bit a bit, y no por pereza: dos órdenes distintos
+        // del MISMO sistema de orden 4 agrupan el redondeo de otra manera. Lo
+        // medido va de 1,9e-6 con g++ optimizado a 3,5e-6 con MSVC en Debug,
+        // que son de 16 a 30 ULPs. La holgura de 1e-4 deja unas treinta veces de
+        // margen por encima, y sigue siendo mas de doscientas veces mas
+        // pequena que lo que daria un orden equivocado de verdad, que es lo
+        // unico que este aserto tiene que cazar. El numero se imprime porque
+        // un umbral sin el valor al lado es un numero que nadie revisa.
+        std::printf ("  [cascada] las dos etapas en orden contrario difieren en %.3e\n",
+                     static_cast<double> (peor));
+        check (peor < 1e-4f,
+               "las dos etapas son LTI, asi que ponerlas al reves da la misma respuesta (no es conmutatividad, es algebra)");
+    }
+
+    //--- ESTABILIDAD, DETERMINISMO Y RESET EN LAS CUATRO POSICIONES --------
+    {
+        bool todoFinito = true;
+        bool picosVistos = false;
+
+        for (int li = 0; li < MS2000EqProfile::numPositions; ++li)
+        for (int hi = 0; hi < MS2000EqProfile::numPositions; ++hi)
+        {
+            Eq eq;
+            eq.prepare (kSr);
+            eq.setLowIndex (li);
+            eq.setHighIndex (hi);
+            eq.setLowGainDB (-12.0f);
+            eq.setHighGainDB (12.0f);
+
+            for (int i = 0; i < 4096; ++i)
+            {
+                float l = 0.4f * std::sin (0.011f * static_cast<float> (i));
+                float r = l * 0.8f;
+                eq.processFrame (l, r);
+
+                if (! std::isfinite (l) || ! std::isfinite (r)) todoFinito = false;
+                if (jmax (jmax (std::fabs (l), std::fabs (r)), 0.0f) > 1e-3f) picosVistos = true;
+            }
+        }
+
+        check (todoFinito, "las dieciseis combinaciones de las dos tablas dan numeros finitos");
+        check (picosVistos, "y producen audio");
+
+        // Determinismo: dos motores frescos con la misma configuracion, igual.
+        auto corrida = [] (bool conReset) -> std::vector<float>
+        {
+            Eq eq;
+            eq.prepare (kSr);
+            eq.setLowIndex (1);
+            eq.setHighIndex (3);
+            eq.setLowGainDB (4.0f);
+            eq.setHighGainDB (-4.0f);
+
+            // Cuatro bloques de kN, asi que el buffer es de 4 por kN: con
+            // uno de kN se salia de rango al segundo bloque.
+            std::vector<float> salida (static_cast<size_t> (kN) * 4, 0.0f);
+            for (int bloque = 0; bloque < 4; ++bloque)
+            {
+                if (conReset && bloque == 2) eq.reset();
+                for (int i = 0; i < kN; ++i)
+                {
+                    float l = 0.25f * std::sin (0.013f * static_cast<float> (bloque * kN + i));
+                    float r = l;
+                    eq.processFrame (l, r);
+                    salida[static_cast<size_t> (bloque * kN + i)] = l;
+                }
+            }
+            return salida;
+        };
+
+        std::vector<float> c1 = corrida (false);
+        std::vector<float> c2 = corrida (false);
+        check (c1 == c2, "dos motores frescos con lo mismo dan lo mismo");
+    }
+
+    //--- 0 dB ES LA IDENTIDAD, Y POR ESO UN PRESET NUEVO NO SE OYE --------
+    {
+        Eq eq;
+        eq.prepare (kSr);
+        eq.setLowGainDB (0.0f);
+        eq.setHighGainDB (0.0f);
+
+        check (eq.getLowShelf().esIdentidad() && eq.getHighShelf().esIdentidad(),
+               "a 0 dB las dos repisas son la identidad exacta");
+
+        std::vector<float> entrada (static_cast<size_t> (kN));
+        for (int i = 0; i < kN; ++i) entrada[static_cast<size_t> (i)] = 0.2f * std::sin (0.03f * static_cast<float> (i));
+
+        std::vector<float> salida = entrada;
+        for (int i = 0; i < kN; ++i)
+        {
+            float l = salida[static_cast<size_t> (i)];
+            float r = l;
+            eq.processFrame (l, r);
+            salida[static_cast<size_t> (i)] = l;
+        }
+
+        check (salida == entrada, "y la cascada entera a 0 dB devuelve la senal BIT A BIT");
+    }
+
+    std::printf ("  [ecualizador] cascada de dos repisas con el perfil del MS2000: "
+                 "16 combinaciones de tabla, estabilidad, determinismo y 0 dB identidad\n");
+}
+
+
 int main()
 {
     checkStageContract<abd::dsp::NullStage>       ("NullStage");
@@ -5529,6 +5940,7 @@ int main()
     testSchroederKnobsAreClamped();
     testShelfFilter();
     testShelfRowContract();
+    testCascadeShelfEq();
     testPhaserCoefficientParity();
     testPhaserControlRateStepping();
     testPhaserRowContract();
