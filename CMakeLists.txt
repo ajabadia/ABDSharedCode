@@ -33,6 +33,77 @@ endif()
 # transversal DRY plan): PolyBLEP, DSPUtils, EnvelopeCurves, ADSREnvelope,
 # PortamentoGlide, LFO, AudioThreadSnapshot and the generic VoiceAllocator
 # (converged from LutDSP). Namespace: abd::synth.
+# Headers, not sources, and each one earns its place by being something two
+# synths would otherwise write twice:
+#   S950PatchFields.h   the Akai S950 patch catalogue AS DATA: 38 keygroup
+#                       fields + 18 Perform trims, with byte offset, panel
+#                       range, encoding and human-readable name. Header-only
+#                       and constexpr, so a panel and an engine can both link
+#                       it and still say the same thing about the same byte
+#                       (clean-room from the Mz950 study; nothing AGPL copied).
+#   S950Disk.h          reads and writes the REAL bytes of an S950 programme —
+#                       directory, allocation table, block chain — and resolves
+#                       every field through the catalogue above. The stateful
+#                       half of the pair, and the reason the catalogue exists:
+#                       without it an importer hardcodes byte offsets.
+#   S950Calibration.h   the measured-UNITS contract: which curves exist (envelope
+#                       in s, LFO in Hz, warp in s, cutoff in Hz, filter-envelope
+#                       octaves, sustain in dB), in what unit and over what
+#                       panel range. DELIBERATELY WITH NO NUMBERS: a calibration
+#                       table is experimental results, and read() returns
+#                       std::nullopt — never 0 — for anything unmeasured, because
+#                       a 0 envelope time is a click the engine will not suspect.
+#   S950CalibrationHarness.h  turns a measurement session into that table:
+#                       raw observations plus a known-answer reference model,
+#                       correcting the bias of the analysis window and reporting
+#                       when the session has not converged. It does not measure.
+#   S950EnvelopeBench.h    the OTHER half of that sentence, the half the harness
+#                       itself points at: it RENDERS an envelope whose times are
+#                       known, runs it through the same moving-average analysis a
+#                       probe would use, and returns observed - true as the bias
+#                       the harness subtracts. That is the whole point: without a
+#                       measured bias the harness subtracts a guess, and a guess
+#                       that looks like a table. Two findings came out of writing
+#                       it, both found by MEASURING and neither by reading the
+#                       code: (1) the analytic truth of the exponential shape was
+#                       right at threshold 0.5 and wrong by 58% at 0.25 and 0.75,
+#                       because a fixed time constant never lifts the rise past
+#                       the half-way point, so the render is now normalised; (2)
+#                       with a window much wider than the envelope the analysis
+#                       reports a 0.02 ms "duration" for a 5 ms pulse — a
+#                       one-sample spike, not a measurement — so a reading is only
+#                       trusted when the above-threshold run is at least as long
+#                       as the window. The measured bias is +/-0.35% and it
+#                       CHANGES SIGN with sweep speed, which is the proof that
+#                       correcting per point is not over-engineering: a constant
+#                       factor does not exist. Running this adds no point to
+#                       S950Calibration.h, and a test checks that it does not.
+#   (tests only) SynthCore/tests/S950CalibrationRenderTests.inc carries a
+#                       minimal attack-decay renderer that ASKS the table how
+#                       long an attack is, and checks the one thing that table
+#                       being empty is FOR: that the degradation is silence and
+#                       not a click. A click is not a weird sound, it is a fault
+#                       the engine has no reason to suspect — with silence the
+#                       first question is "is the instrument loaded?", which is
+#                       the right question. A click is measured as the largest
+#                       jump between two consecutive samples, and the same
+#                       renderer on the same empty table gives 0.0 with a
+#                       require-known policy and the full amplitude with a
+#                       zero-fill one: the missing information is identical, only
+#                       the decision taken on it differs. The test double lives in
+#                       the .inc because it is not engine code; what is under test
+#                       is the contract, not its sound.
+#   --- the table above is also a PANEL contract, not just an engine one. It is
+#   --- dumped to ABDSharedAssets/contracts/s950_calibration.json by
+#   --- scripts/generate_s950_calibration_contract.py, so a panel draws the axes
+#   --- and marks the unmeasured ones from the same declaration this file holds.
+#   --- That export is what makes "no numbers here" checkable: the JSON carries
+#   --- measured:false and points:[] on all six curves, and a --check run that
+#   --- disagrees with this table fails. What the export cannot supply is the one
+#   --- thing a log axis needs and nobody has: a measured minimum. Of the six
+#   --- curves only lfoRate and filterEnvOctaves have a linear vertical axis;
+#   --- the four logarithmic ones cannot draw it without a value that does not
+#   --- exist yet. That count is the useful output, and it is a test.
 add_library(ABDShared_SynthCore STATIC
     SynthCore/PolyBLEP.cpp
     SynthCore/ADSREnvelope.cpp
@@ -69,6 +140,13 @@ endif()
 #   DspMidiBuffer.h           literal port of juce::MidiBuffer
 #   DspDebug.h                dspDbg (port of DBG)
 #   DspLeakedObjectDetector.h dspLeakDetector / dspDeclareNonCopyableWithLeakDetector
+#   DspMath.h                 deterministic transcendentals (the WASM<->native bit
+#                             parity invariant of the substrate)
+#   DspResonantFilter.h       ResonantFilterStage: a resonant lowpass SECTION
+#                             whose damping can go negative, so it self-oscillates,
+#                             and whose band-power AGC makes that oscillation
+#                             settle at a level instead of growing (clean-room from
+#                             the Mz950 study; nothing AGPL was copied)
 # Header-only (everything is inline/template), so consumers only need the
 # include path; there is nothing to link. C++17 on purpose: the consumer that
 # motivated the move (ABDNeural) builds at 17, not 20.
@@ -88,7 +166,9 @@ target_compile_features(ABDShared_DspCore INTERFACE cxx_std_17)
 
 # Standalone unit tests for the module (no JUCE), same switch convention as
 # SynthCore. Guard the invariants that break silently: HeapBlock element
-# semantics, MIDI packing, buffer growth and seed determinism.
+# semantics, MIDI packing, buffer growth, seed determinism, and the resonant
+# stage settling at a level instead of growing (which is asserted both with and
+# without its level control, so the AGC is what the test is really about).
 option(ABDSHAREDCODE_BUILD_DSPCORE_TESTS "Build DspCore standalone tests" ON)
 if(ABDSHAREDCODE_BUILD_DSPCORE_TESTS)
     add_executable(ABDShared_DspCore_Tests

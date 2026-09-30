@@ -8,6 +8,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <limits>
 #include <type_traits>
 #include <algorithm>
 
@@ -22,6 +24,11 @@
 // Compat-shim coverage: the LutDSP path must keep aliasing the canonical type.
 #include "LutDSP/VoiceAllocator.h"
 #include "ModMatrix.h"
+#include "S950PatchFields.h"
+#include "S950Disk.h"
+#include "S950Calibration.h"
+#include "S950CalibrationHarness.h"
+#include "S950EnvelopeBench.h"
 
 namespace abd::synth::tests {
 
@@ -43,6 +50,15 @@ static void check(bool condition, const char* testName) {
 // (incluye una COPIA LITERAL de la implementacion previa de ABDEep para el
 // test de equivalencia, que no debe contaminar los includes de los demas).
 #include "tests/ModMatrixTests.inc"
+
+// El catalogo del S950 tambien va en su propio .inc: es un bloque de datos con
+// sus propias reglas, y mezclarlo con el resto haria mas dificil ver que se
+// esta probando.
+#include "tests/S950PatchFieldsTests.inc"
+#include "tests/S950DiskTests.inc"
+#include "tests/S950CalibrationTests.inc"
+#include "tests/S950EnvelopeBenchTests.inc"
+#include "tests/S950CalibrationRenderTests.inc"
 
 // ─────────────────────────── DSPUtils ───────────────────────────
 
@@ -404,6 +420,11 @@ int main() {
     abd::synth::tests::testModMatrixEquivalenceWithAbdeep();
     abd::synth::tests::testModDestinationDescriptor();
     abd::synth::tests::testModMatrixZeroIdIsNotAlwaysInert();
+    abd::synth::tests::testS950PatchFields();
+    abd::synth::tests::testS950Disk();
+    abd::synth::tests::testS950Calibration();
+    abd::synth::tests::testS950EnvelopeBench();
+    abd::synth::tests::testS950CalibrationRender();
 
     printf("\n=== Results: %d passed, %d failed ===\n",
            abd::synth::tests::testsPassed, abd::synth::tests::testsFailed);
