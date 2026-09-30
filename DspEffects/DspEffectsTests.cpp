@@ -655,7 +655,10 @@ void testSchroederReverb()
             r.processFrame (0.5f, 0.5f, l, rr);
     };
 
-    auto runFresh = [] (int numSamples, float& outL, float& outR)
+    // Los dos parametros de salida se llaman `destL`/`destR` y no `outL`/`outR`
+    // porque la funcion que envuelve esta lambda ya declara un par `outL`/`outR`
+    // mas arriba, y el parametro lo sombreaba. Aqui se ESCRIBE, no se lee.
+    auto runFresh = [] (int numSamples, float& destL, float& destR)
     {
         SchroederReverb fresh;
         fresh.prepare (48000.0);
@@ -669,8 +672,8 @@ void testSchroederReverb()
         for (int s = 0; s < numSamples; ++s)
             fresh.processFrame (0.5f, 0.5f, l, rr);
 
-        outL = l;
-        outR = rr;
+        destL = l;
+        destR = rr;
     };
 
     SchroederReverb reused;
@@ -1190,20 +1193,23 @@ void testDspDelay()
     for (int i = 0; i < numSamples; ++i)
     {
         // Feedback 0: el impulso solo tiene que salir una vez, en su sitio.
-        outL[i] = delay.processSample (0, inL[i], delaySamps, 0.0f);
-        outR[i] = delay.processSample (1, inR[i], delaySamps, 0.0f);
+        outL[static_cast<size_t> (i)] =
+            delay.processSample (0, inL[static_cast<size_t> (i)], delaySamps, 0.0f);
+        outR[static_cast<size_t> (i)] =
+            delay.processSample (1, inR[static_cast<size_t> (i)], delaySamps, 0.0f);
         delay.advanceWritePosition();
     }
 
     bool finite = true;
     for (int i = 0; i < numSamples; ++i)
-        if (! std::isfinite (outL[i]) || ! std::isfinite (outR[i])) finite = false;
+        if (! std::isfinite (outL[static_cast<size_t> (i)])
+            || ! std::isfinite (outR[static_cast<size_t> (i)])) finite = false;
 
     check (finite, "dsp::Delay: sale no finito");
 
     int peakAt = -1;
     for (int i = 0; i < numSamples; ++i)
-        if (outL[i] > 0.5f) { peakAt = i; break; }
+        if (outL[static_cast<size_t> (i)] > 0.5f) { peakAt = i; break; }
 
     check (peakAt >= 0, "dsp::Delay: el impulso no vuelve nunca");
     check (peakAt >= expectAt - 2 && peakAt <= expectAt + 2,
@@ -1218,13 +1224,13 @@ void testDspDelay()
     for (int i = 0; i < numSamples; ++i)
     {
         sep.processSample (0, i == 0 ? 1.0f : 0.0f, delaySamps, 0.0f);
-        sepR[i] = sep.processSample (1, 0.0f, delaySamps, 0.0f);
+        sepR[static_cast<size_t> (i)] = sep.processSample (1, 0.0f, delaySamps, 0.0f);
         sep.advanceWritePosition();
     }
 
     bool rightClean = true;
     for (int i = 0; i < numSamples; ++i)
-        if (std::fabs (sepR[i]) > 1.0e-6f) rightClean = false;
+        if (std::fabs (sepR[static_cast<size_t> (i)]) > 1.0e-6f) rightClean = false;
 
     check (rightClean, "dsp::Delay: se filtra del canal izquierdo al derecho");
 
@@ -1372,11 +1378,12 @@ void testDspChorus()
         Chorus chorus;
         chorus.prepare (sampleRate, 0.1);
 
-        std::vector<float> outL (numSamples, 0.0f);
+        std::vector<float> outL (static_cast<size_t> (numSamples), 0.0f);
 
         for (int i = 0; i < numSamples; ++i)
         {
-            outL[i] = chorus.processSample (0, 1.0f, 0.5f, 0.5f);
+            outL[static_cast<size_t> (i)] =
+                chorus.processSample (0, 1.0f, 0.5f, 0.5f);
             chorus.processSample (1, 1.0f, 0.5f, 0.5f);
             chorus.advance (rateHz);
         }
@@ -1395,8 +1402,9 @@ void testDspChorus()
         bool finite = true, same = true;
         for (int i = 0; i < numSamples; ++i)
         {
-            if (! std::isfinite (a[i])) finite = false;
-            if (a[i] != b[i]) same = false;
+            if (! std::isfinite (a[static_cast<size_t> (i)])) finite = false;
+            if (a[static_cast<size_t> (i)] != b[static_cast<size_t> (i)])
+                same = false;
         }
 
         check (finite, "dsp::Chorus: sale no finito");
@@ -1410,7 +1418,8 @@ void testDspChorus()
 
         float worst = 0.0f;
         for (int i = 0; i < numSamples; ++i)
-            worst = std::max (worst, std::fabs (zero[i] - alias[i]));
+            worst = std::max (worst, std::fabs (zero[static_cast<size_t> (i)]
+                                               - alias[static_cast<size_t> (i)]));
 
         // El residuo NO es cero, y hay que saber por que antes de fijar el
         // numero. Medido con las tres envolturas, mismo guion, 4096 muestras:
@@ -1448,7 +1457,7 @@ void testDspChorus()
 
         bool finite = true;
         for (int i = 0; i < numSamples; ++i)
-            if (! std::isfinite (a[i])) finite = false;
+            if (! std::isfinite (a[static_cast<size_t> (i)])) finite = false;
 
         check (finite, "dsp::Chorus: sale no finito con una rate alta");
     }
@@ -1478,7 +1487,7 @@ void testDspChorus()
             const auto a = render (rate, 512, sr);
 
             for (int i = 0; i < 512; ++i)
-                if (! std::isfinite (a[i])) finite = false;
+                if (! std::isfinite (a[static_cast<size_t> (i)])) finite = false;
         }
 
         check (finite, "dsp::Chorus: un rate absurdo deja el motor en NaN o se cuelga");
@@ -1581,7 +1590,8 @@ void testDspReverb()
         reverb.setSampleRate (44100.0);
         reverb.reset();
 
-        std::vector<float> left (numSamples, 0.0f), right (numSamples, 0.0f);
+        std::vector<float> left (static_cast<size_t> (numSamples), 0.0f),
+                            right (static_cast<size_t> (numSamples), 0.0f);
         left[0] = 1.0f;
         right[0] = 1.0f;
 
@@ -1592,11 +1602,14 @@ void testDspReverb()
 
         for (int i = 0; i < numSamples; ++i)
         {
-            if (! std::isfinite (left[i]) || ! std::isfinite (right[i])) finite = false;
-            peak = std::max (peak, std::max (std::fabs (left[i]), std::fabs (right[i])));
+            if (! std::isfinite (left[static_cast<size_t> (i)])
+                || ! std::isfinite (right[static_cast<size_t> (i)])) finite = false;
+            peak = std::max (peak, std::max (std::fabs (left[static_cast<size_t> (i)]),
+                                             std::fabs (right[static_cast<size_t> (i)])));
 
             if (i > 0)
-                tail = std::max (tail, std::max (std::fabs (left[i]), std::fabs (right[i])));
+                tail = std::max (tail, std::max (std::fabs (left[static_cast<size_t> (i)]),
+                                                 std::fabs (right[static_cast<size_t> (i)])));
         }
 
         peakOut = peak;
@@ -2321,7 +2334,8 @@ void testFxEngineRouting()
             e.getSlot (s).setMix (0.5f);
         }
 
-        const std::vector<float> out = fxprobe::render (e, fxprobe::noise (2048, 777u + r));
+        const std::vector<float> out =
+            fxprobe::render (e, fxprobe::noise (2048, 777u + static_cast<unsigned> (r)));
 
         bool finito = true;
         float p = 0.0f;
