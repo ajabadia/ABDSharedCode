@@ -2507,3 +2507,7 @@ private:
 // donde antes lo ponia juce_core, sin tocar a los consumidores.
 #include "DspLeakedObjectDetector.h"
 #include "DspMath.h"
+// La etapa resonante va DESPUES de DspMath a proposito: usa sus sin/cos/log2/
+// pow/exp2 deterministas en vez de la libm de cada plataforma, que es la
+// invariante de paridad nativo <-> WASM del modulo (ver DspMath.h).
+#include "DspResonantFilter.h"

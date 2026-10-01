@@ -1,0 +1,32 @@
+// Shim de <cstdint> para el build freestanding de WASM. NO es parte del modulo.
+//
+// `DspMath.h` hace `#include <cstdint>` y usa `std::uint32_t`, y eso esta bien en
+// cualquier build con biblioteca. En la pata WASM del arnés se compila con
+// `--target=wasm32 -nostdlib`, y ahi no hay C++ estándar queATALLE el
+// `<cstdint>`. El `<stdint.h>` de C si esta, porque lo trae el propio
+// compilador, y es lo unico que hace falta.
+//
+// Este fichero existe para que ese hueco se vea y no se esconda: la cabecera
+// real del modulo no se toca, y la lista de lo que hay que shimmear son solo dos
+// ficheros (<cstdint> y <limits>). Si alguien mete un <cmath> o un <cstring> en
+// DspMath.h, este shim no lo tapa y la pata WASM deja de compilar, que es
+// justo lo que tiene que pasar: es la fuga de la biblioteca estandar la que
+// rompe el modulo, y que se note al compilar es mas util que un ifdef.
+#ifndef ABD_WASM_SHIM_CSTDINT
+#define ABD_WASM_SHIM_CSTDINT
+
+#include <stdint.h>
+
+namespace std
+{
+    using ::uint8_t;
+    using ::uint16_t;
+    using ::uint32_t;
+    using ::uint64_t;
+    using ::int8_t;
+    using ::int16_t;
+    using ::int32_t;
+    using ::int64_t;
+}
+
+#endif

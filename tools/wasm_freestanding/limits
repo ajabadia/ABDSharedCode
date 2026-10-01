@@ -1,0 +1,59 @@
+// Shim de <limits> para el build freestanding de WASM. NO es parte del modulo.
+//
+// `DspMath.h` usa de la biblioteca estandar exactamente tres cosas de
+// `std::numeric_limits<float>`:
+//
+//     numeric_limits<float>::max()        -> el mayor float finito
+//     numeric_limits<float>::infinity()   -> el inf
+//     numeric_limits<float>::quiet_NaN()  -> el NaN
+//
+// Los tres salen de los bits del float, que es lo que hace por debajo la
+// biblioteca estandar, asi que el shim no puede estar mas lejos de la verdad.
+//
+// POR QUE NO SON `constexpr`. `__builtin_bit_cast` es de C++20 y el modulo es
+// C++17; el unico truco de conversion que funciona en C++17 es leer un miembro
+// del union distinto del que se escribio, y eso no es una expresion constante
+// valida. Por eso van sin `constexpr`.
+//
+// Y no pasa nada por eso: en `DspMath.h` estos tres valores se usan en
+// comparaciones y en asignaciones en tiempo de ejecucion, nunca en una
+// expresion constante. Si algun dia se usan en una, el shim deja de compilar
+// en vez de compilar mal, que es el intercambio correcto.
+//
+// Lo que NO esta aqui, a proposito: `is_specialized` como member, `lowest`,
+// `epsilon`, `min`, `denorm_min` y las demas. Si `DspMath.h` empieza a usarlas,
+// este shim deja de compilar y hay que anadirlas aqui. Preferible eso a un
+// `numeric_limits` de mentira que responda a todo y del que no se sepa lo que
+// vale: un `<limits>` incompleto que se nota al compilar vale mas que uno
+// completo que miente en silencio.
+#ifndef ABD_WASM_SHIM_LIMITS
+#define ABD_WASM_SHIM_LIMITS
+
+namespace std
+{
+    template <typename T>
+    class numeric_limits;
+
+    template <>
+    class numeric_limits<float>
+    {
+    public:
+        // El float IEEE-754 de 32 bits, leido por sus bits. Los tres valores
+        // que DspMath.h pide estan aqui porque son los unicos que la
+        // biblioteca estandar define por construccion y no por una formula.
+        static float desdeBits (unsigned u) noexcept
+        {
+            union Bits { unsigned u; float f; } v;
+            v.u = u;
+            return v.f;
+        }
+
+        static float max()        noexcept { return desdeBits (0x7f7fffffu); }
+        static float lowest()     noexcept { return desdeBits (0xff7fffffu); }
+        static float infinity()   noexcept { return desdeBits (0x7f800000u); }
+        static float quiet_NaN()  noexcept { return desdeBits (0x7fc00000u); }
+        static float epsilon()    noexcept { return desdeBits (0x34000000u); }
+    };
+}
+
+#endif

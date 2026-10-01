@@ -22,7 +22,7 @@ Salida:
 
 Uso:
   python tools/audit_unconsumed_sources.py           # informe
-  python tools/audit_unconsumed_sources.py --check   # solo codigo de salida
+  python tools/audit_unconsumed_sources.py --check   # sin informe, pero EN ROJO DICE POR QUE
 """
 
 import io
@@ -95,6 +95,11 @@ ALLOWLIST = {
         'arnas de medicion de DspMath; a proposito fuera de CMake, se compila a mano',
     'DspCore/DspMathBitIdent.cpp':
         'arnas de identidad bit a bit de DspMath; a proposito fuera de CMake',
+    'DspCore/DspMathHarness.h':
+        'arnas de paridad WASM<->nativo y de coste de DspMath; se compila dos veces '
+        'con el mismo fuente, a nativo y a wasm32, y a proposito fuera de CMake',
+    'DspCore/DspMathHarness.cpp':
+        'el arnes anterior en su unico fuente; lo corre tools/run_dsp_math_harness.py',
     'DspCore/DspCoreTests.cpp':
         'el test standalone del propio modulo; lo compila su CMake, ningun producto',
     'DspEffects/DspEffectsTests.cpp':
@@ -279,6 +284,46 @@ def main():
     new = [o for o in orphans if o[0] not in ALLOWLIST]
     seen = dict(orphans)
     listed = [r for r in ALLOWLIST if r not in seen]
+
+    # `--check` NO es silencioso. Antes salia con 1 sin imprimir nada, y en el
+    # log de un job eso se lee como "el script se rompio" y no como "ha
+    # aparecido una fuente huerfana": el fallo que hay que arreglar no se
+    # distinguia del fallo que no hay. Aqui imprime lo mismo que el informe, en
+    # corto, y sale con 1.
+    if check_only and (new or listed):
+        if new:
+            n = len(new)
+            print('audit_unconsumed_sources: %d %s SIN NINGUN PRODUCTO QUE LA CONSUME%s, '
+                  'y no %s en la lista blanca:'
+                  % (n,
+                     'fuente huerfana' if n == 1 else 'fuentes huerfanas',
+                     '' if n == 1 else 'n',
+                     'esta' if n == 1 else 'estan'),
+                  file=sys.stderr)
+            for rel, inert in sorted(new):
+                print('  %s%s' % (rel, '  [INERTE: no lo compila nadie, ni el propio modulo]'
+                                  if inert else ''), file=sys.stderr)
+            print('  Trabajo a medias: el fichero esta, se documenta y se prueba, y ningun')
+            print('  producto lo enlaza. O se le anade un consumidor, o se documenta el motivo')
+            print('  en ALLOWLIST (tools/audit_unconsumed_sources.py), que es lo que dice que')
+            print('  es un resto DELIBERADO y no un olvido.', file=sys.stderr)
+
+        if listed:
+            n = len(listed)
+            print('audit_unconsumed_sources: %d %s de la lista blanca ya NO %s huerfana%s '
+                  '(borrar la entrada%s):'
+                  % (n,
+                     'entrada' if n == 1 else 'entradas',
+                     'es' if n == 1 else 'son',
+                     '' if n == 1 else 's',
+                     '' if n == 1 else 's'),
+                  file=sys.stderr)
+            for r in listed:
+                print('  %s' % r, file=sys.stderr)
+
+        print('  El informe completo, con el porque de cada huerfana conocida: '
+              'python tools/audit_unconsumed_sources.py', file=sys.stderr)
+        print('', file=sys.stderr)
 
     if not check_only:
         total = len(shared)
