@@ -7,6 +7,10 @@
      --kbd-white-top/base/bottom, --kbd-black-top/base/bottom
      --kbd-active-bg, --kbd-led-color, --kbd-sweep-color, --kbd-panic-color
      --kbd-font, --kbd-wheel-label-color, --kbd-wheel-value-color
+   HOST CONTRACT: la franja del host lleva el teclado con altura DEFINIDA
+   (p.ej. height: 155px). WebView2 no resuelve height:100% a traves de una
+   cadena de estiramientos: sin altura definida las teclas colapsan
+   (leccion NEURONiK 8.3). Ver README 'Important Layout & Container Contract'.
    ══════════════════════════════════════════════════════════════ */
 
 

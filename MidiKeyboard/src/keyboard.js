@@ -59,6 +59,10 @@ export function createKeyboard(deps = {}) {
   const cfg = {
     numOctaves: config.numOctaves ?? 4,
     startNote: config.startNote ?? 36,
+    // Layout FIJO del host: numOctaves/startNote son los del host y no se
+    // recalculan por ancho disponible (ABDEep 4 octavas desde C2, CZ101 sus
+    // 49 teclas). Sin esto, el keybed se re-acomoda por ancho.
+    fixedOctaves: config.fixedOctaves ?? false,
     maxOctaveShift: config.maxOctaveShift ?? 3,
     velocitySource: config.velocitySource ?? 'fixed',
     velocityCurve: config.velocityCurve ?? 'normal',

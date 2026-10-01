@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createKeyboard } from '../src/keyboard.js';
+import { createKeyboard, CZ101_PRESET } from '../src/keyboard.js';
 
 // ── jsdom polyfill: PointerEvent ──
 if (typeof globalThis.PointerEvent === 'undefined') {
@@ -2791,5 +2791,54 @@ describe('host-driven feedback API (v0.2)', () => {
       stub.setModWheel(0.5);
       stub.notesOffVisual([60]);
     }).not.toThrow();
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════
+//  LAYOUT FIJO (config.fixedOctaves)
+//  El host decide el rango (numOctaves/startNote) y el keybed NO lo re-acomoda
+//  por ancho: ABDEep conserva sus 4 octavas desde C2 y ABDCZ101 sus 49 teclas.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('fixed layout (config.fixedOctaves)', () => {
+  /** Contenedor con ancho simulado: sin ancho real el re-layout por ancho no corre. */
+  function mountWithWidth(widthPx, config) {
+    document.body.innerHTML = '<div id="piano-keyboard"></div>';
+    const container = document.getElementById('piano-keyboard');
+    Object.defineProperty(container, 'clientWidth', { value: widthPx, configurable: true });
+    const kbd = createKeyboard({ containerId: 'piano-keyboard', config });
+    return { container, kbd };
+  }
+
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('sin fixedOctaves el ancho decide octavas y nota inicial', () => {
+    const { container, kbd } = mountWithWidth(950, { numOctaves: 4, startNote: 36 });
+    // 950px / 36 teclas blancas = 26,4px por tecla → candidato de 5 octavas (61 teclas).
+    expect(container.querySelectorAll('.kbd-white-key')).toHaveLength(36);
+    expect(Number(container.querySelector('.kbd-white-key').dataset.note)).toBe(24);
+    kbd.destroy();
+  });
+
+  it('con fixedOctaves manda el host (4 octavas desde C2 = 49 teclas)', () => {
+    const { container, kbd } = mountWithWidth(950, {
+      numOctaves: 4, startNote: 36, fixedOctaves: true,
+    });
+    expect(container.querySelectorAll('.kbd-white-key')).toHaveLength(29);
+    expect(Number(container.querySelector('.kbd-white-key').dataset.note)).toBe(36);
+    // La ultima tecla cierra la octava (C2 + 4 octavas = C6).
+    const last = container.querySelectorAll('.kbd-white-key');
+    expect(Number(last[last.length - 1].dataset.note)).toBe(84);
+    kbd.destroy();
+  });
+
+  it('el rango del preset CZ-101 se respeta tal cual con fixedOctaves', () => {
+    const { container, kbd } = mountWithWidth(1150, {
+      ...CZ101_PRESET, fixedOctaves: true,
+    });
+    expect(container.querySelectorAll('.kbd-white-key')).toHaveLength(29);
+    expect(Number(container.querySelector('.kbd-white-key').dataset.note)).toBe(48); // C3
+    kbd.destroy();
   });
 });

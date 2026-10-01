@@ -248,6 +248,7 @@ const kbd = createKeyboard({
   config: {
     numOctaves: 4,
     startNote: 36,
+    fixedOctaves: false,           // true = el host fija el rango (sin re-layout por ancho)
     maxOctaveShift: 3,
     velocitySource: 'fixed',       // 'fixed' | 'yPosition'
     velocityCurve: 'normal',       // 'normal' | 'soft' | 'hard' | 'linear' | 'fixed'
@@ -573,9 +574,13 @@ createKeyboard({
 
 ### ABDEep (full experience)
 
+Monta el keybed compartido con `fixedOctaves: true` (mantiene sus 4 octavas
+desde C2, 49 teclas) y aplica su propia curva de velocity en `onNoteOn`:
+
 ```js
 createKeyboard({
   config: {
+    fixedOctaves: true,
     velocitySource: 'yPosition',
     velocityCurve: 'normal',
     enablePressureDisplay: true,
@@ -590,8 +595,12 @@ createKeyboard({
     enableChordMemory: true,
     maxChordSlots: 12,
   },
-  getLedColor: () => arpActive ? '#ff3366' : seqActive ? '#9933ff' : 'var(--color-accent)',
-  getPressureState: () => ({ aftertouch: at, modWheel: mw, pitchBend: pb }),
+  config: {
+    // ...el resto de la config de arriba...
+    // OJO: getLedColor y getPressureState son config, no callbacks de primer nivel.
+    getLedColor: () => arpActive ? '#ff3366' : seqActive ? '#9933ff' : 'var(--color-accent)',
+    getPressureState: () => ({ aftertouch: at, modWheel: mw, pitchBend: pb }),
+  },
   onAftertouch: (note, pressure) => {
     if (note === -1) synth.setChannelPressure(pressure * 127);
     else synth.setPolyPressure(note, pressure * 127);
@@ -609,7 +618,10 @@ createKeyboard({
 import { CZ101_PRESET } from '@abdsynths/keyboard';
 
 createKeyboard({
-  ...CZ101_PRESET,
+  containerId: 'piano-keyboard',
+  // fixedOctaves: el host fija el rango (49 teclas) en vez de re-acomodarlo
+  // por ancho; los botones de octava y las ruedas son los del chasis.
+  config: { ...CZ101_PRESET, startNote: 36, fixedOctaves: true },
   onNoteOn: (n, v) => bridge.noteOn(n, v),
   onNoteOff: (n) => bridge.noteOff(n),
   onSustainChange: (on) => bridge.sustain(on),
@@ -711,6 +723,18 @@ When hosting #piano-keyboard, its internal .kbd-keys-wrapper element requires fl
 }
 `
 This is defined directly in src/keyboard.css and @abdsynths/shared/styles/components/keyboard.css.
+
+**Definite height required (host contract).** The host strip that wraps
+`#piano-keyboard` must give the keyboard a **defined height** (e.g. `height: 155px`),
+not a stretch chain (`min-height` / flex stretch with `height: 100%` underneath).
+WebView2 does not resolve `height: 100%` through a chain of stretches: the keys
+collapse to a fraction of a pixel (all black / invisible). All hosts define it
+explicitly: ABDMS2000 `155px` (collapsed `42px`), ABDEep `185px`, ABDCZ101 `180px`,
+NEURONiK `height: calc(var(--abd-keys-h) - var(--keys-note-h, 14px))`.
+
+Los hosts que montan este paquete lo importan como dependencia del workspace
+(`@abdsynths/midi-keyb`, ESM) en vez de mantener un keybed propio: ABDMS2000
+(Vite), ABDEep y ABDCZ101.
 
 ### Theming System
 The component natively adapts to dark and light modes via the data-theme attribute (e.g. udiolab, udiolab-light, ms2000, cz101, juno, deepmind).

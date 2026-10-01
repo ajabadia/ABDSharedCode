@@ -4,6 +4,21 @@ All notable changes to ABDKeyboard will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.1] - 2026-09-24
+
+### Added
+- `config.fixedOctaves` — el host fija `numOctaves`/`startNote` y el keybed
+  deja de re-acomodarse por ancho disponible. ABDEep conserva sus 4 octavas
+  desde C2 (49 teclas) y ABDCZ101 sus 49 teclas del preset CZ-101.
+
+### Fixed
+- README: el ejemplo de ABDEep pasaba `getLedColor`/`getPressureState` en el
+  primer nivel, donde se ignoran — son opciones de `config`.
+
+### Consumers
+- ABDEep y ABDCZ101 montan ya el keybed compartido (antes declaraban la
+  dependencia pero renderizaban su propio keybed).
+
 ## [0.2.0] - 2026-09-17
 
 ### Added
