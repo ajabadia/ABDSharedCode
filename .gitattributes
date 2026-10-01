@@ -7,6 +7,7 @@ CMakeLists.txt text eol=lf
 *.cpp text eol=lf
 *.h text eol=lf
 *.md text eol=lf
+*.yml text eol=lf
 *.gitignore text eol=lf
 *.gitattributes text eol=lf
 
@@ -19,3 +20,5 @@ CMakeLists.txt text eol=lf
 *.exe binary
 *.pdb binary
 *.ilk binary
+*.pyc binary
+*.gif binary
