@@ -880,6 +880,146 @@ describe('el verde falso, que es un pipe que se come el codigo de salida', () =>
   });
 });
 
+
+// El laboratorio: como se mide la linea base contra la FOTO y no contra el arbol de
+// trabajo. Va aqui, y no en un `regenerar_linea_base.test.mjs` propio, por el mismo
+// motivo que los otros dos bloques: el guard de la cabecera de mas arriba obliga a que
+// TODO `*.test.mjs` de tools/ este nombrado en esa cabecera, y la cabecera solo
+// admite una orden con UN solo nombre.
+describe('el laboratorio, que mide la foto y no el arbol de trabajo', () => {
+  const PY = (() => {
+    for (const cand of (process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'])) {
+      const r = spawnSync(cand, ['--version'], { encoding: 'utf8' });
+      if (r.status === 0) return cand;
+    }
+    return null;
+  })();
+
+  const GUION = resolve(RAIZ, 'tools', 'regenerar_linea_base.py');
+  const WORKFLOW = resolve(RAIZ, '.github', 'workflows', 'shared-code-ci.yml');
+  const SIN_PY = PY === null && 'no hay python en esta maquina';
+
+  /** Corre el comando contra un workflow y una linea base escribidos a mano. */
+  function correr (args) {
+    const r = spawnSync(PY, [GUION].concat(args), { cwd: RAIZ, encoding: 'utf8' });
+    return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
+  }
+
+  it('un workflow sin ningun checkout con ref: da 2, no 0', { skip: SIN_PY }, () => {
+    // Sin repos que clonar no hay fotografia que medir, y un 0 aqui seria un verde
+    // que no ha medido nada. Es el mismo codigo 2 que usa el resto de guards del repo.
+    const d = mkdtempSync(join(tmpdir(), 'lab-wf-'));
+    try {
+      const wf = join(d, 'wf.yml');
+      writeFileSync(wf, 'name: x\non: [push]\njobs:\n  uno:\n    steps: []\n', 'utf8');
+      const r = spawnSync(PY, [GUION, '--raiz', join(d, 'lab'), '--workflow', wf],
+        { encoding: 'utf8' });
+      const salida = (r.stdout || '') + (r.stderr || '');
+      assert.notEqual(r.status, 0,
+        `sin SHA que clonar no se puede medir, y no puede salir en verde:\n${salida}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('la foto sale del WORKFLOW, y no de la linea base que se quiere regenerar', {
+    skip: SIN_PY,
+  }, () => {
+    // Este es el argumento central del comando, y por eso hay un test que lo fija.
+    // Leer los SHA de la linea base seria medirse a uno mismo: si los SHA se
+    // equivocaron al subirlos en el workflow, este comando clonaria los mismos
+    // repos equivocados y escribiria una linea base que sigue mintiendo, con la
+    // ilusion de que se ha arreglado. La foto tiene que salir de lo que CI clona.
+    const wf = readFileSync(WORKFLOW, 'utf8');
+    const base = readFileSync(resolve(RAIZ, 'tools', 'audit-baseline.json'), 'utf8');
+
+    const shasDelWorkflow = [...wf.matchAll(/repository: ajabadia\/(\w+)[\s\S]{0,80}?ref: ([0-9a-f]{7,40})/g)]
+      .map((m) => m[1]);
+    assert.ok(shasDelWorkflow.length >= 5,
+      `el workflow deberia clonar los 5 hermanos, no ${shasDelWorkflow.length}`);
+
+    // Los SHA del workflow tienen que estar en la linea base: si no, el job `foto`
+    // esta en rojo y el comando no puede disfrazarlo.
+    const foto = JSON.parse(base).foto || {};
+    for (const repo of shasDelWorkflow) {
+      assert.ok(foto[repo], `la linea base no declara ${repo}: el job foto lo diria`);
+    }
+  });
+
+  it('el auditor se ejecuta DENTRO del laboratorio, no el del arbol', { skip: SIN_PY }, () => {
+    // `SUITE = <padre del directorio del script>`, asi que ejecutar el script de aqui
+    // mediria el ARBOL DE TRABAJO, que es exactamente el fallo que este comando evita.
+    // El del arbol ve los cambios sin commitear de otra persona y daria 55 huerfanas
+    // falsas; el del clon ve los SHA de la foto y da las 55 de verdad.
+    const src = readFileSync(GUION, 'utf8');
+    assert.match(src, /raiz, 'ABDSharedCode', 'tools', AUDITOR/,
+      'el comando tiene que ejecutar el auditor de DENTRO del clon, no el de SHARED');
+    assert.doesNotMatch(src, /subprocess\.run\(\[sys\.executable, os\.path\.join\(HERE/,
+      'el comando no puede ejecutar el auditor de tools/ junto a el: mediria el arbol');
+  });
+
+  it('el repositorio se clona con fetch --depth 1, no con clone', { skip: SIN_PY }, () => {
+    // Medido: un clon completo de ABDSharedAssets son 56 MB de .git y los seis repos
+    // tardan minutos; `fetch --depth 1 <sha>` tarda menos de 2 s por repo. Y
+    // `clone --depth 1` NO sirve: trae el HEAD del rama, no un SHA cualquiera.
+    const src = readFileSync(GUION, 'utf8');
+    assert.match(src, /'fetch', '-q', '--depth', '1', 'origin', sha/,
+      'los repos tienen que venir por fetch --depth 1 con el SHA explicito');
+    assert.doesNotMatch(src, /'clone'/,
+      'no debe usar git clone: con --depth 1 no trae un SHA arbitrario');
+  });
+
+  it('un repo que no se puede clonar es 2, y el resto no se mide en su lugar', {
+    skip: SIN_PY,
+  }, () => {
+    // Un laboratorio al que le falta un hermano mediria MENOS huerfanas que CI, porque
+    // los consumidores que faltan harian parecer huerfanas fuentes que no lo son. Y esa
+    // linea base se escribiria en el sitio que dice medir la verdad.
+    const d = mkdtempSync(join(tmpdir(), 'lab-fallo-'));
+    try {
+      // Un workflow con un SHA que no existe en el remoto.
+      const wf = join(d, 'wf.yml');
+      writeFileSync(wf, [
+        'name: x',
+        'on: [push]',
+        'jobs:',
+        '  uno:',
+        '    steps:',
+        '      - uses: actions/checkout@v4',
+        '        with:',
+        '          repository: ajabadia/ABDSharedAssets',
+        '          ref: 0000000000000000000000000000000000000000',
+        '',
+      ].join('\n'), 'utf8');
+
+      const r = spawnSync(PY, [GUION, '--raiz', join(d, 'lab'), '--workflow', wf],
+        { encoding: 'utf8' });
+      const salida = (r.stdout || '') + (r.stderr || '');
+      assert.equal(r.status, 2,
+        `un SHA inexistente es que no se ha medido nada, no un hallazgo:\n${salida}`);
+      assert.match(salida, /NO SE HA PODIDO MONTAR/,
+        `el motivo tiene que decir que el laboratorio no se monto:\n${salida}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('un flag desconocido: 2, y se escribe el que si vale', { skip: SIN_PY }, () => {
+    const r = correr(['--inventado']);
+    assert.equal(r.code, 2);
+    for (const flag of ['--escribir', '--raiz', '--montar']) {
+      assert.ok(r.out.includes(flag), `el error no ofrece ${flag}:\n${r.out}`);
+    }
+  });
+
+  it('--help sale 0 y documenta los flags que importan', { skip: SIN_PY }, () => {
+    const r = correr(['--help']);
+    assert.equal(r.code, 0);
+    for (const flag of ['--escribir', '--de-la-linea-base', '--reusar', '--montar']) {
+      assert.ok(r.out.includes(flag), `--help no menciona ${flag}`);
+    }
+  });
+});
 // La foto de la linea base. Va aqui, y no en un `verificar_foto.test.mjs` propio,
 // porque el guard de la cabecera de mas arriba obliga a que TODO `*.test.mjs` de
 // tools/ este nombrado en esa cabecera, y la cabecera solo admite una orden con

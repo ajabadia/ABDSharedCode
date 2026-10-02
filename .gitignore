@@ -73,3 +73,8 @@ pnpm-lock.yaml
 # OS
 .DS_Store
 Thumbs.db
+
+# La copia de la linea base que deja `tools/regenerar_linea_base.py --escribir`
+# antes de tocarla. Es la vuelta atras, no un fichero del repo: sin esto, un
+# `git add tools/` a lo bruto se la lleva al commit.
+tools/audit-baseline.json.antes
