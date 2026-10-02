@@ -77,24 +77,66 @@ inputs:
 runs:
   using: composite
   steps:
+    # ── Guarda de colision: ANTES de clonar ────────────────────────────────────
+    # Los dos ultimos pasos usan `path:` fijo (`ABDSharedCode` y `ABDSharedAssets`)
+    # y el primero usa `path: <project>`. Si `project` fuera uno de esos dos, dos
+    # checkouts cairian en el mismo directorio con repos distintos, y por lo medido
+    # (ver README.md, "Lo que decide es el REMOTO, no el path: repetido")
+    # `actions/checkout` borra el contenido del primero: el repo llamante
+    # desapareceria del workspace y el fallo apareceria mas tarde, en el
+    # `pnpm install`, con un motivo que no nombra al checkout que lo rompio.
+    #
+    # Esta guarda es la que se dispara primero. La de
+    # `tools/bootstrap-workspace.mjs` sigue ahi y sigue siendo necesaria (ella ve
+    # el layout real, que es lo que de verdad manda), pero para este error concreto
+    # esta dice el porque en el paso donde se puede evitar la clonacion entera.
+    #
+    # El input va por env y se referencia como "$ABD_PROJECT", nunca interpolado con
+    # ${{ }}: un input interpolado se convierte en codigo shell (mismo motivo que el
+    # paso de bootstrap de mas abajo).
+    - name: Guard against checkout path collisions
+      shell: bash
+      env:
+        ABD_PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+
+        # La comparacion es SIN mayusculas a proposito. Los jobs que usan esta
+        # accion corren en `windows-latest`, y alli el sistema de ficheros no
+        # distingue `abdsharedcode/` de `ABDSharedCode/`: son el mismo
+        # directorio, luego la colision del caso A ocurre igual y con el mismo
+        # borrado. En Linux el path si distingue, pero ahi el repo con esa
+        # capitalizacion tampoco existe y el fallo seria de otro tipo.
+        caso="${ABD_PROJECT,,}"
+
+        case "$caso" in
+          abdsharedcode|abdsharedassets)
+            echo "::error::project: '$ABD_PROJECT' no puede ser el repo llamante: colisiona con el checkout fijo de ese mismo repo."
+            echo "::error::La accion hace tres checkouts en <project>/, ABDSharedCode/ y ABDSharedAssets/. Con project: '$ABD_PROJECT' los dos primeros caen en el mismo path y con repos distintos."
+            echo "::error::Medido sobre actions/checkout: si el path ya tiene un remoto distinto, borra su contenido ('Deleting the contents of ...'). El repo llamante desapareceria del workspace."
+            echo "::error::Sin esta guarda el fallo saldria tres pasos mas tarde, en el pnpm install, con un motivo que no nombra al checkout que lo rompio. Usa otro project (ABDEep, ABDMS2000, ABDNeural, ABDCZ101)."
+            exit 1
+            ;;
+        esac
+
     # ── Layout del monorepo ──────────────────────────────────────────────────
     # Los tres repos van como HERMANOS dentro del workspace. Es la misma
     # disposicion que tiene el checkout local de la suite, donde
     # node_modules/@abdsynths/* son symlinks a ../.
     - name: Checkout calling repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         path: ${{ inputs.project }}
 
     - name: Checkout ABDSharedCode (@abdsynths/midi-keyb)
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: ajabadia/ABDSharedCode
         path: ABDSharedCode
         ref: ${{ inputs.shared-code-ref }}
 
     - name: Checkout ABDSharedAssets (@abdsynths/shared)
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: ajabadia/ABDSharedAssets
         path: ABDSharedAssets
@@ -114,7 +156,7 @@ runs:
     # suite (el del workspace vive en el repo raiz, que no se clona), y
     # setup-node falla en duro si declara cache y no encuentra el lockfile.
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ inputs.node-version }}
 
