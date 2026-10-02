@@ -449,6 +449,425 @@ describe('la orden que dice la cabecera de este fichero', () => {
   });
 });
 
+
+// El verde falso: un paso que sale en verde porque `tee` se comio el codigo de
+// salida. Va aqui, y no en un `guard_pipefail.test.mjs` propio, por el mismo motivo
+// que el bloque de la foto: el guard de la cabecera de mas arriba obliga a que TODO
+// `*.test.mjs` de tools/ este nombrado en esa cabecera, y la cabecera solo admite una
+// orden con UN solo nombre. Anadir un segundo fichero de test obligaria a cambiar ese
+// patron, que es justo el patron que impide que ese guard se apruebe a si mismo.
+describe('el verde falso, que es un pipe que se come el codigo de salida', () => {
+  const PY = (() => {
+    for (const cand of (process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'])) {
+      const r = spawnSync(cand, ['--version'], { encoding: 'utf8' });
+      if (r.status === 0) return cand;
+    }
+    return null;
+  })();
+
+  const GUION = resolve(RAIZ, 'tools', 'guard_pipefail.py');
+  const WORKFLOW = resolve(RAIZ, '.github', 'workflows', 'shared-code-ci.yml');
+  const SIN_PY = PY === null && 'no hay python en esta maquina';
+
+  /** Un workflow con UN paso, de la forma real de GitHub. */
+  function workflow (nombre, cuerpo, shell) {
+    const l = [
+      'name: prueba',
+      'on: [push]',
+      'jobs:',
+      '  uno:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      `      - name: ${nombre}`,
+    ];
+    if (shell) l.push(`        shell: ${shell}`);
+    l.push('        run: |');
+    for (const c of cuerpo) l.push(`          ${c}`);
+    return l.join('\n') + '\n';
+  }
+
+  /** Monta una suite de un clon y corre el guard. (codigo, salida) */
+  function medir (workflows) {
+    const d = mkdtempSync(join(tmpdir(), 'pipefail-'));
+    try {
+      const raiz = join(d, 'suite');
+      for (const [repo, nombre, txt] of workflows) {
+        const wf = join(raiz, repo, '.github', 'workflows');
+        mkdirSync(wf, { recursive: true });
+        writeFileSync(join(wf, nombre), txt, 'utf8');
+      }
+      const r = spawnSync(PY, [GUION, '--check', '--raiz', raiz], { encoding: 'utf8' });
+      return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  }
+
+  it('EL CASO QUE CIERRA: `pnpm test | tee log` sin pipefail sale 1, no 0', {
+    skip: SIN_PY,
+  }, () => {
+    // El fallo del primer push, reproducido. Medido en bash antes de escribir el
+    // guard: `false | tee /dev/null` sin pipefail sale 0 y con pipefail sale 1, que
+    // es la diferencia entre un job verde con `pnpm test` fallando y un job rojo.
+    const r = medir([['ABDSharedCode', 'ci.yml',
+      workflow('Tests', ['pnpm test 2>&1 | tee "$RUNNER_TEMP/log"'])]]);
+
+    assert.equal(r.code, 1,
+      `un \`| tee\` sin pipefail tiene que ser un hallazgo. Salida:\n${r.out}`);
+    // Y el motivo tiene que NOMBRAR el paso y el shell, porque "algo fallo" obliga a
+    // abrir el workflow a buscar.
+    assert.match(r.out, /Tests/, `el informe no nombra el paso:\n${r.out}`);
+    assert.match(r.out, /sh/, `el informe no dice que shell ejecuta el paso:\n${r.out}`);
+  });
+
+  it('`shell: bash` SOLO ya vale, porque el runner le pone -o pipefail', { skip: SIN_PY }, () => {
+    // Este es el caso donde un guard demasiadoplice se pone ROJO sobre el paso que
+    // el commit 4f5e6a4 acaba de arreglar. Sale de las reglas del runner
+    // (`ScriptHandlerHelpers.cs`), no de una suposicion.
+    const r = medir([['ABDSharedCode', 'ci.yml',
+      workflow('Tests', ['pnpm test 2>&1 | tee log'], 'bash')]]);
+    assert.equal(r.code, 0, `shell: bash ya trae pipefail del runner:\n${r.out}`);
+  });
+
+  it('pero `shell: bash -e {0}` NO vale: esos args pisan los del runner', { skip: SIN_PY }, () => {
+    // El caso hermano del de arriba, y el que separa un guard medido de uno que
+    // mira "la palabra bash" por el fichero. Escribir args propios REEMPLAZA el
+    // `--noprofile --norc -e -o pipefail {0}` del runner, y el pipefail se va con el.
+    const r = medir([['ABDSharedCode', 'ci.yml',
+      workflow('Tests', ['pnpm test 2>&1 | tee log'], 'bash -e {0}')]]);
+    assert.equal(r.code, 1, `args propios sin pipefail: tiene que ser hallazgo:\n${r.out}`);
+  });
+
+  it('`set -o pipefail` dentro del run tambien vale, con o sin shell:', { skip: SIN_PY }, () => {
+    for (const shell of [null, 'bash', 'sh']) {
+      const r = medir([['ABDSharedCode', 'ci.yml',
+        workflow('Tests', ['set -o pipefail', 'pnpm test 2>&1 | tee log'], shell)]]);
+      assert.equal(r.code, 0, `set -o pipefail dentro (shell=${shell}):\n${r.out}`);
+    }
+  });
+
+  it('las tres formas de `set` que se usan de verdad', { skip: SIN_PY }, () => {
+    for (const linea of ['set -o pipefail', 'set -euo pipefail', 'set -uo pipefail']) {
+      const r = medir([['ABDSharedCode', 'ci.yml',
+        workflow('Tests', [linea, 'pnpm test 2>&1 | tee log'])]]);
+      assert.equal(r.code, 0, `${linea} tiene que valer:\n${r.out}`);
+    }
+  });
+  
+
+  it('la palabra "puppeteer" NO es un tee, y el guard no puede marcar por eso', {
+    skip: SIN_PY,
+  }, () => {
+    // Falso POSITIVO real y medido: `grep -n tee ABDEep/.github/workflows/webui-ci.yml`
+    // casa en la linea 53, dentro de la palabra "Chromium" de la linea que explica
+    // que se omite la descarga de puppeteer. Un guard que nace marcando eso se apaga
+    // el primer dia, y a partir de ahi no vigila nada.
+    const r = medir([['ABDSharedCode', 'ci.yml',
+      workflow('Bootstrap', ['echo se omite el Chromium de puppeteer'])]]);
+    assert.equal(r.code, 0, `"puppeteer" no es una tuberia:\n${r.out}`);
+  });
+
+  it('un `| tee` que esta en un COMENTARIO no cuenta', { skip: SIN_PY }, () => {
+    // El propio workflow de este repo tiene un comentario que dice
+    // "`pnpm test | tee log` devuelve el codigo de tee". Si el guard no lo ignorara,
+    // el fichero que documenta el fallo seria un hallazgo, y el arreglo seria borrar
+    // la documentacion.
+    const r = medir([['ABDSharedCode', 'ci.yml', workflow('Tests', [
+      '# `pnpm test | tee log` devuelve el codigo de tee, que es 0 siempre',
+      'pnpm test',
+    ])]]);
+    assert.equal(r.code, 0, `un comentario no ejecuta nada:\n${r.out}`);
+  });
+
+  it('en pwsh no es hallazgo: el runner le anade exit $LASTEXITCODE', { skip: SIN_PY }, () => {
+    // El `FixUpScriptContents` del runner anade `if ((Test-Path variable:LASTEXITCODE))
+    // { exit $LASTEXITCODE }` a los scripts de pwsh, asi que el pipe se nota. Y hay un
+    // caso real de la suite: el paso de CMake de ABDEep/webui-bundle-ci.yml.
+    const r = medir([['ABDSharedCode', 'ci.yml',
+      workflow('Configure CMake', ['cmake -B build 2>&1 | tee cfg.log'], 'pwsh')]]);
+    assert.equal(r.code, 0, `pwsh propaga el codigo por su cuenta:\n${r.out}`);
+  });
+
+  it('EL REPO REAL: su workflow esta limpio', { skip: SIN_PY }, () => {
+    // El guard sobre el arbol de trabajo entero, no sobre un fixture.
+    const r = spawnSync(PY, [GUION, '--check'], { cwd: RAIZ, encoding: 'utf8' });
+    assert.equal(r.status, 0,
+      `la suite real da ${r.status}. Si es 1, hay un \`| tee\` sin pipefail:\n`
+      + `${r.stdout}${r.stderr}`);
+  });
+
+  it('y mira pasos de verdad, no sale en verde por no mirar nada', { skip: SIN_PY }, () => {
+    // La contraprueba del `--listar`: un guard en verde que no ha medido nada es el
+    // peor resultado posible, porque parece una comprobacion. Se mide que ha visto
+    // pasos con codigo de verdad.
+    const r = spawnSync(PY, [GUION, '--listar'], { cwd: RAIZ, encoding: 'utf8' });
+    assert.equal(r.status, 0, `--listar no compara nada y sale 0:\n${r.stdout}${r.stderr}`);
+
+    const pasos = Number((r.stdout.match(/pasos con codigo ejecutable: (\d+)/) || [])[1]);
+    const riesgos = Number(
+      (r.stdout.match(/que pueden perder el codigo de salida: (\d+)/) || [])[1]);
+    assert.ok(pasos > 100,
+      `ha mirado ${pasos} pasos, demasiados pocos para una suite entera:\n${r.stdout}`);
+    assert.equal(riesgos, 0, `la suite real tiene ${riesgos} riesgos:\n${r.stdout}`);
+  });
+
+  it('una raiz sin workflows: 2, no 0, porque no es un hallazgo', { skip: SIN_PY }, () => {
+    const d = mkdtempSync(join(tmpdir(), 'vacio-'));
+    try {
+      mkdirSync(join(d, 'suite', 'repo'), { recursive: true });
+      const r = spawnSync(PY, [GUION, '--check', '--raiz', join(d, 'suite')],
+        { encoding: 'utf8' });
+      assert.equal(r.status, 2,
+        'sin workflows no se ha medido nada: un 0 aqui diria que la suite esta limpia');
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('una raiz que no existe: 2, y lo dice', { skip: SIN_PY }, () => {
+    const r = spawnSync(PY, [GUION, '--check', '--raiz', join(tmpdir(), 'no-existe-este-dir')],
+      { encoding: 'utf8' });
+    assert.equal(r.status, 2, 'una raiz inexistente no puede dar un veredicto');
+    assert.match((r.stdout || '') + (r.stderr || ''), /no existe/,
+      'el motivo tiene que decir que no existe, no solo devolver 2');
+  });
+
+  it('un flag desconocido: 2, y se escribe el que si vale', { skip: SIN_PY }, () => {
+    const r = spawnSync(PY, [GUION, '--inventado'], { cwd: RAIZ, encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    const salida = (r.stdout || '') + (r.stderr || '');
+    for (const flag of ['--check', '--listar', '--raiz']) {
+      assert.ok(salida.includes(flag), `el error no ofrece ${flag}:\n${salida}`);
+    }
+  });
+  
+
+  /** Un workflow con un `defaults: run:` de un tipo dado. (texto) */
+  function conDefaults (clave, valor) {
+    return [
+      'name: prueba',
+      'on: [push]',
+      'jobs:',
+      '  uno:',
+      '    runs-on: ubuntu-latest',
+      '    defaults:',
+      '      run:',
+      `        ${clave}: ${valor}`,
+      '    steps:',
+      '      - name: Tests',
+      '        run: |',
+      '          pnpm test 2>&1 | tee log',
+      '',
+    ].join('\n');
+  }
+
+  it('`defaults: run: shell: bash` protege a los pasos que no digan shell:', {
+    skip: SIN_PY,
+  }, () => {
+    // La precedencia es la de GitHub y no una suposicion: si un paso dice `shell:`
+    // gana, y un `defaults:` solo habla de los pasos que NO digan nada.
+    const r = medir([['ABDSharedCode', 'ci.yml', conDefaults('shell', 'bash')]]);
+    assert.equal(r.code, 0, `el defaults: run: shell: protege:\n${r.out}`);
+  });
+
+  it('y `defaults: run: shell: sh` NO protege, porque sh no trae pipefail', {
+    skip: SIN_PY,
+  }, () => {
+    const r = medir([['ABDSharedCode', 'ci.yml', conDefaults('shell', 'sh')]]);
+    assert.equal(r.code, 1, `sh es \`-e {0}\`: sin pipefail:\n${r.out}`);
+  });
+
+  it('`defaults: run: working-directory:` sin shell no protege (no es un shell)', {
+    skip: SIN_PY,
+  }, () => {
+    // El caso real de ABDEep/webui-ci.yml: tiene un `defaults: run:
+    // working-directory:` y nada de shell. Que el bloque exista no significa que
+    // proteja: lo que protege es el `shell:`.
+    const r = medir([['ABDSharedCode', 'ci.yml', conDefaults('working-directory', 'ABDEep')]]);
+    assert.equal(r.code, 1, `working-directory no es un shell:\n${r.out}`);
+  });
+
+  it('un paso NO hereda el `shell:` del paso ANTERIOR', { skip: SIN_PY }, () => {
+    // Este es el bug que casi hizo que este guard se aprobara a si mismo. Con la
+    // busqueda del `shell:` "hacia atras sin limite", el paso sin `shell:` tomaba el
+    // del paso de al lado, que esta en la misma sangria. Medido: con ese bug, el
+    // workflow real de este repo con el arreglo de 4f5e6a4 quitado seguia en verde.
+    const wf = [
+      'name: prueba',
+      'on: [push]',
+      'jobs:',
+      '  uno:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - name: Con bash',
+      '        shell: bash',
+      '        run: |',
+      '          echo hola',
+      '      - name: Sin shell, y con tee',
+      '        run: |',
+      '          pnpm test 2>&1 | tee log',
+      '',
+    ].join('\n');
+    const r = medir([['ABDSharedCode', 'ci.yml', wf]]);
+    assert.equal(r.code, 1,
+      `el segundo paso no hereda nada: sin shell, el runner usa sh:\n${r.out}`);
+    assert.match(r.out, /Sin shell/,
+      `el informe tiene que senalar el paso SIN shell, no el de al lado:\n${r.out}`);
+  });
+
+  it('el repo real, con el arreglo de 4f5e6a4 quitado, es un hallazgo', { skip: SIN_PY }, () => {
+    // La contraprueba del guard entero, con el fichero de verdad y no un fixture. Se
+    // copia el workflow real, se le quita el `shell: bash` y el `set -o pipefail` del
+    // paso de tests, y tiene que salir 1 nombrando ESE paso. Sin esta prueba, un
+    // guard que no mirara nada tambien estaria en verde.
+    const real = readFileSync(WORKFLOW, 'utf8');
+    const roto = real.replace(
+      '        shell: bash\n        run: |\n          set -o pipefail\n',
+      '        run: |\n');
+    assert.notEqual(roto, real,
+      'no se ha podido quitar el arreglo del workflow real: el fixture no serviria');
+
+    const d = mkdtempSync(join(tmpdir(), 'real-'));
+    try {
+      const wf = join(d, 'suite', 'ABDSharedCode', '.github', 'workflows');
+      mkdirSync(wf, { recursive: true });
+      writeFileSync(join(wf, 'shared-code-ci.yml'), roto, 'utf8');
+      const r = spawnSync(PY, [GUION, '--check', '--raiz', join(d, 'suite')],
+        { encoding: 'utf8' });
+      const salida = (r.stdout || '') + (r.stderr || '');
+      assert.equal(r.status, 1,
+        `el workflow real sin la proteccion tiene que ser un hallazgo:\n${salida}`);
+      assert.match(salida, /Tests de MidiKeyboard/,
+        `tiene que nombrar el paso de tests, no otro:\n${salida}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('`runs-on: windows` con `| tee` y sin shell NO es hallazgo (el runner usa pwsh)', {
+    skip: SIN_PY,
+  }, () => {
+    // El caso REAL de la suite, y el que obliga a leer `runs-on:`. El paso "Configure
+    // CMake" de ABDEep/webui-bundle-ci.yml hace `cmake ... | tee log` sin declarar
+    // shell, pero su job es `windows-2022`: el runner ejecuta pwsh y le anade
+    // `exit $LASTEXITCODE`. Sin mirar el `runs-on:`, el guard lo marcaria como fallo
+    // sobre un fichero sano, y un guard que nace marcando eso no sobrevive al primer
+    // dia.
+    const wf = [
+      'name: prueba',
+      'on: [push]',
+      'jobs:',
+      '  bundle-in-binary:',
+      '    name: El binario lleva el bundle',
+      '    runs-on: windows-2022',
+      '    steps:',
+      '      - name: Configure CMake',
+      '        run: |',
+      '          cmake -B build 2>&1 | tee build\configure.log',
+      '',
+    ].join('\n');
+    const r = medir([['ABDEep', 'ci.yml', wf]]);
+    assert.equal(r.code, 0, `en windows el runner usa pwsh, que propaga el codigo:\n${r.out}`);
+  });
+
+  it('y el MISMO paso en `runs-on: ubuntu` SI es hallazgo, porque ahi es sh', {
+    skip: SIN_PY,
+  }, () => {
+    // El caso hermano: el `runs-on:` es lo unico que cambia, y por eso se mira. Sin
+    // el `runs-on:` no se puede distinguir, y sin distinguirlos el guard o se come un
+    // rojo o se come un falso positivo.
+    const l = [
+      'name: prueba',
+      'on: [push]',
+      'jobs:',
+      '  uno:',
+      '    name: Con nombre, que no es una clave del job',
+      '__RUNS_ON__',
+      '    steps:',
+      '      - name: Configure CMake',
+      '        run: |',
+      '          cmake -B build 2>&1 | tee build\configure.log',
+      '',
+    ].join('\n');
+
+    const rojo = medir([['ABDEep', 'ci.yml', l.replace('__RUNS_ON__', '    runs-on: ubuntu-latest')]]);
+    assert.equal(rojo.code, 1, `en ubuntu el runner usa sh, que pierde el codigo:\n${rojo.out}`);
+
+    const verde = medir([['ABDEep', 'ci.yml', l.replace('__RUNS_ON__', '    runs-on: windows-2022')]]);
+    assert.equal(verde.code, 0, `en windows el runner usa pwsh:\n${verde.out}`);
+  });
+
+  it('el nombre del job no se confunde con su `runs-on:`', { skip: SIN_PY }, () => {
+    // El `name:` de un job cuelga de el, igual que el `runs-on:`, y los dos estan en la
+    // misma sangria. Un parser que se comiera el `name:` por el nombre del job
+    // perderia el `runs-on:` de al lado. Este test mete un job con `name:` para que el
+    // caso no dependa de que el fichero real lo tenga o no.
+    const wf = [
+      'name: prueba',
+      'on: [push]',
+      'jobs:',
+      '  uno:',
+      '    name: Este nombre es del job, no del workflow',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - name: Tests',
+      '        run: |',
+      '          pnpm test 2>&1 | tee log',
+      '',
+    ].join('\n');
+    const r = medir([['ABDSharedCode', 'ci.yml', wf]]);
+    assert.equal(r.code, 1,
+      `con runs-on: ubuntu el paso es un hallazgo, y el name: no puedepotentarlo:\n${r.out}`);
+  });
+
+  it('el quinto trabajo se vigila a si mismo (un `| tee` suyo, sin pipefail, es 1)', {
+    skip: SIN_PY,
+  }, () => {
+    // ESTE es el test que hace que el trabajo sea una puerta y no un adorno. El paso
+    // "El guard ha mirado de verdad" hace `... | tee "$RUNNER_TEMP/pipes.txt"` para no
+    // perder el recuento, asi que el guard tiene que MIRARSE a si mismo. Si el paso
+    // dejara de llevar `shell: bash` + `set -o pipefail`, este guard dejaria de
+    // vigilar el fichero donde vive, que es la forma mas tonta de no vigilar nada.
+    const roto = readFileSync(WORKFLOW, 'utf8').replace(
+      '        shell: bash\n        run: |\n          set -o pipefail\n'
+      + '          python tools/guard_pipefail.py --listar',
+      '        run: |\n          python tools/guard_pipefail.py --listar');
+    assert.notEqual(roto, readFileSync(WORKFLOW, 'utf8'),
+      'no se ha podido quitar la proteccion del paso nuevo: el test no mide nada');
+
+    const d = mkdtempSync(join(tmpdir(), 'self-'));
+    try {
+      const wf = join(d, 'suite', 'ABDSharedCode', '.github', 'workflows');
+      mkdirSync(wf, { recursive: true });
+      writeFileSync(join(wf, 'shared-code-ci.yml'), roto, 'utf8');
+      const r = spawnSync(PY, [GUION, '--check', '--raiz', join(d, 'suite')],
+        { encoding: 'utf8' });
+      const salida = (r.stdout || '') + (r.stderr || '');
+      assert.equal(r.status, 1,
+        `el paso del quinto trabajo sin pipefail tiene que ser un hallazgo:\n${salida}`);
+      assert.match(salida, /El guard ha mirado de verdad/,
+        `tiene que senalar ese paso:\n${salida}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('y el quinto trabajo esta en el workflow, con sus repos clonados', { skip: SIN_PY }, () => {
+    // El guard puede pasar en verde sobre un workflow donde el trabajo no existe: no
+    // miraria el fichero del todo. Se comprueba que el trabajo esta, y que los
+    // hermanos tambien, porque un guard sin hermanos solo vigila este repo.
+    const wf = readFileSync(WORKFLOW, 'utf8');
+    assert.match(wf, /^ {2}pipes:$/m, 'el quinto trabajo `pipes` no esta en el workflow');
+    assert.match(wf, /guard_pipefail\.py --check --raiz "\$GITHUB_WORKSPACE"/,
+      'el trabajo no llama al guard con la raiz del workspace');
+
+    for (const repo of ['ABDEep', 'ABDMS2000', 'ABDNeural', 'ABDCZ101', 'ABDSharedAssets']) {
+      assert.ok(wf.includes(`repository: ajabadia/${repo}`),
+        `el quinto trabajo no clona ${repo}, asi que el guard no lo miraria`);
+    }
+  });
+});
+
 // La foto de la linea base. Va aqui, y no en un `verificar_foto.test.mjs` propio,
 // porque el guard de la cabecera de mas arriba obliga a que TODO `*.test.mjs` de
 // tools/ este nombrado en esa cabecera, y la cabecera solo admite una orden con

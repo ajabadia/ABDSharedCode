@@ -7,7 +7,7 @@ name: Shared code CI
 # codigo esta sano por si mismo: que sus pruebas corran, que sus herramientas
 # salgan en verde y que el package que publica resuelva sus dependencias.
 #
-# LO QUE ES PUERTA. Los cuatro trabajos bloquean, y los cuatro salen en verde.
+# LO QUE ES PUERTA. Los cinco trabajos bloquean, y los cinco salen en verde.
 #
 # El audit merece una explicacion, porque sin ella su veredicto se lee mal. Compara
 # este repo contra una foto de la suite fijada por SHA, y en esa foto hay 55 fuentes
@@ -236,6 +236,122 @@ jobs:
               echo "::warning::El SHA $sha de ajabadia/$repo no aparece en el remoto. O lo han borrado con un force-push, o el repo se ha movido. Si es un force-push, el job de audit no podra clonar ese repo y caera con un mensaje de checkout que no nombra la linea base."
             fi
           done
+
+
+  # EL QUINTO TRABAJO, Y EL MAS BARATO DE TODOS. No clona repos, no compila nada y
+  # no tarda: lee ficheros YAML que ya estan en disco y sale con 0 o con 1.
+  #
+  # QUE CIERRA. El primer push de este repo salio con un job en VERDE que no habia
+  # pasado: `pnpm test 2>&1 | tee log` devuelve el codigo de `tee`, que es 0
+  # siempre, y el shell por defecto de Actions (`sh`, que es `-e {0}`) no lo
+  # arregla. El log decia ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND debajo de un tick, y
+  # lo que lo delato fue que otro job, el `foto`, tambien salio raro. Si nadie
+  # hubiera mirado el log, el verde falso se queda.
+  #
+  # Lo que hace este trabajo es convertir ese hallazgo de casualidad en puerta. Es
+  # la unica forma de que no vuelva: no es que el guard explique el fallo, es que
+  # el fallo no se puede commitear.
+  #
+  # POR QUE ESTE TRABAJO Y NO UNO MAS. Los otros cuatro miden algo de este repo.
+  # Este mide LOS OTROS repos de la suite: los hermanos se clonan aqui abajo (job
+  # `audit`) y el guard recorre sus `.github/workflows/`. Sin el, un `| tee` sin
+  # pipefail en ABDEep pasaria tan desapercibido como paso en el de aqui.
+  #
+  # Y POR QUE NO ES UN PASO DEL `audit`. El `audit` mide las fuentes huerfanas; este
+  # mide si los jobs de la suite pueden mentir sobre su propio resultado. Si
+  # compartieran log, un rojo de este se leeria como un rojo del audit, que es justo
+  # el diagnostico equivocado. Aqui se sabe que se ha movido el shell, no el suelo.
+  pipes:
+    name: Pipes (ningun trabajo de la suite se pone verde sin pasar)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ABDSharedCode (este repo)
+        uses: actions/checkout@v4
+
+      # Los hermanos, y SOLO para leer sus workflows. Estos mismos SHA son los del
+      # job `audit` y los de la foto de la linea base: la lista no se escribe aqui,
+      # sale de `verificar_foto.py --listar`, que la lee del propio workflow. Si el
+      # workflow anade un repo, este trabajo lo sigue sin que nadie actualice nada.
+      #
+      # Sin `ref:`, a proposito: aqui no interesa el estado commiteado de los
+      # hermanos (eso es la foto, y la mide el job `foto`), sino el `HEAD` de su
+      # rama, que es donde alguien esta a punto de meter el `| tee`. Un guard de los
+      # repos ya arreglados no ve los que se rompen manana.
+      - name: Checkout ABDEep (HEAD)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDEep
+          path: ABDEep
+
+      - name: Checkout ABDMS2000 (HEAD)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDMS2000
+          path: ABDMS2000
+
+      - name: Checkout ABDNeural (HEAD)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDNeural
+          path: ABDNeural
+
+      - name: Checkout ABDCZ101 (HEAD)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDCZ101
+          path: ABDCZ101
+
+      - name: Checkout ABDSharedAssets (HEAD)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDSharedAssets
+          path: ABDSharedAssets
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Sin dependencias, sin PyYAML y sin `pnpm install`. Es un lector de YAML con
+      # regex, no un parser: lo que busca es un `run:` con un `tee` y el shell que
+      # lo ejecuta, y eso se lee con la misma logica con la que `verificar_foto.py`
+      # saca los SHA del workflow. Un guard que necesita `pnpm install` para leer un
+      # YAML acaba sin ejecutarse el dia que el install falla.
+      #
+      # `--raiz` es el workspace, que tiene el layout que el script espera: un
+      # directorio por repo. En local se pasa el arbol de la suite y es el mismo
+      # script con la misma forma, asi que lo que sale en verde aqui es lo que sale
+      # en verde ahi.
+      - name: Ningun `| tee` puede perder el codigo de salida
+        run: python tools/guard_pipefail.py --check --raiz "$GITHUB_WORKSPACE"
+
+      # EL CONTRASTE DEL RECUENTO, Y POR QUE NO ES RUIDO. Un guard en verde que no
+      # ha medido nada es el peor resultado posible, porque parece una
+      # comprobacion. Por eso el paso anterior imprime el numero de repos y de
+      # pasos que ha mirado, y este lo comprueba: si el guard se queda sin
+      # hermanos, o sin YAML, o sin un solo `run:`, sale 2 (que no se ha medido
+      # nada), y este paso avisa de que la puerta no estaba puesta.
+      # `shell: bash` y `set -o pipefail`, y no por costumbre: este paso hace un
+      # `| tee` y este mismo trabajo es el que lo vigila. Sin las dos cosas, el
+      # guard de abajo marcaria ESTE paso. Un guard que no puede pasar por el fichero
+      # que vigila no vigila nada.
+      - name: El guard ha mirado de verdad (un 0 sin medir no es un verde)
+        shell: bash
+        run: |
+          set -o pipefail
+          python tools/guard_pipefail.py --listar --raiz "$GITHUB_WORKSPACE" | tee "$RUNNER_TEMP/pipes.txt"
+          pasos=$(grep -o 'pasos con codigo ejecutable: [0-9]*' "$RUNNER_TEMP/pipes.txt" | grep -o '[0-9]*')
+          repos=$(grep -o 'repos con workflows: [0-9]*' "$RUNNER_TEMP/pipes.txt" | grep -o '[0-9]*')
+          echo "repos con workflows: $repos, pasos mirados: $pasos"
+          if [ "${repos:-0}" -lt 6 ]; then
+            echo "::error::el guard ha mirado solo ${repos:-0} repos. Se esperaban 6 (este + los 5 hermanos). Si un checkout no se completo, el paso anterior no estaba midiendo la suite entera."
+            exit 1
+          fi
+          if [ "${pasos:-0}" -lt 50 ]; then
+            echo "::error::el guard ha mirado solo ${pasos:-0} pasos con codigo. Con 6 repos clonados eso no es la suite: el layout del workspace no es el que el guard espera."
+            exit 1
+          fi
+          echo "el guard ha mirado $repos repos y $pasos pasos: el 0 de antes era un 0 medido"
 
   audit:
     name: Audit de fuentes (trinquete)
