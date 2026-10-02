@@ -7,7 +7,7 @@ name: Shared code CI
 # codigo esta sano por si mismo: que sus pruebas corran, que sus herramientas
 # salgan en verde y que el package que publica resuelva sus dependencias.
 #
-# LO QUE ES PUERTA. Los tres trabajos bloquean, y los tres salen en verde.
+# LO QUE ES PUERTA. Los cuatro trabajos bloquean, y los cuatro salen en verde.
 #
 # El audit merece una explicacion, porque sin ella su veredicto se lee mal. Compara
 # este repo contra una foto de la suite fijada por SHA, y en esa foto hay 55 fuentes
@@ -17,6 +17,14 @@ name: Shared code CI
 # fuente que ya esta en la linea base no es un fallo nuevo, una que no esta sale 1,
 # y una entrada de la linea base que ya NO hace falta sale 1 tambien, porque si no
 # la linea base seria un escudo que solo crece y nadie podaria nunca.
+#
+# Y el cuarto trabajo (`foto`) es el que vigila el suelo de todo eso. La linea
+# base dice 55 nombres, pero no dice CONTRA QUE SHA se midieron: subir el SHA del
+# checkout de un hermano no cambia los nombres, asi que el audit se queda en
+# verde y su veredicto ya no habla de lo que CI va a medir. Medido, no supuesto:
+# un commit nuevo en ABDNeural que no toca consumidores deja el audit en 0. Este
+# trabajo compara el SHA con el que se midio la linea base contra el SHA del
+# checkout de aqui, y falla si no son el mismo.
 on:
   push:
     branches: [master]
@@ -110,6 +118,50 @@ jobs:
             exit 1
           fi
           echo "el motivo del OMITIDO aparece en la salida: el salto no es silencioso"
+
+  # ESTE TRABAJO NO MIDE NADA DE ESTE REPO. Compara un dato con otro dato: el
+  # SHA contra el que se midio `tools/audit-baseline.json`, y el SHA que los
+  # checkout de ARRIBA (los del job `audit`) van a clonar. Los dos estan
+  # escritos, y no hace falta ningun repo al lado ni ningun Python de la suite.
+  #
+  # Va como trabajo aparte y no como paso del `audit` por una razon que se ha
+  # medido: si fuera un paso, su fallo y el del audit caerian en el MISMO log y
+  # no se podrian distinguir. Aqui se sabe que lo que se ha movido es el suelo.
+  #
+  # El caso que cierra, medido en un clon con los cinco hermanos en su SHA: un
+  # commit nuevo en ABDNeural que no toca ningun consumidor deja el audit en 0,
+  # porque el conjunto de huerfanas no cambia (siguen siendo 55, los consumidores
+  # siguen sin commitear) y el trinquete solo compara NOMBRES. La linea base
+  # sigue diciendo "estas 55" y no hay forma de saber que se ha movido el suelo.
+  # Con este trabajo, ese commit obliga a regenerar la linea base antes de que
+  # el audit de la proxima vez signifique algo.
+  #
+  # Y el caso al reves, que es el peor: si la linea base se regenera en LOCAL,
+  # donde los hermanos tienen el trabajo sin commitear en el disco, lo que se
+  # commitea no son las huerfanas de CI. El audit daria 1 con 55 huerfanas
+  # nuevas y el motivo no nombra la causa. Aqui el rojo lo dice antes.
+  foto:
+    name: Foto de la linea base (los SHA no se mueven solos)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ABDSharedCode
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # El script lee los SHA del PROPIO workflow, no de una lista suya. Por eso
+      # no hay un segundo sitio que poner al dia y por eso este trabajo no
+      # necesita que nadie le avise: si el workflow cambia un SHA, cambia lo que
+      # este script lee. Una lista de repos en el propio script seria una copia
+      # mas, y las copias se separan en silencio.
+      #
+      # Sin `continue-on-error` y sin `warning`, como los otros. Un guard que se
+      # puede dejar en warning es un guard que no guarda.
+      - name: La foto de la linea base es la que el workflow va a medir
+        run: python tools/verificar_foto.py --check
 
   audit:
     name: Audit de fuentes (trinquete)

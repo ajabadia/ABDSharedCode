@@ -48,8 +48,12 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 import {
   UMBRAL_PESADO, patronARegex, reglasDe, cubreLa, reglasInertes,
@@ -441,5 +445,124 @@ describe('la orden que dice la cabecera de este fichero', () => {
     assert.deepEqual(sinNombrar, [],
       `${sinNombrar.length} fichero(s) de test que la cabecera no nombra, y por tanto que `
       + 'nadie ejecuta: añade el nombre a la cabecera de este fichero.');
+  });
+});
+
+// La foto de la linea base. Va aqui, y no en un `verificar_foto.test.mjs` propio,
+// porque el guard de la cabecera de mas arriba obliga a que TODO `*.test.mjs` de
+// tools/ este nombrado en esa cabecera, y la cabecera solo admite una orden con
+// UN solo nombre (el patron `node --test (\S+)`). Anadir un segundo fichero de
+// test obligaria a cambiar ese patron, que es justo el patron que impide que
+// este guard se apruebe a si mismo. Menos campos que cambiar, mejor.
+describe('la foto de la linea base, que es lo que impide que el trinquete mienta', () => {
+  // Windows necesita python y no python3; Unix al reves. Se prueban los dos y
+  // se coge el primero que exista, porque un guard que solo funciona en la
+  // plataforma de quien lo escribio no es un guard.
+  const PY = (() => {
+    for (const cand of (process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'])) {
+      const r = spawnSync(cand, ['--version'], { encoding: 'utf8' });
+      if (r.status === 0) return cand;
+    }
+    return null;
+  })();
+
+  const GUION = resolve(RAIZ, 'tools', 'verificar_foto.py');
+  const WORKFLOW = resolve(RAIZ, '.github', 'workflows', 'shared-code-ci.yml');
+  const LINEA_BASE = resolve(RAIZ, 'tools', 'audit-baseline.json');
+
+  /** Corre el guard contra un workflow y una linea base escritos a dedo. */
+  function medir (workflowTxt, baseline) {
+    const d = mkdtempSync(join(tmpdir(), 'foto-'));
+    try {
+      const wf = join(d, 'wf.yml');
+      const bl = join(d, 'base.json');
+      writeFileSync(wf, workflowTxt, 'utf8');
+      writeFileSync(bl, JSON.stringify(baseline), 'utf8');
+
+      const r = spawnSync(PY, [GUION, '--check', '--workflow', wf, '--baseline', bl],
+        { encoding: 'utf8' });
+      return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  }
+
+  // Un workflow minimo pero de la FORMA REAL: `repository:` con owner y luego su
+  // `ref:`. El owner es lo que hacia fallar la primera version de este guard
+  // contra el workflow de verdad, asi que el fixture lo trae a proposito.
+  const WORKFLOW_SANO = [
+    'jobs:',
+    '  audit:',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '        with:',
+    '          repository: ajabadia/ABDEep',
+    '          ref: aaaaaa111111',
+    '      - uses: actions/checkout@v4',
+    '        with:',
+    '          repository: ajabadia/ABDNeural',
+    '          ref: bbbbbb222222',
+    '',
+  ].join('\n');
+
+  const BASE_SANA = {
+    nota: 'x',
+    foto: { ABDEep: 'aaaaaa111111', ABDNeural: 'bbbbbb222222' },
+    fuentes: ['DspCore/DspMath.h'],
+  };
+
+  it('el repo real: su linea base declara la foto que el workflow va a medir', {
+    skip: PY === null && 'no hay python en esta maquina',
+  }, () => {
+    const r = spawnSync(PY, [GUION, '--check'], { cwd: RAIZ, encoding: 'utf8' });
+    assert.equal(r.status, 0,
+      `el repo de verdad da ${r.status}. Si es 1, la foto guardada no es la del `
+      + `workflow, o la linea base se regenero en local (donde los hermanos tienen `
+      + `trabajo sin commitear):\n${r.stdout}${r.stderr}`);
+  });
+
+  it('foto igual: 0', { skip: PY === null && 'no hay python' }, () => {
+    assert.equal(medir(WORKFLOW_SANO, BASE_SANA).code, 0);
+  });
+
+  it('un SHA subido sin regenerar: 1, que es EL caso que este guard existe para',
+    { skip: PY === null && 'no hay python' }, () => {
+      // El audit se queda en VERDE en este caso: el conjunto de huerfanas no
+      // cambia, siguen siendo las mismas 55, y el trinquete solo compara
+      // nombres. Lo unico que se ha movido es el suelo.
+      const r = medir(WORKFLOW_SANO.replace('bbbbbb222222', 'cccccc333333'), BASE_SANA);
+      assert.equal(r.code, 1);
+      assert.match(r.out, /ABDNeural/,
+        'el rojo tiene que NOMBRAR el repo que no cuadra, no solo decir que no cuadra');
+    });
+
+  it('una linea base sin clave foto: 1, y el motivo es que no se puede saber',
+    { skip: PY === null && 'no hay python' }, () => {
+      const sinFoto = { nota: 'x', fuentes: ['DspCore/DspMath.h'] };
+      const r = medir(WORKFLOW_SANO, sinFoto);
+      assert.equal(r.code, 1);
+      assert.match(r.out, /foto/);
+    });
+
+  it('una foto con un null: 1, porque una foto con huecos parece completa',
+    { skip: PY === null && 'no hay python' }, () => {
+      const r = medir(WORKFLOW_SANO, { ...BASE_SANA, foto: { ABDEep: null, ABDNeural: 'bbbbbb222222' } });
+      assert.equal(r.code, 1);
+      assert.match(r.out, /ABDEep/);
+    });
+
+  it('un repo en el workflow que no esta en la foto: 1 (su foto nadie la midio)',
+    { skip: PY === null && 'no hay python' }, () => {
+      const r = medir(WORKFLOW_SANO + '          repository: ajabadia/ABDCZ101\n          ref: dddddd444444\n',
+        BASE_SANA);
+      assert.equal(r.code, 1);
+      assert.match(r.out, /ABDCZ101/);
+    });
+
+  it('un workflow ilegible: 2, no 1, porque no es un hallazgo', { skip: PY === null && 'no hay python' }, () => {
+    const r = spawnSync(PY, [GUION, '--check', '--workflow', join(tmpdir(), 'no-existe-esta.yml')],
+      { cwd: RAIZ, encoding: 'utf8' });
+    assert.equal(r.status, 2,
+      'un 1 aqui diria "la foto no cuadra" cuando en realidad no se ha medido nada');
   });
 });

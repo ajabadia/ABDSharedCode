@@ -421,6 +421,12 @@ la realidad, y el script saldría en rojo pidiendo podar 55 entradas que en loca
 sí hacen falta. Sin el flag el script aplica el modo estricto: sale 1 ante
 cualquier huérfana que no esté en `ALLOWLIST`.
 
+El JSON lleva además una clave `foto` con el SHA exacto de cada hermano en el
+disco donde se midió, y `--write-baseline` la escribe sola. Sin ella, subir un
+SHA en el workflow no obligaría a nada: el trinquete compara nombres, y los
+nombres no cambian al mover el suelo. `tools/verificar_foto.py` es el cuarto
+trabajo del CI que vigila eso; ver *El trabajo `foto`* más abajo.
+
 ### Cómo integrarlo
 
 **1. CMake.** Igual que cualquier módulo (ver *Cómo funciona la integración*,
@@ -1267,11 +1273,11 @@ desde la raíz de la suite corren los 340.
 Es el primero de este repo, y su limitación conviene saberla antes de fiarse:
 ABDSharedCode no tiene código propio que ejecutar, es código que vive aquí y se
 consume desde fuera. Lo único comprobable sin esos repos es que el código está
-sano por sí mismo. Tres trabajos, **los tres puertas** (ninguno en `warning`):
+sano por sí mismo. Cuatro trabajos, **los cuatro puertas** (ninguno en `warning`):
 
 | Trabajo | Qué corre | Por qué |
 |---|---|---|
-| `tools` | `node --test tools/guard_atributos.test.mjs` (37) | Sin dependencias: `node:test` y `assert` vienen en el runtime, y estas herramientas no están dentro del workspace pnpm. Meter un runner para 37 pruebas sería meter una cadena de dependencias en un guard que vigila los binarios. |
+| `tools` | `node --test tools/guard_atributos.test.mjs` (44) | Sin dependencias: `node:test` y `assert` vienen en el runtime, y estas herramientas no están dentro del workspace pnpm. Meter un runner para 44 pruebas sería meter una cadena de dependencias en un guard que vigila los binarios. |
 | `midikeyboard` | la acción `pnpm-workspace-bootstrap` + `pnpm test` (340) | Usa la acción de **este** repo, `ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master`, que a su vez llama a `tools/bootstrap-workspace.mjs`. |
 | `audit` | 5 hermanos por SHA inmutable + el audit con trinquete | El auditor compara contra la suite; los SHA son lo que hace el veredicto reproducible. |
 
@@ -1650,6 +1656,7 @@ class MiControladorCustom : public abd::hw::IHardwareController
 {
 public:
     bool isAutomatic() const noexcept override { return false; } // false para operador humano
+| `foto` | `python tools/verificar_foto.py --check` | Comprueba que la línea base se midió contra los SHA que el workflow clona. No clona nada: son dos datos escritos los comparan. |
     bool connect() override { /* ... */ return true; }
     void disconnect() override { /* ... */ }
     bool setParameter(int paramIndex, float normalizedValue) override { /* ... */ return true; }
@@ -1673,6 +1680,45 @@ public:
   Módem de audio FSK de fase continua (CP-FSK) a 1200 baudios con frecuencias portadoras a 12 kHz (Mark/0) y 14 kHz (Space/1) y discriminación espectral Goertzel para inyección de parches por audio in (*Remote In*).
 
 ---
+
+#### El trabajo `foto`: la línea base tiene que decir contra qué SHA se midió
+
+Es el cuarto trabajo y cierra el agujero por el que el trinquete **empieza a
+mentir sin que se note**. La línea base decía 55 nombres, pero no decía contra
+qué foto se midieron, y el trinquete solo compara **nombres**. Medido en un clon
+con los cinco hermanos en su SHA: un commit nuevo en ABDNeural que no toca
+ningún consumidor deja el audit en **0**, porque el conjunto de huérfanas no
+cambia —siguen siendo las mismas 55, los consumidores siguen sin commitear— y
+nadie puede saber que se ha movido el suelo. El veredicto es verde y ya no
+habla de lo que CI va a medir.
+
+La solución es que la foto sea un **dato**: `--write-baseline` escribe en el
+JSON la clave `foto`, con el `git rev-parse HEAD` de cada repo hermano en el
+disco donde se midió. Y `tools/verificar_foto.py` compara esa foto con los SHA
+que este mismo workflow clona, leyendo el YAML en vez de llevar su propia lista
+—una lista sería una segunda copia de los SHA, y las copias se separan en
+silencio—. Por eso no hay nada que avisar cuando cambia un SHA: cambia lo que
+el guard lee.
+
+| Situación | Código |
+|---|---|
+| La foto de la línea base es la del workflow | **0** |
+| Un SHA del workflow no es el que dice la foto (se subió sin regenerar) | **1** |
+| La línea base no tiene clave `foto`: no se puede saber contra qué se midió | **1** |
+| Un repo de la foto sin SHA, que es una foto con huecos que parece completa | **1** |
+| Un repo que el workflow clona y no está en la foto | **1** |
+| El workflow no se puede leer | **2** (no es un hallazgo: no se midió nada) |
+
+Va como trabajo aparte y no como paso del job `audit` por una razón medida: si
+fuera un paso, su fallo y el del audit caerían en el mismo log y no se podrían
+distinguir. Así se sabe que lo que se movió es el suelo.
+
+El caso al revés, que es el peor y el que el guard hace visible: si la línea
+base se regenera **en local** —donde los hermanos tienen el trabajo sin
+commitear en el disco— lo que se commitea no son las huérfanas de CI. El audit
+daría 1 con 55 huérfanas nuevas y el motivo no nombraría la causa. El orden que
+funciona es: dejar cada hermano en el SHA del workflow, `--write-baseline`, y
+commitear la línea base **con el workflow ya subido**.
 
 ## Módulo: AudioComparator
 

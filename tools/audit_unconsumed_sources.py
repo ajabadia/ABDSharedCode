@@ -51,6 +51,15 @@ en un escudo permanente y nadie la poda nunca.
 O sea: esto no es una lista de excepciones, es una lista de deuda con el
 inventario al dia.
 
+Y el inventario va con FECHA. La linea base que escribe --write-baseline lleva
+una clave `foto` con el SHA exacto de cada repo hermano en el disco donde se
+midio, porque sin ella el trinquete solo sabe que "estas 55 no las consume
+nadie" y no CONTRA QUE se midio eso. Medido: con un commit nuevo en ABDNeural que
+no toca consumidores, el audit sale 0 (siguen siendo las mismas 55 huerfanas y
+los mismos nombres) y no hay forma de saber que se ha movido el suelo. Eso lo
+vigila `tools/verificar_foto.py`, que compara esa foto con los SHA que clona
+el workflow.
+
 --baseline <fichero>   activa el TRINQUETE contra esa linea base de huerfanas
                          conocidas. Sin este flag la linea base NO se lee, ni
                          aunque tools/audit-baseline.json este ahi al lado.
@@ -89,6 +98,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import collections
 
@@ -231,37 +241,81 @@ LINEA_BASE_POR_DEFECTO = os.path.join(HERE, 'audit-baseline.json')
 def leer_linea_base (ruta):
     """
     Las huerfanas que ya se sabian. Un JSON con `fuentes` (lista de rutas
-    relativas) y `nota` (por que estan ahi). Devuelve (conjunto, texto_de_error).
+    relativas), `nota` (por que estan ahi) y `foto` (los SHA contra los que se
+    midio). Devuelve (conjunto, foto, texto_de_error).
 
     Un fichero que no existe NO es un error: sin linea base este script sigue
     funcionando, solo que sin red. Eso si, el error se distingue del "no hay
     linea base" por el texto, porque "no hay linea base" y "la linea base esta
     rota" no son lo mismo y uno es transitorio y el otro no.
+
+    La `foto` es lo que separa "esta linea base describe estos 55 nombres" de
+    "esta linea base describe estos 55 nombres MEDIDOS CONTRA ESTOS SHA". Sin
+    ella, subir un SHA en el workflow deja el audit en verde y la linea base
+    sigue anunciando una foto que ya nadie ha medido. Se devuelve como
+    diccionario vacio cuando no esta, y el guard de tools/verificar_foto.py es
+    el que dice que eso no vale.
     """
     if not os.path.isfile(ruta):
-        return set(), None
+        return set(), {}, None
 
     try:
         datos = json.load(io.open(ruta, 'r', encoding='utf-8'))
     except (ValueError, OSError) as exc:
-        return set(), 'no se pudo leer %s: %s' % (ruta, exc)
+        return set(), {}, 'no se pudo leer %s: %s' % (ruta, exc)
 
     if not isinstance(datos, dict) or not isinstance(datos.get('fuentes'), list):
-        return set(), '%s no tiene la forma {"fuentes": [...], "nota": "..."}' % ruta
+        return set(), {}, '%s no tiene la forma {"fuentes": [...], "nota": "..."}' % ruta
 
-    return set(datos['fuentes']), None
+    foto = datos.get('foto')
+    if foto is not None and not isinstance(foto, dict):
+        return set(), {}, '%s: la clave "foto" tiene que ser un objeto {proyecto: sha}' % ruta
+
+    return set(datos['fuentes']), (foto or {}), None
 
 
-def escribir_linea_base (ruta, nombres, nota):
-    """Reescribe la linea base. Solo con --write-baseline: es una decision."""
+def escribir_linea_base (ruta, nombres, nota, foto):
+    """
+    Reescribe la linea base. Solo con --write-baseline: es una decision.
+
+    La `foto` va dentro a proposito. Una linea base sin el SHA contra el que se
+    midio dice "estas 55 fuentes no las consume nadie", y eso es una verdad sin
+    fecha: sigue siendo verdad mañana aunque los hermanos hayan cambiado, y por
+    eso subir un SHA en el workflow no la obliga a nada. Con la foto escrita, el
+    SHA es un dato y no un comentario, y tools/verificar_foto.py puede
+    compararlo con el del workflow.
+    """
     cuerpo = collections.OrderedDict()
     cuerpo['nota'] = nota
     cuerpo['generado'] = 'python tools/audit_unconsumed_sources.py --write-baseline'
+    cuerpo['foto'] = collections.OrderedDict(sorted(foto.items()))
     cuerpo['fuentes'] = sorted(nombres)
 
     with io.open(ruta, 'w', encoding='utf-8', newline='\n') as f:
         f.write(json.dumps(cuerpo, indent=2, ensure_ascii=False))
         f.write('\n')
+
+
+def foto_de_la_suite (hermanos):
+    """
+    El SHA exacto contra el que se midio esta pasada. De cada repo hermano
+    `git rev-parse HEAD`, en el disco donde el script esta mirando.
+
+    Un repo al que no se le puede preguntar el HEAD NO se salta en silencio: se
+    anota como null. La razon es que una foto con un hueco es visible (el guard
+    la rechaza) mientras que una foto a la que le falta un repo del todo parece
+    completa, y esa es la forma de que el guard deje de servir para algo.
+    """
+    foto = collections.OrderedDict()
+    for nombre in hermanos:
+        try:
+            r = subprocess.run(['git', '-C', os.path.join(SUITE, nombre), 'rev-parse', 'HEAD'],
+                               capture_output=True, text=True)
+        except (OSError, ValueError):
+            r = None
+        sha = r.stdout.strip() if r is not None and r.returncode == 0 else None
+        foto[nombre] = sha if sha else None
+    return foto
 
 
 def main ():
@@ -294,7 +348,7 @@ def main ():
     # docstring: esta es medida contra los SHA de CI, y en local no describe la
     # realidad del disco.
     ruta_base = LINEA_BASE_POR_DEFECTO
-    base_conocida, error_base = set(), None
+    base_conocida, foto_base, error_base = set(), {}, None
 
     if '--baseline' in args:
         valor = args['--baseline'][-1]
@@ -303,7 +357,7 @@ def main ():
                   file=sys.stderr)
             return 2
         ruta_base = valor
-        base_conocida, error_base = leer_linea_base(ruta_base)
+        base_conocida, foto_base, error_base = leer_linea_base(ruta_base)
     if error_base:
         print('audit_unconsumed_sources: la linea base esta rota: %s' % error_base, file=sys.stderr)
         print('  Una linea base ilegible no se puede ignorar: pasaria todo y el job en', file=sys.stderr)
@@ -691,11 +745,13 @@ def main ():
 
     if escribir:
         nota = ('Huerfanas conocidas en la foto de la suite fijada por los SHA del '
-                'workflow .github/workflows/shared-code-ci.yml. Se accepts a proposito: '
+                'workflow .github/workflows/shared-code-ci.yml, y medidas contra los '
+                'SHA de la clave "foto" de este mismo fichero. Se aceptan a proposito: '
                 'sus consumidores estan escritos pero sin commitear en los repos '
-                'hermanos. Cuando se commiteen, sube los SHA, borra su entrada con '
-                '--write-baseline y este script vuelve a exigirla.')
-        escribir_linea_base(ruta_base, [o[0] for o in new], nota)
+                'hermanos. Cuando se commiteen, sube los SHA del workflow, borra su '
+                'entrada con --write-baseline y este script vuelve a exigirla. Si '
+                'subes un SHA sin regenerar esto, tools/verificar_foto.py lo dice.')
+        escribir_linea_base(ruta_base, [o[0] for o in new], nota, foto_de_la_suite(hermanos))
         print('audit_unconsumed_sources: linea base escrita con %d fuentes en %s'
               % (len(new), ruta_base), file=sys.stderr)
         # Escribir la linea base ES aceptar la foto de huerfanas de este momento,
