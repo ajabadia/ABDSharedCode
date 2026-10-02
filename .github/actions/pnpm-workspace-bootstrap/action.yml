@@ -1,0 +1,196 @@
+name: Bootstrap pnpm workspace (multi-repo)
+description: >-
+  Recrea el layout de hermanos del workspace pnpm de la suite ABDSynths (repo
+  llamante + ABDSharedCode + ABDSharedAssets), escribe pnpm-workspace.yaml en la
+  raiz del workspace e instala las dependencias. Los paquetes @abdsynths/* NO
+  estan publicados en ningun registry: solo existen como miembros de este
+  workspace, asi que sin este bootstrap `pnpm install` no puede resolver las
+  dependencias declaradas como "workspace:*".
+
+# ── Uso ──────────────────────────────────────────────────────────────────────
+#
+#   - name: Bootstrap pnpm workspace
+#     uses: ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master
+#     with:
+#       project: ABDEep
+#
+# Sustituye a los 3 checkouts + el manifiesto + el setup de pnpm/node + el
+# install. NO hagas un `actions/checkout` del repo llamante antes de esta accion:
+# el layout de hermanos solo queda consistente si los tres checkouts los hace
+# ella (y asi el `path:` del repo llamante es siempre el mismo).
+#
+# El checkout del repo llamante va SIN `repository:` a proposito, para heredar el
+# comportamiento exacto de un checkout normal del workflow: asi un PR desde un
+# fork resuelve igual (con `repository:` explicito se clonaria el repo base y se
+# perderia el merge ref del PR).
+#
+# Tras esta accion el workspace es:
+#
+#   $GITHUB_WORKSPACE/
+#     pnpm-workspace.yaml          <- generado aqui
+#     <project>/                   <- repo llamante  (node_modules/@abdsynths/* -> ../)
+#     ABDSharedCode/               <- @abdsynths/midi-keyb (+ cualquier miembro futuro)
+#     ABDSharedAssets/             <- @abdsynths/shared
+
+inputs:
+  project:
+    description: >-
+      Nombre del directorio del repo llamante dentro del workspace (p.ej. ABDEep
+      o ABDMS2000). Es a la vez su ruta de checkout y su miembro del workspace.
+    required: true
+  node-version:
+    description: Version de Node.js.
+    required: false
+    default: '20'
+  pnpm-version:
+    description: Version de pnpm.
+    required: false
+    default: '10'
+  shared-code-ref:
+    description: >-
+      Ref (rama/tag/SHA) de ABDSharedCode. Vacio = la rama por defecto del repo.
+    required: false
+    default: ''
+  shared-assets-ref:
+    description: >-
+      Ref (rama/tag/SHA) de ABDSharedAssets. Vacio = la rama por defecto del repo.
+    required: false
+    default: ''
+  skip-puppeteer-download:
+    description: >-
+      Omite la descarga del Chromium de puppeteer durante el install. Ningun job
+      de la suite usa puppeteer (los e2e usan Playwright) y MidiKeyboard lo trae
+      como devDependency: son ~150 MB por job que nadie consume.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # ── Layout del monorepo ──────────────────────────────────────────────────
+    # Los tres repos van como HERMANOS dentro del workspace. Es la misma
+    # disposicion que tiene el checkout local de la suite, donde
+    # node_modules/@abdsynths/* son symlinks a ../.
+    - name: Checkout calling repository
+      uses: actions/checkout@v4
+      with:
+        path: ${{ inputs.project }}
+
+    - name: Checkout ABDSharedCode (@abdsynths/midi-keyb)
+      uses: actions/checkout@v4
+      with:
+        repository: ajabadia/ABDSharedCode
+        path: ABDSharedCode
+        ref: ${{ inputs.shared-code-ref }}
+
+    - name: Checkout ABDSharedAssets (@abdsynths/shared)
+      uses: actions/checkout@v4
+      with:
+        repository: ajabadia/ABDSharedAssets
+        path: ABDSharedAssets
+        ref: ${{ inputs.shared-assets-ref }}
+
+    # Todos los `run` de esta accion fijan working-directory a la raiz del
+    # workspace: un job llamante puede declarar defaults.run.working-directory
+    # (ABDEep lo hace) y no queremos que eso decida donde se escribe el
+    # manifiesto o donde corre el install.
+    - name: Write pnpm workspace manifest
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        # Los inputs se pasan por env, nunca interpolados en el script: un input
+        # interpolado con ${{ }} se convierte en codigo shell.
+        ABD_PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+
+        # Miembros de ABDSharedCode que son paquetes pnpm (hoy: solo MidiKeyboard).
+        # Se DESCUBREN en vez de hardcodear el path: anadir un paquete pnpm a
+        # ABDSharedCode no deberia obligar a tocar esta accion ni cada workflow.
+        members=()
+        for manifest in ABDSharedCode/*/package.json; do
+          [ -f "${manifest}" ] || continue
+          members+=("$(dirname "${manifest}")")
+        done
+
+        if [ "${#members[@]}" -eq 0 ]; then
+          echo "::error::ABDSharedCode no expone ningun miembro de workspace (ningun package.json en un subdirectorio): @abdsynths/midi-keyb no podria resolverse."
+          exit 1
+        fi
+
+        {
+          echo "packages:"
+          echo "  - ABDSharedAssets"
+          for member in "${members[@]}"; do
+            echo "  - ${member}"
+          done
+          echo "  - ${ABD_PROJECT}"
+        } > pnpm-workspace.yaml
+
+        echo "--- pnpm-workspace.yaml ---"
+        cat pnpm-workspace.yaml
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    # Sin cache: no hay pnpm-lock.yaml versionado en ninguno de los repos de la
+    # suite (el del workspace vive en el repo raiz, que no se clona), y
+    # setup-node falla en duro si declara cache y no encuentra el lockfile.
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # --no-frozen-lockfile porque no hay lockfile versionado que respetar: el
+    # workspace se materializa entero en cada job.
+    - name: Install workspace dependencies
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        ABD_SKIP_PUPPETEER: ${{ inputs.skip-puppeteer-download }}
+      run: |
+        set -euo pipefail
+
+        if [ "${ABD_SKIP_PUPPETEER}" = "true" ]; then
+          export PUPPETEER_SKIP_DOWNLOAD=1
+          echo "puppeteer: descarga del Chromium OMITIDA (input skip-puppeteer-download=true)."
+        fi
+
+        pnpm install --no-frozen-lockfile
+
+    # Guardia: `pnpm install` puede terminar en verde y aun asi dejar las deps
+    # "workspace:*" sin enlazar (manifiesto mal formado, miembro que no existe).
+    # Hoy eso no se descubre hasta que Vite o Vitest revientan veinte pasos mas
+    # tarde con un error que no menciona el workspace, asi que se comprueba aqui.
+    - name: Verify workspace layout
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        ABD_PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+
+        fail() { echo "::error::$1"; exit 1; }
+
+        for dir in ABDSharedCode/MidiKeyboard ABDSharedAssets/components "${ABD_PROJECT}"; do
+          [ -d "${dir}" ] || fail "Falta el directorio '${dir}': el layout de hermanos del workspace no se creo."
+        done
+
+        [ -s pnpm-workspace.yaml ] || fail "pnpm-workspace.yaml no existe o esta vacio."
+        grep -qx "  - ${ABD_PROJECT}" pnpm-workspace.yaml || fail "pnpm-workspace.yaml no lista '${ABD_PROJECT}' como miembro."
+
+        # nullglob: sin el, un glob sin coincidencias queda literal y el bucle
+        # iteraria sobre el patron en vez de sobre cero ficheros.
+        shopt -s nullglob
+        linked=("${ABD_PROJECT}"/node_modules/@abdsynths/*)
+
+        if [ "${#linked[@]}" -eq 0 ]; then
+          fail "pnpm no enlazo ningun paquete @abdsynths/* en ${ABD_PROJECT}/node_modules: el manifiesto no los esta resolviendo."
+        fi
+
+        for link in "${linked[@]}"; do
+          printf '  %-16s -> %s\n' "$(basename "${link}")" "$(readlink -f "${link}" 2>/dev/null || echo "${link}")"
+        done
+        echo "Workspace listo: ${#linked[@]} paquete(s) @abdsynths/* enlazados en ${ABD_PROJECT}."
