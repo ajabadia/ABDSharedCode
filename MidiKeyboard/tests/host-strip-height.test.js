@@ -89,10 +89,45 @@ function findWorkspaceRoot() {
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error('No se encontró la raíz del workspace ABDSynths (pnpm-workspace.yaml) subiendo desde la raíz del paquete.');
+  return null;
 }
 
-const root = findWorkspaceRoot();
+// QUE ESTE FICHERO NO ES UN TEST DE ESTE PAQUETE, Y POR QUE SALTA EN VEZ DE
+// REVENTAR. Las tres capas de arriba necesitan el CSS y el codigo de los cuatro
+// hosts registrados (ABDMS2000, ABDEep, ABDCZ101, ABDNeural): comprueba que
+// declaren altura definida en su franja, que esten registrados, y que monten el
+// paquete de verdad. Eso es un CONTRATO DEL WORKSPACE, y un workspace son cinco
+// repos, no uno. En un clon limpio de ABDSharedCode —que es donde se corre esto
+// para probar el paquete— no hay ni la raiz del workspace ni los hosts.
+//
+// Antes esto fallaba al CARGAR el modulo, y asi se llevaba por delante los otros
+// cinco ficheros del paquete en el recuento del runner: 326 pruebas en verde
+// acababan marcadas como un fallo. Peor: el mensaje ("No se encontro la raiz
+// del workspace") no decia que hacer, y el arreglo no es un bug, es un clon.
+//
+// Saltar es correcto aqui porque el salto se ve. Un `describe.skip` silencioso
+// seria un verde que parece una comprobacion; este imprime el motivo y el
+// runner lo cuenta como omitido. Lo que NO haria es fingir que el contrato se
+// cumple: por eso el motivo nombra los repos que faltan.
+const workspaceRoot = findWorkspaceRoot();
+const SIN_WORKSPACE = workspaceRoot === null;
+
+if (SIN_WORKSPACE) {
+  process.stderr.write(
+    '\n'
+    + '  [host-strip-height] OMITIDO: este fichero no se puede ejecutar aqui.\n'
+    + '  No es un test de @abdsynths/midi-keyb: es el contrato de franja de los\n'
+    + '  cuatro hosts que montan el teclado (ABDMS2000, ABDEep, ABDCZ101,\n'
+    + '  ABDNeural), y necesita sus repos al lado. Se ejecuta desde la raiz de la\n'
+    + '  suite ABDSynths, donde esta pnpm-workspace.yaml y estan los hosts.\n'
+    + '  Los otros cinco ficheros de este paquete si se ejecutan.\n\n'
+  );
+}
+
+// Cuando no hay workspace, `root` se usa solo dentro de las capas que ya estan
+// saltadas; se deja apuntando al paquete para que un fallo futuro sea legible en
+// vez de ser un TypeError sobre null.
+const root = workspaceRoot ?? process.cwd();
 
 // ── utilidades de CSS (parseo mínimo, suficiente para reglas planas) ─────────
 
@@ -276,7 +311,10 @@ function discoverHosts(wsRoot) {
 // ── tests ────────────────────────────────────────────────────────────────────
 
 describe('host strip height (smoke)', () => {
-  describe('registro: cada host documentado declara altura definida en su franja', () => {
+  // Estas TRES capas leen ficheros de la suite. La cuarta no: es el resolutor de
+  // CSS contra reglas inventadas, y se ejecuta siempre, porque es lo unico de
+  // este fichero que no depende de que haya cuatro repos al lado.
+  describe.skipIf(SIN_WORKSPACE)('registro: cada host documentado declara altura definida en su franja', () => {
     for (const host of HOSTS) {
       it(`${host.project} → ${host.stripSelector} resuelve a px`, () => {
         expect(host.stripSelector, `${host.project}: stripSelector vacío en HOSTS`).toBeTruthy();
@@ -336,7 +374,7 @@ describe('host strip height (smoke)', () => {
     }
   });
 
-  describe('descubrimiento: ningún host del workspace queda sin registrar', () => {
+  describe.skipIf(SIN_WORKSPACE)('descubrimiento: ningún host del workspace queda sin registrar', () => {
     it(`todo proyecto que monta o declara ${PKG} está en HOSTS`, () => {
       const { mounters, dependents } = discoverHosts(root);
       const discovered = new Set([...mounters, ...dependents]);
@@ -358,7 +396,7 @@ describe('host strip height (smoke)', () => {
     }, 30000);
   });
 
-  describe('montaje real: cada host monta el paquete, no solo lo declara', () => {
+  describe.skipIf(SIN_WORKSPACE)('montaje real: cada host monta el paquete, no solo lo declara', () => {
     /** Ficheros de codigo del proyecto (mismos ignores que el descubrimiento). */
     function projectSources(project) {
       const files = [];

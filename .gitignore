@@ -48,6 +48,28 @@ Generated/
 # Logs
 *.log
 
+# Python
+# La cache de bytes va al lado del script, no en la raiz: los scripts de
+# `tools/` dejan la suya en `tools/__pycache__/`. Sin barra delante, que lo
+# ancla a la raiz y deja fuera justo esa.
+__pycache__/
+*.pyc
+*.pyo
+
+# Node / pnpm
+# `MidiKeyboard/` es el paquete `@abdsynths/midi-keyb` y se instala con
+# `node tools/bootstrap-workspace.mjs`, que crea `node_modules/` en la raiz del
+# repo y en el hermano. Sin estas reglas, instalar dejaba ~300 MB de arbol de
+# dependencias sin ignorar: `git add -A` los commiteaba.
+#
+# `pnpm-lock.yaml` tampoco se versiona, y es la practica de la suite: el
+# `pnpm-workspace-bootstrap` de CI instala con `--no-frozen-lockfile` por lo
+# mismo. Un lock aqui solo congelaria una resolucion local en un repo cuyo
+# manifiesto de workspace genera una herramienta.
+node_modules/
+*.tsbuildinfo
+pnpm-lock.yaml
+
 # OS
 .DS_Store
 Thumbs.db

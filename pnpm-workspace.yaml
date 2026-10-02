@@ -1,0 +1,66 @@
+# Workspace pnpm de ABDSharedCode.
+#
+# POR QUE EXISTE, Y POR QUE NO ES EL MISMO QUE EL DE LA SUITE. La suite tiene su
+# propio `pnpm-workspace.yaml` en la raiz de ABDSynths, con MidiKeyboard como
+# miembro, y es el que usan ABDEep, ABDMS2000, ABDCZ101 y ABDNeural. Este es un
+# SEGUNDO workspace, mas pequeno, y no lo sustituye: pnpm resuelve `workspace:*`
+# contra el workspace que esta haciendo la instalacion, de modo que los dos
+# coexisten y cada instalacion obtiene sus enlaces de donde toca. Verificado: con
+# este fichero presente, un proyecto de la suite sigue enlazando
+# `@abdsynths/midi-keyb` contra `../ABDSharedCode/MidiKeyboard` sin cambios.
+#
+# verifyDepsBeforeRun, Y POR QUE NO ES EL DEFECTO. Este ajuste existe porque el
+# default (`install`) rompe este workspace de una forma que no parece suya. Lo que
+# hace: antes de cada `pnpm test` / `pnpm run`, comprueba si `node_modules` esta al
+# dia y, si cree que no lo esta, lanza un `pnpm install` POR SU CUENTA. Ese
+# installimplicito resuelve MidiKeyboard (miembro tambien del workspace de la raiz
+# de la suite) contra el virtual store de otro proyecto, y sus `node_modules`
+# acaban apuntando a `ABDNeural/WebUI/node_modules/.pnpm`, cuyo arbol tiene ACLs
+# que impiden incluso leer los ficheros.
+#
+# El sintoma NO dice nada de permisos: es `ERR_INVALID_PACKAGE_CONFIG` al cargar
+# `picocolors`, con un `operation not permitted` en medio de una traza de Node que
+# parece un problema de configuracion de este repo. Y es intermitente, que es lo
+# que lo hace tan caro: la primera corrida pasa y la segunda ya esta envenenada.
+#
+# Medido, con el mismo arbol y sin tocar nada mas:
+#   verifyDepsBeforeRun=install (defecto) -> corrida 1: exit 1, enlaces a ABDNeural
+#   verifyDepsBeforeRun=warn             -> corrida 1 y 2: exit 0, enlaces correctos
+#   verifyDepsBeforeRun=false            -> corrida 1 y 2: exit 0, enlaces correctos
+#
+# Se queda en `warn` y no en `false` porque `false` apaga tambien el aviso: si
+# alguien deja el arbol a medias, conviene que le digan "corre `pnpm install`"
+# en vez de que se entere por un test que falla por otra cosa. Lo que NO puede
+# hacer pnpm es instalar solo.
+#
+# SI ALGO SE ROMPE: `pnpm install --force` DESDE AQUI, no desde la raiz de la
+# suite. Tarda 5s y vuelve a enlazar contra el virtual store de este workspace.
+#
+# PARA QUE ESTA, EN UNA FRASE. Sin este fichero, `pnpm install` dentro de
+# MidiKeyboard falla con "Cannot resolve package from workspace because workspace
+# packages were not loaded into the resolver", que no dice ni que paquete falta ni
+# que hacer. Y un clon limpio de ABDSharedCode no puede resolverlo por si solo,
+# porque `@abdsynths/shared` esta declarado como `workspace:*` y vive en
+# ABDSharedAssets, un repo distinto. Este manifiesto hace que el error sea el de
+# verdad ("no package named @abdsynths/shared is present in the workspace") y
+# `tools/bootstrap-workspace.mjs` pone el hermano donde falta.
+packages:
+  - MidiKeyboard
+  - ../ABDSharedAssets
+
+verifyDepsBeforeRun: warn
+
+# allowBuilds, Y POR QUE NO onlyBuiltDependencies. pnpm >= 11 dejo de leer
+# `onlyBuiltDependencies` (tampoco en `package.json`, que ya no se lee entero) y
+# lo sustituyo por esta tabla de booleanos. Con la clave vieja, `pnpm install`
+# termina el trabajo y sale con 1: ERR_PNPM_IGNORED_BUILDS, y un install que
+# parece hecho y no lo esta.
+#
+#   esbuild   -> true: su postinstall es el que deja el binario en su sitio.
+#   puppeteer -> false: lo usa `MidiKeyboard/demo/capture.mjs` para grabar el gif
+#               de la demo, y NINGUN test. Su build descarga ~150 MB de Chromium
+#               que un `pnpm test` no va a usar nunca. Para grabar la demo:
+#               `PUPPETEER_SKIP_DOWNLOAD=0 pnpm rebuild puppeteer`.
+allowBuilds:
+  esbuild: true
+  puppeteer: false
