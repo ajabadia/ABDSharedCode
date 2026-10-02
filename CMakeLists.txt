@@ -255,14 +255,59 @@ target_include_directories(ABDShared_LutDSP INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# --- nlohmann_json: una sola resolucion para todo el repo -------------------------
+# Dos cabeceras de este repo incluyen <nlohmann/json.hpp> y las dos son Superficie
+# publica de un target:
+#   HardwareDrivers/CasioCzVirtualController.h    -> ABDShared::HardwareDrivers
+#   HardwareMidiDetect/HardwareContractRegistry.h -> ABDShared::HardwareMidiDetect
+#
+# Antes solo resolvia el segundo. El primero se quedaba sin la dependencia, y el
+# sintoma NO es que este repo no compile: es un C1083 (Cannot open include file:
+# nlohmann/json.hpp) en el CONSUMIDOR, en cuanto incluye esa cabecera. Se configura
+# limpio aqui y revienta alli, que es el sitio mas caro de enterarse. Por eso el
+# enlace va en el target que EXPONE la cabecera, no en el que la compila.
+#
+# Se resuelve una vez y se reutiliza en los dos sites, en vez de repetir el bloque
+# if/find_package/if. El orden importa: esta resolucion tiene que correr ANTES
+# que los targets que la enlazan, que es por eso que vive aqui arriba y no junto
+# a HardwareMidiDetect, que es donde estaba.
+#
+# nlohmann_json es header-only: nlohmann_json::nlohmann_json solo aporta un include
+# dir. Enlazarlo en PUBLIC no le cuesta nada a quien no incluya esas cabeceras,
+# mientras que dejarlo fuera hace que.include falle segun que consumidor toque.
+if(NOT TARGET nlohmann_json::nlohmann_json AND NOT TARGET nlohmann_json)
+    find_package(nlohmann_json QUIET)
+endif()
+if(TARGET nlohmann_json::nlohmann_json)
+    set(ABDSHAREDCODE_NLOHMANN_TARGET nlohmann_json::nlohmann_json)
+elseif(TARGET nlohmann_json)
+    set(ABDSHAREDCODE_NLOHMANN_TARGET nlohmann_json)
+else()
+    set(ABDSHAREDCODE_NLOHMANN_TARGET "")
+endif()
+
 # --- HardwareDrivers Module ---
 # Protocol-level hardware drivers shared by the synths (namespace abd::hw): the
 # SysEx and NRPN codecs consumed by every synth's MIDI layer.
 #
-# The Casio CZ / Juno tape / FSK controllers that live in the same folder are
-# deliberately NOT part of this target: ABDAudioLab compiles them directly from
-# source and they require nlohmann/json, which would otherwise become a hard
-# dependency for every consumer of the target.
+# CasioCzVirtualController.cpp queda FUERA de este target, a proposito. La
+# CABECERA si entra (ver target_sources mas abajo) porque es Superficie publica
+# del modulo, pero el .cpp no: compilarlo aqui convertiria nlohmann/json en una
+# dependencia dura de COMPILACION para todo el que enlace este target, que es el
+# 90% de la suite y no lo necesita para nada. Lo compila ABDAudioLab desde
+# fuente, que si hace FetchContent de nlohmann_json.
+#
+# El .cpp fuera NO significa que la cabecera se pueda incluir sola: por eso el
+# target enlaza nlohmann_json en PUBLIC mas abajo. Antes no lo hacia, y el
+# fallo era un C1083 en el consumidor. La razon de dejar fuera el .cpp era
+# "nlohmann no esta aqui", que es exactamente la misma premisa que hacia fallar
+# al que si incluia la cabecera.
+#
+# Los otros tres SI entran, y antes no estaban por confusion con el de Casio:
+# JunoTapeModem, FskAudioModem y CasioNibbleCodec no dependen de nlohmann/json y
+# compilan con lo que el target ya enlazaba. FskAudioModem lo documentaba el
+# INTEGRATION_GUIDE.md como componente del modulo y no se podia enlazar: el
+# sintoma era un undefined reference en el consumidor, no un error aqui.
 #
 # NOTE: it pulls juce_audio_basics, so the Emscripten WASM builds compile
 # SysExCodec.cpp directly instead of linking this target.
@@ -271,9 +316,36 @@ if(ABDSHAREDCODE_BUILD_HARDWAREDRIVERS)
     add_library(ABDShared_HardwareDrivers STATIC
         HardwareDrivers/SysExCodec.cpp
         HardwareDrivers/NRPNParser.cpp
+        HardwareDrivers/CasioNibbleCodec.cpp
+        HardwareDrivers/FskAudioModem.cpp
+        HardwareDrivers/JunoTapeModem.cpp
     )
 
     add_library(ABDShared::HardwareDrivers ALIAS ABDShared_HardwareDrivers)
+
+    # Las cabeceras van en target_sources y no solo en el disco porque esto es un
+    # paquete: lo que el guia promete son CLASES, y una clase cuya cabecera no
+    # aparece aqui no se ve desde el IDE del consumidor ni cuando se inspecciona
+    # el target. Las tres que se compilan ahora mismo y antes no (JunoTapeModem,
+    # FskAudioModem, CasioNibbleCodec) estaban en disco y fuera del target, con
+    # sus metodos definidos fuera de linea: se podian incluir y documentar, pero
+    # no enlazar. El sintoma de eso es un undefined reference en el consumidor, no
+    # un error aqui, que es el sitio mas caro de enterarse.
+    # CasioCzVirtualController.h aparece igualmente porque es Superficie publica
+    # del modulo, aunque su .cpp se compile fuera del target (ver nota de arriba).
+    target_sources(ABDShared_HardwareDrivers PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/AiraSysExController.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/CasioCzVirtualController.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/CasioNibbleCodec.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/FskAudioModem.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/HardwareController.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/JunoTapeModem.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/MidiCcController.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/NRPNParser.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/RoutingValidator.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/SysexPresetGenerator.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/HardwareDrivers/SysExCodec.h
+    )
 
     # Exposing the module root lets consumers write `#include <HardwareDrivers/...>`
     # (used by ABDJUNiO601) as well as relative includes.
@@ -283,9 +355,77 @@ if(ABDSHAREDCODE_BUILD_HARDWAREDRIVERS)
 
     target_compile_features(ABDShared_HardwareDrivers PUBLIC cxx_std_20)
 
+    # juce_audio_devices no estaba y hace falta desde CasioCzVirtualController.h:
+    # AiraSysExController.h, MidiCcController.h y CasioCzVirtualController.h
+    # incluyen <juce_audio_devices/...> en su Superficie publica. Con solo
+    # juce_core + juce_audio_basics, compilar CasioCzVirtualController.cpp —que
+    # incluye su propia cabecera— falla en cuanto aparece ese include.
+    # nlohmann_json va aqui, y no solo en HardwareMidiDetect, porque
+    # CasioCzVirtualController.h es una cabecera PUBLIC de ESTE target y
+    # necesita <nlohmann/json.hpp>. Sin este enlace, el que la incluya se come un
+    # C1083 en su propia compilacion: ABDSharedCode se configura bien y el fallo
+    # sale en el consumidor, que es donde nadie lo busca. En PUBLIC porque la
+    # dependencia es de la Superficie, no de la implementacion: se propaga al
+    # consumidor con target_link_libraries(ABDShared::HardwareDrivers) y por eso
+    # basta con resolverlo una vez aqui arriba.
     target_link_libraries(ABDShared_HardwareDrivers PUBLIC
         juce_core
         juce_audio_basics
+        juce_audio_devices
+    )
+    if(ABDSHAREDCODE_NLOHMANN_TARGET)
+        target_link_libraries(ABDShared_HardwareDrivers PUBLIC ${ABDSHAREDCODE_NLOHMANN_TARGET})
+    endif()
+endif()
+
+# --- AudioComparator Module ---
+# Motor de comparacion acustica A/B: alinea dos tomas en el tiempo (correlacion
+# cruzada FFT), mide error temporal y espectral, y emite un veredicto formal
+# (`pass`/`warn`/`fail`) contra una matriz de tolerancias.
+#
+# Lo que existia era el codigo entero y su seccion entera en el
+# INTEGRATION_GUIDE.md, con su linea de CMake copiable
+# (`target_link_libraries(... ABDShared::AudioComparator)`) y su ejemplo de uso,
+# pero NINGUN target lo definia. Un consumidor que siguiera el guia no fallaba al
+# configurar —que es cuando se nota un target que falta— sino al enlazar, y por
+# el motivo equivocado.
+#
+# STATIC, no INTERFACE: son cuatro .cpp, y dos de ellos no son una unidad
+# autonomous. `AudioABComparator.cpp`, `_Alignment.cpp` y `_Spectral.cpp` definen
+# metodos de la MISMA clase `AudioABComparator` repartidos en tres unidades de
+# traduccion. Compilar solo el primero deja los otros dos metodos sin definir.
+#
+# juce_dsp lo necesita `AudioABComparator_Spectral.cpp`, que es donde vive la
+# correlacion cruzada FFT que el guia describe. No se hace INTERFACE porque el
+# codigo ya existe y compilarlo es lo que lo hace cierto.
+option(ABDSHAREDCODE_BUILD_AUDIOCOMPARATOR "Build AudioComparator module" ON)
+if(ABDSHAREDCODE_BUILD_AUDIOCOMPARATOR)
+    add_library(ABDShared_AudioComparator STATIC
+        AudioComparator/AudioABComparator.cpp
+        AudioComparator/AudioABComparator_Alignment.cpp
+        AudioComparator/AudioABComparator_Spectral.cpp
+        AudioComparator/AudioABVerdictEngine.cpp
+    )
+
+    add_library(ABDShared::AudioComparator ALIAS ABDShared_AudioComparator)
+
+    target_sources(ABDShared_AudioComparator PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/AudioComparator/AudioABComparator.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/AudioComparator/AudioABVerdictEngine.h
+    )
+
+    # El modulo raiz, para que el consumidor escriba
+    # `#include <AudioComparator/AudioABComparator.h>` como dice el guia.
+    target_include_directories(ABDShared_AudioComparator PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    target_compile_features(ABDShared_AudioComparator PUBLIC cxx_std_20)
+
+    target_link_libraries(ABDShared_AudioComparator PUBLIC
+        juce_core
+        juce_audio_basics
+        juce_dsp
     )
 endif()
 
@@ -322,6 +462,51 @@ if(NOT EMSCRIPTEN)
 
     target_link_libraries(ABDShared_WebView2Bridge INTERFACE
         juce_core
+        juce_gui_extra
+    )
+endif()
+
+# --- MidiKeyboard C++ Module ---
+# EL LADO NATIVO de @abdsynths/midi-keyb. El paquete JS (`MidiKeyboard/`, sin
+# target, se consume por pnpm workspace) es la otra mitad; aqui esta el
+# componente JUCE que lo monta dentro de un plugin, con el WebUI del teclado
+# servido desde un catalogo de binarios.
+#
+# Lo que estaba era una contradiccion, no un olvido: el INTEGRATION_GUIDE.md
+# decia, en su seccion MidiKeyboard, "este modulo NO es CMake ... No tiene target
+# C++ ni aparece en CMakeLists.txt", y en la misma carpeta havia cuatro
+# ficheros C++ que no compilaba nadie. La frase era literalmente cierta y
+# practicamente falsa, que es la peor forma de ser verdad: el lector se queda
+# con la conclusion de que no hay nada que integrar, sin llegar a la de que
+# hay algo que esta a medias.
+#
+# INTERFACE por el mismo motivo que WebView2Bridge: el .cpp se propaga y se
+# compila en el consumidor, que es quien tiene su JUCE y su catalogo de assets.
+# Depende de ese puente (`#include <WebView2Bridge/...>`), asi que este bloque
+# va DESPUES de el y no puede vivir sin el.
+#
+# Gated on NOT EMSCRIPTEN, igual que WebView2Bridge y por el mismo motivo: es
+# juce_gui_extra, que no existe en las builds WASM.
+if(NOT EMSCRIPTEN)
+    add_library(ABDShared_MidiKeyboardCpp INTERFACE)
+
+    add_library(ABDShared::MidiKeyboardCpp ALIAS ABDShared_MidiKeyboardCpp)
+
+    target_sources(ABDShared_MidiKeyboardCpp INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/MidiKeyboard/JuceMidiKeyboardComponent.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/MidiKeyboard/MidiKeyboardFloatingWindow.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/MidiKeyboard/MidiKeyboardResourceProvider.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/MidiKeyboard/MidiKeyboardResourceProvider.cpp
+    )
+
+    target_include_directories(ABDShared_MidiKeyboardCpp INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    target_link_libraries(ABDShared_MidiKeyboardCpp INTERFACE
+        ABDShared::WebView2Bridge
+        juce_core
+        juce_audio_basics
         juce_gui_extra
     )
 endif()
@@ -414,15 +599,12 @@ target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE
     juce_core
 )
 
-# nlohmann_json is used by HardwareContractRegistry. Prefer a fetched/bundled
-# target, else fall back to a header-only include if available on the system.
-if(NOT TARGET nlohmann_json::nlohmann_json AND NOT TARGET nlohmann_json)
-    find_package(nlohmann_json QUIET)
-endif()
-if(TARGET nlohmann_json::nlohmann_json)
-    target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE nlohmann_json::nlohmann_json)
-elseif(TARGET nlohmann_json)
-    target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE nlohmann_json)
+# HardwareContractRegistry.h incluye <nlohmann/json.hpp> y es Superficie publica
+# de este target. La resolucion ya esta hecha mas arriba, antes de
+# HardwareDrivers, y se comparte: no se vuelve a buscar aqui. La variable se
+# expande al valor, no al nombre de una variable de CMake.
+if(ABDSHAREDCODE_NLOHMANN_TARGET)
+    target_link_libraries(ABDShared_HardwareMidiDetect INTERFACE ${ABDSHAREDCODE_NLOHMANN_TARGET})
 endif()
 
 # Optional: embed the picker WebUI as binary assets so hosts do not need a

@@ -127,20 +127,53 @@ Assembled from the strongest features of **ABDMS2000**, **ABDEep**, and **ABDCZ1
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Running the tests
+
+The suite is **vitest**, and it runs from a clean clone of `ABDSharedCode` with
+one command:
+
+```bash
+node tools/bootstrap-workspace.mjs   # ensures the sibling repo is there and installs
+pnpm test                           # 340 tests
+```
+
+`bootstrap-workspace.mjs` exists because this package declares
+`"@abdsynths/shared": "workspace:*"`, and that package lives in **ABDSharedAssets,
+a different repo**. A clean clone of `ABDSharedCode` therefore cannot resolve its
+own dependency alone; the script clones the sibling next to it if missing and
+installs. It does **not** update or switch branches in a sibling that is already
+there: checking that it exists is not the same as deciding which version to use.
+
+```bash
+node tools/bootstrap-workspace.mjs --check   # verifies without installing or writing
+```
+
+From inside this package, `pnpm exec vitest run` works too. Inside the
+ABDSynths monorepo the suite root's own workspace is used instead, and no
+bootstrap is needed.
+
+**One file needs the whole monorepo.** `tests/host-strip-height.test.js` is not
+a test of this package: it is the strip-height contract of the four synths that
+mount the keyboard, and it reads their CSS and their sources. Run from a clean
+clone of `ABDSharedCode` alone, its three workspace-dependent blocks are
+**skipped with a printed reason** and the other 331 tests run. Run from the
+suite root, all 340 run.
+
 ## Installation
 
 ### As npm workspace (recommended)
 
 ```bash
-# From your synth project root
-npm install @abdsynths/keyboard --workspace-root
+# From your synth project root, which must be a pnpm workspace that also has
+# ABDSharedAssets as a member: the package is declared as "workspace:*".
+pnpm install
 ```
 
 ```js
 // In your synth's package.json
 {
   "dependencies": {
-    "@abdsynths/keyboard": "0.1.0"
+    "@abdsynths/midi-keyb": "workspace:*"
   }
 }
 ```
@@ -159,11 +192,17 @@ git submodule add ../ABDKeyboard Shared/ABDKeyboard
 </script>
 ```
 
-### Copy (simplest)
+### Copy (discouraged)
 
 ```bash
 cp -r ../ABDKeyboard/src/ ./src/components/keyboard/
 ```
+
+> **This one is checked, and it fails.** `tests/host-strip-height.test.js`
+> verifies that every project declaring or mounting `@abdsynths/midi-keyb` also
+> calls `createKeyboard` in the same file. Copying the sources sidesteps the
+> shared component without paying for the host strip contract that keeps the
+> keybed from collapsing in WebView2, and the test is built to catch exactly that.
 
 ## Demo
 

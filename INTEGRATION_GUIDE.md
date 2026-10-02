@@ -17,8 +17,12 @@
 
 ## Estructura
 
-> Árbol abreviado — los directorios reales incluyen también `Certification`,
+> Árbol abreviado — los directorios reales incluyen también `AudioComparator`,
+> `Certification`, `HardwareDrivers`, `LcdDisplay`, `LutDSP`, `Segmented`,
 > `StudioTopology`, `SynthCore`, `WebView2Bridge`, `visualizers` y `docs`.
+>
+> Los que tienen sección propia más abajo son los que se integran desde fuera;
+> `StudioTopology`, `visualizers` y `Certification` todavía no la tienen.
 
 ```
 ABDSharedCode/
@@ -52,11 +56,13 @@ ABDSharedCode/
 │   ├── JuceHardwareMidiPicker.h    ← Componente WebView2 (pick UX) estilo ABDScope
 │   ├── HardwareMidiPickerResourceProvider.* ← Sirve el WebUI embebido + assets
 │   └── WebUI/index.html            ← WebUI de detección (queries por contrato)
-└── MidiKeyboard/               ← Módulo WebUI/JS (pnpm, NO CMake)
-    ├── package.json                ← @abdsynths/midi-keyb (workspace pnpm)
+└── MidiKeyboard/               ← Dos mitades: WebUI/JS (pnpm) y nativa (CMake)
+    ├── package.json                ← @abdsynths/midi-keyb (workspace pnpm, NO CMake)
     ├── src/keyboard.js             ← createKeyboard: teclado + ruedas + pedals
     ├── src/keyboard.css            ← Temas/tokens (importa @abdsynths/shared)
-    └── tests/                      ← vitest + jsdom (323 tests)
+    ├── tests/                      ← vitest + jsdom (323 tests)
+    └── JuceMidiKeyboardComponent.h ← Capa nativa: monta el WebUI en un plugin
+                                     ← target ABDShared::MidiKeyboardCpp
 ```
 
 ---
@@ -375,6 +381,45 @@ buscar nombres miente: un `#include` relativo en el consumidor gana al include
 path del módulo y compila una copia privada mientras el módulo compartido parece
 enlazado. Los detalles, y las tres trampas, en
 [`docs/fuentes-sin-consumidor.md`](docs/fuentes-sin-consumidor.md).
+
+##### La línea base: cómo el audit es puerta sin mentir
+
+En local el comando anterior sale **0**: los consumidores existen en el disco. En
+CI sale **1** con 55 fuentes, y no es un problema de este repo: en la foto de la
+suite fijada por SHA, el trabajo que las consume está escrito pero **sin
+commitear** en los repos hermanos. Un rojo así no se arregla arreglando este
+repo, y un CI rojo el primer día es un CI que nadie mira.
+
+La salida es un **trinquete** en `tools/audit-baseline.json`, con las 55 fuentes
+con nombre:
+
+| Qué pasa | Código |
+|---|---|
+| Fuente huérfana que **no** está en la línea base → hay que consumirla o documentarla en `ALLOWLIST` | **1** |
+| Entrada de la línea base que **ya no** es huérfana → hay que podarla | **1** |
+| Lista blanca obsoleta, o test declarado que el CMake ya no compila | **1** |
+| Solo hay lo que ya estaba en la línea base | **0** |
+| No hay repos hermanos clonados al lado → no se ha podido comprobar | **3** |
+
+La segunda regla es la que lo hace un trinquete y no una lista de excepciones:
+sin ella, la línea base sería un escudo permanente al que se le pueden añadir
+todos los hallazgos que salgan. Con ella, cuando el trabajo se commitee en los
+hermanos, subir los SHA del workflow hace **caer** el número de entradas, y lo
+único que queda por hacer es quitar las que sobren:
+
+```bash
+# CI lo hace así, con el flag:
+python tools/audit_unconsumed_sources.py --check --baseline tools/audit-baseline.json
+
+# Para regenerar la línea base, cuando los SHA ya están subidos:
+python tools/audit_unconsumed_sources.py --write-baseline
+```
+
+**`--baseline` es opt-in a propósito.** En local los repos hermanos tienen ese
+trabajo sin commitear, así que la línea base describiría una foto que aquí no es
+la realidad, y el script saldría en rojo pidiendo podar 55 entradas que en local
+sí hacen falta. Sin el flag el script aplica el modo estricto: sale 1 ante
+cualquier huérfana que no esté en `ALLOWLIST`.
 
 ### Cómo integrarlo
 
@@ -1152,9 +1197,105 @@ siempre; por eso la regla es **contrato único + test que ate las capas**.
 
 ## Módulo: MidiKeyboard (WebUI/JS)
 
-> **OJO: este módulo NO es CMake.** Es un paquete JS (`@abdsynths/midi-keyb`) que se consume
-> desde las WebUI de los proyectos vía pnpm workspace, igual que `@abdsynths/shared`
-> (ABDSharedAssets). No tiene target C++ ni aparece en `CMakeLists.txt`.
+> **OJO: este módulo tiene DOS mitades y solo una es JS.** El paquete
+> `@abdsynths/midi-keyb` (`src/`, `tests/`, `package.json`) se consume desde las WebUI
+> de los proyectos vía pnpm workspace, igual que `@abdsynths/shared` (ABDSharedAssets),
+> y **no** pasa por CMake. Pero en la misma carpeta hay una capa nativa —
+> `JuceMidiKeyboardComponent.h`, `MidiKeyboardFloatingWindow.h` y
+> `MidiKeyboardResourceProvider.{h,cpp}`— que monta el WebUI del teclado dentro de un
+> plugin y **sí** tiene target: `ABDShared::MidiKeyboardCpp`.
+>
+> ```cmake
+> target_link_libraries(TuPlugin PRIVATE ABDShared::MidiKeyboardCpp)
+> ```
+>
+> Va `Cpp` y no a secas para que no se confunda con el paquete npm: `MidiKeyboard`
+> ya es el nombre del paquete pnpm, y un target homónimo haría que un error de
+> enlace dijera `MidiKeyboard` sin que quede claro de qué mitad habla.
+
+### Correr las pruebas de este paquete
+
+`vitest`, y se ejecutan desde un clon limpio de `ABDSharedCode` con un comando:
+
+```bash
+node tools/bootstrap-workspace.mjs   # pone el hermano donde falta e instala
+pnpm test                           # 340 pruebas
+```
+
+El bootstrap existe porque el paquete declara `"@abdsynths/shared": "workspace:*"`
+y ese paquete vive en **ABDSharedAssets, otro repo**. Sin él, un clon limpio de
+ABDSharedCode no puede resolver su propia dependencia, y el error que da pnpm
+(`Cannot resolve package from workspace...`) no nombra el paquete que falta.
+`--check` comprueba lo mismo sin instalar ni escribir.
+
+**El mismo script arranca el workspace en CI.** La acción
+`pnpm-workspace-bootstrap` (la que usan ABDEep, ABDMS2000 y ABDCZ101) hace los tres
+checkouts y luego llama a este script con dos flags:
+
+```bash
+node ABDSharedCode/tools/bootstrap-workspace.mjs \
+  --workspace-root "$GITHUB_WORKSPACE" --project "$ABD_PROJECT"
+```
+
+`--workspace-root` dice dónde está el workspace —que en CI no es este repo sino el
+directorio que arma la acción— y `--project` quién es el repo llamante, que es lo
+único que CI sabe. Con ellos, el script genera `pnpm-workspace.yaml`, instala y
+**verifica el layout** (que los paquetes `@abdsynths/*` estén enlazados), que antes
+vivía en un `run:` de bash. Un `pnpm install` puede salir en verde y dejar las
+dependencias `workspace:*` sin enlazar, y eso antes no se descubría hasta que
+Vitest reventaba veinte pasos más tarde con un error que no menciona el workspace.
+
+Los dos flags van **juntos o ninguno**: `--project` sin `--workspace-root` no dice
+dónde va el repo llamante, y `--workspace-root` sin `--project` genera un workspace
+al que solo le faltan de miembros lo único que CI sabe. Aceptarlos por separado
+daría dos formas de pasar que no funcionan.
+
+Esto no es una conciliación de estilos: es que **la lógica del workspace estaba
+duplicada**, una copia en bash que solo corría en CI y otra en el script que corre
+en local. Dos copias se separan en silencio, y la que se separa es la que nadie
+ejecuta. Añadir un paquete pnpm a ABDSharedCode, o cambiar la tabla `allowBuilds`,
+ahora toca **un** sitio.
+
+Un fichero de la suite necesita la suite entera: `tests/host-strip-height.test.js`
+es el contrato de franja de los cuatro synths que montan el teclado, y lee su
+CSS y su código. Desde un clon de ABDSharedCode solo, sus tres bloques de
+workspace se **omiten con un motivo impreso** y corren los otros 331 tests;
+desde la raíz de la suite corren los 340.
+
+### El CI de este repo (`.github/workflows/shared-code-ci.yml`)
+
+Es el primero de este repo, y su limitación conviene saberla antes de fiarse:
+ABDSharedCode no tiene código propio que ejecutar, es código que vive aquí y se
+consume desde fuera. Lo único comprobable sin esos repos es que el código está
+sano por sí mismo. Tres trabajos, **los tres puertas** (ninguno en `warning`):
+
+| Trabajo | Qué corre | Por qué |
+|---|---|---|
+| `tools` | `node --test tools/guard_atributos.test.mjs` (37) | Sin dependencias: `node:test` y `assert` vienen en el runtime, y estas herramientas no están dentro del workspace pnpm. Meter un runner para 37 pruebas sería meter una cadena de dependencias en un guard que vigila los binarios. |
+| `midikeyboard` | la acción `pnpm-workspace-bootstrap` + `pnpm test` (340) | Usa la acción de **este** repo, `ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master`, que a su vez llama a `tools/bootstrap-workspace.mjs`. |
+| `audit` | 5 hermanos por SHA inmutable + el audit con trinquete | El auditor compara contra la suite; los SHA son lo que hace el veredicto reproducible. |
+
+**Por qué el job nombra el fichero y no el directorio.** `node --test tools/` es
+una orden que funciona o no según la versión de Node en un punto que no se ve.
+Hasta la 20, `node --test` recibía un **directorio** y lo buscaba recursivamente;
+desde la 21 recibe **patrones glob**, y el glob `tools` casa con el propio
+directorio, que Node carga como módulo y responde `MODULE_NOT_FOUND`. El glob
+explícito tampoco vale como arreglo general: en la 20 el argumento se toma
+literal. Como el CI usa la 20 y la máquina de desarrollo ya va por la 24,
+cualquier forma con directorio o glob pasa en un lado y falla en el otro.
+
+El precio de nombrar los ficheros es que hay que nombrarlos: un
+`tools/nuevo.test.mjs` que nadie nombra **no falla, no avisa y sale con 0**. Eso
+no lo comprueba un paso del workflow sino la propia suite, cuyo último bloque
+falla si hay más `*.test.mjs` en `tools/` que los que dice la cabecera del test.
+
+Y el job `midikeyboard` comprueba que el motivo del `OMITIDO` aparezca en la
+salida: un salto sin motivo se lee como una comprobación que pasó.
+
+El paso de audit **mide** y anota su código de salida con `set +e`; el paso
+siguiente es el que **decide** y el que puede fallar. Así el código no se pierde
+y no hace falta un `continue-on-error`, que era justo lo que dejaba el job verde
+sin mirar.
 
 Teclado virtual completo (keybed responsivo, ruedas pitch/mod con filmstrip, pedals,
 QWERTY, touch, chord memory, scale filter) + **API de feedback host-driven** (v0.2.0) para
@@ -1617,3 +1758,32 @@ El ecosistema ABDSynths adopta una **Arquitectura en Tres Niveles** para unifica
 3. **Nivel 2: Aplicaciones Consumidoras**:
    - **ABDAudioLab**: Carga dinámica mediante `core::HardwareContractRegistry` para calibración y perfilado acústico.
    - **ABDBankManager**: Sincronización e hidratación declarativa de `ModelContract`s mediante `npm run sync-contracts` (`scripts/sync_contracts.mjs`).
+- **`abd::hw::JunoTapeModem`**:
+  Módem de audio FSK de fase continua para la interfaz de cinta analógica de Roland, con portadoras de 1,3 kHz (Space/0) y 2,6 kHz (Mark/1), detección de tono piloto y demodulación para Juno-60, Juno-6 y HS-60.
+- **`abd::hw::CasioCzVirtualController`**:
+  Controlador autónomo para interrogar sintetizadores Casio CZ con Phase Distortion emulados (VES / núcleo MAME) o por hardware físico vía loopMIDI. Implementa `IHardwareController` con empaquetado estándar de 4 bits (Manufacturer ID 0x44) y una tabla de opcodes NZ-1 de 1984 con override por mapeo JSON.
+  Su **`.cpp` NO está en el target `ABDShared::HardwareDrivers`**, a propósito:
+  compilarlo allí convertiría `nlohmann/json` en una dependencia dura de
+  *compilación* para todo el que enlace el módulo, que es casi toda la suite y no
+  lo necesita para nada. Su **cabecera sí** es superficie pública del target, y el
+  target enlaza `nlohmann_json` en `PUBLIC` justo por eso: incluirla no da
+  `C1083`. Lo único que queda fuera es la implementación, y quien la use la
+  compila desde fuente —es lo que hace `ABDAudioLab`—:
+  ```cmake
+  target_sources(MiProyecto PRIVATE
+      ${ABDSHARED_CODE_DIR}/HardwareDrivers/CasioCzVirtualController.cpp)
+  target_link_libraries(MiProyecto PRIVATE nlohmann_json::nlohmann_json)
+  ```
+- **`abd::hw::CasioNibbleCodec`**:
+  Empaquetador/desempaquetador universal de 4 bits (nibbles `0x00..0x0F`) con verificación de checksum de 7 bits Casio.
+
+> Cinco de las seis clases con métodos definidos fuera de línea —`SysExCodec`,
+> `NRPNParser`, `FskAudioModem`, `JunoTapeModem` y `CasioNibbleCodec`— se compilan
+> en `ABDShared::HardwareDrivers`. Las tres últimas estaban en disco y fuera del
+> target: se podían incluir y documentar, pero no enlazar, y el síntoma era un
+> `undefined reference` en el consumidor.
+El target se puede apagar con `-DABDSHAREDCODE_BUILD_AUDIOCOMPARATOR=OFF`, y
+arranca en `ON`. Propaga `juce_core`, `juce_audio_basics` y `juce_dsp`: este
+último no es opcional, porque la correlación cruzada FFT que se describe más
+abajo vive en la unidad de traducción que lo incluye.
+
