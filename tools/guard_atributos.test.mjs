@@ -1,12 +1,38 @@
 // Pruebas del guard de `.gitattributes`.
 //
-//   node --test tools/
+//   node --test tools/guard_atributos.test.mjs
 //
-// SIN DEPENDENCIAS, a propósito. Este repo no tiene `package.json`, ni vitest,
-// ni runner: tiene cuatro tests de C++ y unas herramientas en node. Meter un
-// runner para veinte tests sería meter una cadena de dependencias en un repo que
-// no la tiene, y el guard que vigila los saltos de línea de los binarios
-// terminaría depending de un `pnpm install` que nadie recuerda hacer.
+// POR QUÉ EL NOMBRE DEL FICHERO Y NO EL DIRECTORIO. La orden de antes era
+// `node --test tools/`, y funciona o no según la versión de Node en un punto que
+// no se ve. Hasta la 20, `node --test` recibía un DIRECTORIO y lo buscaba
+// recursivamente. Desde la 21 recibe PATRONES GLOB, y el glob `tools` casa con el
+// propio directorio: Node lo carga como módulo y contesta
+// `Error: Cannot find module '.../tools'` (MODULE_NOT_FOUND). No es que el
+// directorio no tenga tests, es que el argumento dejó de ser un directorio.
+//
+// Medido en la 24.21, en este repo: `node --test tools/` sale 1 con
+// MODULE_NOT_FOUND; `node --test tools/*.test.mjs` sale 0 con los 37 de 37. Y
+// entrecomillado tampoco vale como arreglo general: `node --test
+// "tools/**/*.test.mjs"` funciona en la 21+ y rompe en la 20, donde el argumento
+// se toma literal. Ninguna forma con directorio o con glob vale en las dos, y el
+// CI usa la 20 mientras que la máquina de desarrollo ya va por la 24: cualquier
+// forma con globs pasa en local y falla en CI, o al revés. Un nombre de fichero
+// explícito es la única que no depende de la versión, así que es la que se
+// documenta.
+//
+// El precio de esa elección es que los ficheros hay que NOMBRARLOS, y un test que
+// no se nombra no se ejecuta nunca: verde, sin hacer nada, que es el peor
+// resultado posible porque parece una comprobación. Por eso el último bloque
+// comprueba que no haya más `*.test.mjs` en `tools/` que los que nombra esta
+// cabecera. Añadir uno sin actualizar la cabecera es un test que nadie lee nunca.
+//
+// SIN DEPENDENCIAS, a propósito. Estas herramientas NO están dentro del workspace
+// pnpm y no declaran nada: `node:test` y `assert` vienen en el runtime, así que se
+// ejecutan con `node --test` y sin `pnpm install`. La raíz del repo sí tiene ya un
+// `package.json` (el del workspace, para MidiKeyboard) y MidiKeyboard sí usa vitest,
+// pero esto es otra cosa: meter un runner para veinte tests sería meter una cadena
+// de dependencias en un guard que vigila los binarios, y ese guard acabaría
+// dependiendo de un `pnpm install` que nadie recuerda hacer.
 //
 // Lo que hay aquí es más pequeño y más duro: `node:test` viene en el runtime,
 // `assert` viene en el runtime, y las funciones puras de `guard_atributos.mjs`
@@ -22,7 +48,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
@@ -351,5 +377,69 @@ describe('git check-attr, que es la autoridad y se usa de contrapeso', () => {
     assert.equal(texto, datos.reglas);
     assert.match(texto, /^\*\.gif binary$/m);
     assert.match(texto, /^\*\.pyc binary$/m);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// LA ORDEN DOCUMENTADA, QUE ESTA CABECERA DICE Y QUE NADIE COMPRUEBA
+
+// Este guard es de los pocos que vigilan algo del PROPIO repo de test y no de
+// `.gitattributes`, y existe por una razón concreta: al documentar el nombre del
+// fichero en vez del directorio se ganó algo que no es gratis. Con un directorio,
+// `node --test tools/` descubría lo que hubiera; con un nombre, lo que no esté
+// nombrado no se ejecuta. Ese es el fallo que este bloque mide.
+//
+// El fallo es INDETECTABLE fuera de aquí: un `tools/nuevo.test.mjs` que nadie
+// nombra no falla, no se queja y no aparece en ningún log. Se ejecuta con 0
+// pruebas y con código de salida 0, que es la forma más limpia que hay de
+// mentir.
+describe('la orden que dice la cabecera de este fichero', () => {
+  const AQUI = resolve(RAIZ, 'tools');
+
+  /**
+   * Las órdenes de la cabecera, y solo ellas.
+   *
+   * La línea que documenta la orden es un comentario entero: empieza por `//`,
+   * sigue con espacios, y se acaba en `node --test <algo>`. El comentario de más
+   * abajo cita órdenes que NO son la documentada (`node --test tools/`, que es
+   * justo la que no funciona), y si el patrón fuera más ancho las contaría como
+   * si fueran la orden buena y este guard se aprobaría a sí mismo.
+   */
+  const ordenesDocumentadas = (cabecera) =>
+    [...cabecera.matchAll(/^\/\/\s+node --test (\S+)\s*$/gm)].map((m) => m[1]);
+
+  const cabecera = readFileSync(resolve(AQUI, 'guard_atributos.test.mjs'), 'utf8');
+  const ordenes = ordenesDocumentadas(cabecera);
+
+  const ficherosDeTest = readdirSync(AQUI).filter((f) => f.endsWith('.test.mjs'));
+
+  it('la cabecera documenta una orden que existe', () => {
+    assert.ok(ordenes.length > 0,
+      'la cabecera de guard_atributos.test.mjs no dice cómo ejecutar las pruebas');
+
+    for (const orden of ordenes) {
+      assert.ok(existsSync(resolve(RAIZ, orden)),
+        `la cabecera documenta \`${orden}\` y ese fichero no existe`);
+    }
+  });
+
+  it('la cabecera no documenta el directorio, que es la orden que ya no funciona', () => {
+    // La forma con globs pasa en local (Node 24) y rompe en el CI (Node 20), y al
+    // revés también. Nombrar el directorio o un glob es volver a abrir este
+    // ticket justo cuando alguien suba la versión de Node en el workflow.
+    const parsanas = ordenes.filter((o) => o === 'tools' || o === 'tools/' || o.includes('*'));
+
+    assert.deepEqual(parsanas, [],
+      'forma documentada que depende de la versión de Node: '
+      + `${parsanas.join(', ')}. Usa el nombre del fichero.`);
+  });
+
+  it('cada fichero de test de tools/ aparece en la orden documentada', () => {
+    const sinNombrar = ficherosDeTest.filter(
+      (f) => !ordenes.some((o) => o.replace(/\\/g, '/').endsWith('/' + f) || o === f));
+
+    assert.deepEqual(sinNombrar, [],
+      `${sinNombrar.length} fichero(s) de test que la cabecera no nombra, y por tanto que `
+      + 'nadie ejecuta: añade el nombre a la cabecera de este fichero.');
   });
 });

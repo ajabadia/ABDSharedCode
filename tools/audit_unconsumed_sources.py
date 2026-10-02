@@ -17,15 +17,76 @@ NOMBRE, se resuelve cada #include y se pregunta a que path apunta de verdad.
 
 Salida:
   0  solo hay huerfanos de la lista blanca (estado conocido)
-  1  hay huerfanos NUEVOS  -> para el CI
-  2  error de uso
+  1  hay huerfanos NUEVOS (fuera de ALLOWLIST y, si se paso --baseline, fuera de
+     la linea base), o una entrada de lista blanca que un producto ya consume,
+     o una entrada de la linea base que YA NO es huerfana, o un TESTS_PROPIOS
+     que el modulo dejo de compilar  -> para el CI
+  2  error de uso, o excepcion no prevista (no es un hallazgo: no se llego a
+     comprobar nada)
+  3  NO SE HA PODIDO COMPROBAR: no hay ningun proyecto de la suite al lado, y
+     este auditor mide una propiedad de TODA la suite, no de este repo. Sin los
+     hermanos no sabe quien consume que, y su respuesta no es "nadie lo usa":
+     es "no mire". El 3 existe para que un job no lo lea como un verde ni como
+     un rojo.
+
+EL TRINQUETE, Y POR QUE HACE FALTA. Este script compara este repo contra una FOTO
+de la suite, y esa foto va siempre por detras: una fuente nueva que aun no ha
+llegado a ningun HEAD de los hermanos se ve sin consumidor aunque un producto la
+use de verdad. Medido contra los SHA fijados del workflow: 55. En el arbol de
+trabajo, con lo que hay sin commitear: 0.
+
+Con eso, hay dos salidas malas y una buena:
+
+  - Dejar el job en rojo siempre: el primer dia de CI nace roto, y un CI rojo el
+    primer dia es un CI que nadie mira.
+  - Poner `continue-on-error` en el workflow: el job pasa en verde sin mirar, que
+    es el peor resultado posible porque es verde.
+
+La buena es un TRINQUETE, y `tools/audit-baseline.json` lo es. Una fuente sin
+consumidor que ya esta en la linea base NO es un fallo nuevo, y el codigo sale
+0. Una que no esta, sale 1. Y al reves tambien muerde: una entrada de la linea
+base que YA NO es huerfana es un FALLO, porque si no, la linea base se convierte
+en un escudo permanente y nadie la poda nunca.
+
+O sea: esto no es una lista de excepciones, es una lista de deuda con el
+inventario al dia.
+
+--baseline <fichero>   activa el TRINQUETE contra esa linea base de huerfanas
+                         conocidas. Sin este flag la linea base NO se lee, ni
+                         aunque tools/audit-baseline.json este ahi al lado.
+  --write-baseline       reescribe tools/audit-baseline.json con ESTA pasada
+  --help
+
+POR QUE --baseline ES UN FLAG Y NO UN DEFECTO. La linea base commiteada esta
+medida contra una foto de la suite: los repos hermanos en los SHA que fija
+.github/workflows/shared-code-ci.yml. En local, al lado, esos mismos repos tienen
+trabajo SIN COMMITEAR (varios ficheros en M, ??), asi que las 55 huerfanas de CI
+NO son huerfanas aqui: sus consumidores existen en el disco. Si la linea base se
+leyera siempre, en local saldrian 55 "entradas que ya no son huerfanas" y el repo
+se quedaria en rojo para siempre, con un arreglo (--write-baseline) que ademas
+destruye la proteccion de CI. Un rojo permanente es un rojo que nadie mira.
+
+Asi que: en local, sin --baseline, el trinquete no aplica y sale 1 solo si hay
+huerfanas de verdad, que es el modo estricto. En CI, el workflow pasa
+--baseline explicitamente y las dos reglas (nueva por encima, y entrada que hay
+que podar) estan activas.
+
+QUE CUENTA COMO HUERFANA. Una fuente es huerfana si ningun producto la enlaza Y
+el modulo tampoco la compila en sus propios tests. Las dos mitades hacen falta:
+sin la primera, el modulo se llenaria de trabajo a medias que nadie integra;
+sin la segunda, las cabeceras que solo usa el test standalone del modulo saldrian
+como huerfanas nuevas en cada pasada, que es un rojo perpetuo que no significa
+ningun problema y por lo tanto no obliga a arreglar nada.
 
 Uso:
   python tools/audit_unconsumed_sources.py           # informe
   python tools/audit_unconsumed_sources.py --check   # sin informe, pero EN ROJO DICE POR QUE
+  python tools/audit_unconsumed_sources.py --check --baseline tools/audit-baseline.json
+                                                     # idem, con el TRINQUETE (lo que hace CI)
 """
 
 import io
+import json
 import os
 import re
 import sys
@@ -109,6 +170,32 @@ ALLOWLIST = {
 }
 
 
+# Las unidades de traduccion que el modulo compila en SU PROPIO CMake para
+# probarse a si mismo. No las consume ningun producto, asi que no son raices de
+# "alcanzable desde un producto": y sin esta lista, lo que ellas incluyen sale
+# como huerfano NUEVO en cada pasada.
+#
+# El caso que obliga a esto: `SynthCoreTests.cpp` incluye los cinco
+# `SynthCore/S950*.h`, que son el trabajo mas reciente y mas comentado del
+# modulo, y el auditor los declaraba "HUERFANAS NUEVAS (no estaban en la lista
+# blanca)" con codigo de salida 1. No era verdad: se compilan y se ejecutan en
+# cada `ctest` del modulo. Lo que el veredicto no tenia forma de decir es "no lo
+# usa ningun producto, pero si su propio test", que es una situacion distinta de
+# "no lo usa nadie" y no puede compararse con ella.
+#
+# NO vale con anadir CUALQUIER entrada de la lista blanca como raiz. Si
+# `MultiHeadEcho.h` fuera raiz, arrastraria a `TapeColour.h`, `DiodeBridge.h` y
+# `Re201Profile.h`, que solo se usan desde el y no los compila nadie: pasarian de
+# huerfanos a "cubiertos" y la lista blanca se quedaria obsoleta al reves. Aqui
+# solo entran las TU que el modulo COMPILA de verdad, que se comprueba abajo.
+TESTS_PROPIOS = {
+    'DspCore/DspCoreTests.cpp',
+    'DspEffects/DspEffectsTests.cpp',
+    'SynthCore/SynthCoreTests.cpp',
+    'Segmented/SegmentedProbe.cpp',
+}
+
+
 def norm(p):
     return os.path.normpath(os.path.abspath(p)).replace('\\', '/')
 
@@ -138,8 +225,116 @@ def project_of(path):
     return rel[0] if len(rel) > 1 else '(raiz)'
 
 
-def main():
+LINEA_BASE_POR_DEFECTO = os.path.join(HERE, 'audit-baseline.json')
+
+
+def leer_linea_base (ruta):
+    """
+    Las huerfanas que ya se sabian. Un JSON con `fuentes` (lista de rutas
+    relativas) y `nota` (por que estan ahi). Devuelve (conjunto, texto_de_error).
+
+    Un fichero que no existe NO es un error: sin linea base este script sigue
+    funcionando, solo que sin red. Eso si, el error se distingue del "no hay
+    linea base" por el texto, porque "no hay linea base" y "la linea base esta
+    rota" no son lo mismo y uno es transitorio y el otro no.
+    """
+    if not os.path.isfile(ruta):
+        return set(), None
+
+    try:
+        datos = json.load(io.open(ruta, 'r', encoding='utf-8'))
+    except (ValueError, OSError) as exc:
+        return set(), 'no se pudo leer %s: %s' % (ruta, exc)
+
+    if not isinstance(datos, dict) or not isinstance(datos.get('fuentes'), list):
+        return set(), '%s no tiene la forma {"fuentes": [...], "nota": "..."}' % ruta
+
+    return set(datos['fuentes']), None
+
+
+def escribir_linea_base (ruta, nombres, nota):
+    """Reescribe la linea base. Solo con --write-baseline: es una decision."""
+    cuerpo = collections.OrderedDict()
+    cuerpo['nota'] = nota
+    cuerpo['generado'] = 'python tools/audit_unconsumed_sources.py --write-baseline'
+    cuerpo['fuentes'] = sorted(nombres)
+
+    with io.open(ruta, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(json.dumps(cuerpo, indent=2, ensure_ascii=False))
+        f.write('\n')
+
+
+def main ():
     check_only = '--check' in sys.argv
+    escribir = '--write-baseline' in sys.argv
+
+    (args, cola) = _parsear(sys.argv[1:])
+    desconocidos = [a for a in cola if a not in ('--baseline',)]
+    if args.get('--baseline') and args['--baseline'][1:]:
+        desconocidos += args['--baseline'][1:]
+
+    if desconocidos:
+        print('audit_unconsumed_sources: argumento desconocido: %s' % desconocidos[0], file=sys.stderr)
+        print('  --check | --baseline <fichero> | --write-baseline | --help', file=sys.stderr)
+        return 2
+
+    if '--help' in args or '-h' in args:
+        print(__doc__.strip())
+        return 0
+
+    # `--baseline <fichero>`. Antes estaba escrito como
+    # `args.get('--baseline', [None, POR_DEFECTO])[1]`, y el `[1]` se leia sobre
+    # lo que devuelve el get, no sobre el valor por defecto: con
+    # `--baseline ruta.json` la lista tiene un solo elemento y salia un
+    # IndexError envuelto en "error: list index out of range", con codigo 2. Un
+    # error de invocacion no es un error del script, y un 2 en un job se lee
+    # como "se ha roto Python".
+    #
+    # Y sin `--baseline` la linea base NO se lee aunque este al lado. Ver el
+    # docstring: esta es medida contra los SHA de CI, y en local no describe la
+    # realidad del disco.
+    ruta_base = LINEA_BASE_POR_DEFECTO
+    base_conocida, error_base = set(), None
+
+    if '--baseline' in args:
+        valor = args['--baseline'][-1]
+        if valor is True:
+            print('audit_unconsumed_sources: --baseline necesita el fichero que sigue',
+                  file=sys.stderr)
+            return 2
+        ruta_base = valor
+        base_conocida, error_base = leer_linea_base(ruta_base)
+    if error_base:
+        print('audit_unconsumed_sources: la linea base esta rota: %s' % error_base, file=sys.stderr)
+        print('  Una linea base ilegible no se puede ignorar: pasaria todo y el job en', file=sys.stderr)
+        print('  verde sin comprobar nada. Arreglala o borrala a proposito.', file=sys.stderr)
+        return 1
+
+    # --- 0. esta la suite al lado? --------------------------------------------
+    # Se comprueba ANTES de mirar una sola fuente, porque sin hermanos este
+    # script no puede distinguir "nadie consume esto" de "no he mirado quien
+    # consume esto". Medido: en un clon solo de ABDSharedCode salen 76 huerfanas
+    # nuevas, y todas son mentira: son fuentes que ABDEep, ABDMS2000 y ABDNeural
+    # consumen de verdad, desde repos que este checkout no tiene.
+    #
+    # Por eso el codigo es 3 y no 1: un job que recibe 3 sabe que el paso no
+    # comprobo nada, y un job que recibe 1 sabe que hay algo que arreglar. Con un
+    # solo codigo, un checkout a medias se lee como un hallazgo.
+    hermanos = [d for d in sorted(os.listdir(SUITE))
+                if d not in SKIP and d != os.path.basename(SHARED)
+                and os.path.isdir(os.path.join(SUITE, d, '.git'))]
+
+    if not hermanos:
+        print('audit_unconsumed_sources: NO SE HA PODIDO COMPROBAR.', file=sys.stderr)
+        print('  Este script mide que fuentes de ABDSharedCode consume ALGUN proyecto de', file=sys.stderr)
+        print('  la suite, y los proyectos tienen que estar clonados AL LADO (%s).' % SUITE,
+              file=sys.stderr)
+        print('  Ahora mismo no hay ninguno, y sin ellos todo parece huerfano.', file=sys.stderr)
+        print('  En CI hay que clonarlos antes de llamar a este script; es lo que hace',
+              file=sys.stderr)
+        print('  .github/workflows/shared-code-ci.yml.', file=sys.stderr)
+        print('', file=sys.stderr)
+        return 3
 
     shared = []
     for p in walk_sources(SHARED):
@@ -149,10 +344,10 @@ def main():
     # --- 1. que .cpp del modulo compila cada proyecto ------------------------
     compiled_by = collections.defaultdict(set)   # ruta -> {proyecto}
     for proj in sorted(os.listdir(SUITE)):
-        base = os.path.join(SUITE, proj)
-        if not os.path.isdir(base) or proj in SKIP:
+        dir_proy = os.path.join(SUITE, proj)
+        if not os.path.isdir(dir_proy) or proj in SKIP:
             continue
-        for dp, dn, fn in os.walk(base):
+        for dp, dn, fn in os.walk(dir_proy):
             dn[:] = [d for d in dn if d not in SKIP and not d.startswith('.')]
             manifests = [f for f in fn if f == 'CMakeLists.txt' or f.endswith('.cmake')]
             if not manifests:
@@ -210,10 +405,10 @@ def main():
                     break
 
     for proj in sorted(os.listdir(SUITE)):
-        base = os.path.join(SUITE, proj)
-        if not os.path.isdir(base) or proj in SKIP or proj == 'ABDSharedCode':
+        dir_proy = os.path.join(SUITE, proj)
+        if not os.path.isdir(dir_proy) or proj in SKIP or proj == 'ABDSharedCode':
             continue
-        for dp, dn, fn in os.walk(base):
+        for dp, dn, fn in os.walk(dir_proy):
             dn[:] = [d for d in dn if d not in SKIP and not d.startswith('.')]
             for mf in [f for f in fn if f == 'CMakeLists.txt' or f.endswith('.cmake')]:
                 for m in re.finditer(r'ABDShared::([A-Za-z0-9_]+)', read(os.path.join(dp, mf))):
@@ -227,12 +422,13 @@ def main():
     # significa `src/dsp/JunoBBD.h`. Sin estas bases, medio suite parece huerfano.
     includes = {}          # fichero -> {ruta absoluta a la que resuelve}
     for proj in sorted(os.listdir(SUITE)):
-        base = os.path.join(SUITE, proj)
-        if not os.path.isdir(base) or proj in SKIP:
+        dir_proy = os.path.join(SUITE, proj)
+        if not os.path.isdir(dir_proy) or proj in SKIP:
             continue
-        proj_bases = [base, norm(os.path.join(base, 'src')), norm(os.path.join(base, 'Source')),
-                      norm(os.path.join(base, 'wasm')), SHARED, SUITE]
-        for p in walk_sources(base):
+        proj_bases = [dir_proy, norm(os.path.join(dir_proy, 'src')),
+                      norm(os.path.join(dir_proy, 'Source')),
+                      norm(os.path.join(dir_proy, 'wasm')), SHARED, SUITE]
+        for p in walk_sources(dir_proy):
             sdir = os.path.dirname(p)
             bases = [sdir] + proj_bases
             outs = set()
@@ -271,41 +467,141 @@ def main():
                 reachable.add(cur)
                 stack.extend(includes.get(cur, ()))
 
+    # --- 3bis. alcanzable desde los TESTS DEL PROPIO MODULO ------------------
+    # Raices distintas y veredicto distinto: aqui se entra por una TU que el
+    # modulo compila en su CMake, no por un producto. Lo que se alcanza asi no es
+    # "huerfano": se compila y se ejecuta, pero ningun producto lo enlaza, y eso
+    # es informacion que el informe debe dar en su propia linea.
+    tests_raices, tests_rotos = [], []
+    for rel in sorted(TESTS_PROPIOS):
+        p = norm(os.path.join(SHARED, rel))
+        if not os.path.isfile(p):
+            tests_rotos.append((rel, 'el fichero ya no existe'))
+        elif p not in self_built:
+            tests_rotos.append((rel, 'el CMake del modulo ya no lo compila'))
+        else:
+            tests_raices.append(p)
+
+    probadas = set(tests_raices)
+    stack = list(tests_raices)
+    while stack:
+        cur = stack.pop()
+        for nxt in includes.get(cur, ()):
+            if nxt not in probadas:
+                probadas.add(nxt)
+                stack.append(nxt)
+
+    probadas &= shared_set
+
+    # Las raices no se listan como "cubiertas por los tests": ESAS SON los tests.
+    probadas_mostrables = probadas - set(tests_raices)
+
     # --- 4. veredicto --------------------------------------------------------
     orphans = []
+    solo_probadas = []
     for p, rel in sorted(shared, key=lambda t: t[1]):
         if p in reachable:
             continue
         # el .cpp se marca como "inerte" si ademas nadie lo compila
         inert = rel.endswith(('.cpp', '.c')) and p not in compiled_by and p not in self_built
-        orphans.append((rel, inert))
+        if p in probadas_mostrables:
+            solo_probadas.append((rel, inert))
+        else:
+            orphans.append((rel, inert))
 
     known = [o for o in orphans if o[0] in ALLOWLIST]
     new = [o for o in orphans if o[0] not in ALLOWLIST]
-    seen = dict(orphans)
-    listed = [r for r in ALLOWLIST if r not in seen]
+
+    # Una entrada de la lista blanca se declara OBSOLETA cuando la consume un
+    # PRODUCTO, que es lo que invalida su motivo ("nadie lo enlaza"). NO cuando la
+    # cubre el test del propio modulo: el motivo de `DspEffects/MultiHeadEcho.h`
+    # ("motor de maquina sin todavia consumidor") sigue siendo cierto y se sigue
+    # pudiendo comprobar, asi que marcarlo obsoleto por el hecho de que ahora hay
+    # un test que lo ejercita seria tirar una decision consciente, no detectarla.
+    # Medido: con este criterio, cero entradas salen obsoletas.
+    listed = [rel for rel in ALLOWLIST
+              if norm(os.path.join(SHARED, rel)) in reachable]
+
+    # --- 5. el TRINQUETE ------------------------------------------------------
+    # El nombre `base_conocida` y no `base` a proposito: los bucles que recorren
+    # la suite usaban `base` para el DIRECTORIO del proyecto, y al acabar el
+    # ultimo bucle `base` valia una ruta. Con `base = leer_linea_base(...)` la
+    # linea base entera se perdia sin que nada fallara: `set(ruta)` es un set de
+    # CARACTERES, la comparacion de nombres no encontraba nunca nada y el
+    # trinquete pasaba siempre. Un nombre que dos cosas distintas comparten es un
+    # bug esperando a que las dos cosas coincidan en la misma linea.
+    #
+    # Va ANTES de cualquier impresion porque decide que es un hallazgo y que es
+    # una foto conocida, y los dos bloques de abajo (el corto de --check y el
+    # informe largo) tienen que distinguir lo mismo que decide esto.
+    #
+    # Las huerfanas que ya estaban en la linea base no son un hallazgo nuevo, y
+    # las entradas de la linea base que ya NO son huerfanas SI lo son: son deuda
+    # cobrada que nadie ha podado, y sin esa regla la linea base se vuelve un
+    # escudo que solo crece. Con las dos reglas el audit es puerta de verdad
+    # hoy -- las 55 huerfanas conocidas en CI no rompen -- y aun asi muerde.
+    nuevos_reales = [o for o in new if o[0] not in base_conocida]
+    base_podada = sorted(r for r in base_conocida if r not in {o[0] for o in new})
+    en_base = [o for o in new if o[0] in base_conocida]
 
     # `--check` NO es silencioso. Antes salia con 1 sin imprimir nada, y en el
     # log de un job eso se lee como "el script se rompio" y no como "ha
     # aparecido una fuente huerfana": el fallo que hay que arreglar no se
     # distinguia del fallo que no hay. Aqui imprime lo mismo que el informe, en
     # corto, y sale con 1.
-    if check_only and (new or listed):
-        if new:
-            n = len(new)
-            print('audit_unconsumed_sources: %d %s SIN NINGUN PRODUCTO QUE LA CONSUME%s, '
-                  'y no %s en la lista blanca:'
+    #
+    # TODO lo que sale en modo --check va a stderr, sin excepcion. Antes el
+    # parrafo de remedio iba dividido: las tres primeras lineas se imprimian sin
+    # `file=sys.stderr` y solo la cuarta lo llevaba, asi que en --check, donde
+    # stdout esta vacio por definicion, el log de un job mostraba "es un resto
+    # DELIBERADO y no un olvido." sin sujeto, tres lineas antes de donde decia de
+    # que. Un diagnostico partido en dos flujos se lee como dos diagnosticos.
+
+    if check_only and (nuevos_reales or base_podada or listed or tests_rotos):
+        if tests_rotos:
+            n = len(tests_rotos)
+            print('audit_unconsumed_sources: %d %s propio%s declarado%s que ya no %s:'
                   % (n,
-                     'fuente huerfana' if n == 1 else 'fuentes huerfanas',
-                     '' if n == 1 else 'n',
-                     'esta' if n == 1 else 'estan'),
+                     'test' if n == 1 else 'tests',
+                     '' if n == 1 else 's',
+                     '' if n == 1 else 's',
+                     'existe' if n == 1 else 'existen'),
                   file=sys.stderr)
-            for rel, inert in sorted(new):
+            for rel, motivo in tests_rotos:
+                print('  %s  -> %s' % (rel, motivo), file=sys.stderr)
+            print('  TESTS_PROPIOS (este fichero) describe raices que ya no compila nadie: '
+                  'el alcance "probado por el modulo" se ha perdido sin que se note. '
+                  'O se compilan otra vez, o se borran de la lista.', file=sys.stderr)
+            print('', file=sys.stderr)
+
+        if nuevos_reales:
+            n = len(nuevos_reales)
+            # El sufijo dice contra QUE se ha comparado. Sin --baseline no se ha
+            # comparado contra ninguna linea base, asi que decir "ni en la linea
+            # base" seria hablar de un fichero que este script ni ha abierto.
+            contra = ('ni en la lista blanca ni en la linea base (%s)'
+                      % os.path.basename(ruta_base)) if base_conocida \
+                else 'ni en la lista blanca (trinquete no activo)'
+            print('audit_unconsumed_sources: %d %s SIN NINGUN PRODUCTO que %s, y que no %s '
+                  '%s:' % (n,
+                           'fuente huerfana' if n == 1 else 'fuentes huerfanas',
+                           'la consume' if n == 1 else 'las consumen',
+                           'esta' if n == 1 else 'estan',
+                           contra),
+                  file=sys.stderr)
+            for rel, inert in sorted(nuevos_reales):
                 print('  %s%s' % (rel, '  [INERTE: no lo compila nadie, ni el propio modulo]'
                                   if inert else ''), file=sys.stderr)
-            print('  Trabajo a medias: el fichero esta, se documenta y se prueba, y ningun')
-            print('  producto lo enlaza. O se le anade un consumidor, o se documenta el motivo')
-            print('  en ALLOWLIST (tools/audit_unconsumed_sources.py), que es lo que dice que')
+            # Una linea por idea: el texto se parte por la MISMA razon que antes se
+            # partia entre stdout y stderr (un diagnostico largo repartido en
+            # trozos se lee como varios diagnosticos), pero aqui cada trozo lleva
+            # explicitamente su `file=sys.stderr`, que es lo que faltaba.
+            print('  Trabajo a medias: el fichero esta, se documenta y se prueba, y ningun',
+                  file=sys.stderr)
+            print('  producto lo enlaza. O se le anade un consumidor, o se documenta el motivo',
+                  file=sys.stderr)
+            print('  en ALLOWLIST (tools/audit_unconsumed_sources.py), que es lo que dice que',
+                  file=sys.stderr)
             print('  es un resto DELIBERADO y no un olvido.', file=sys.stderr)
 
         if listed:
@@ -324,29 +620,153 @@ def main():
         print('  El informe completo, con el porque de cada huerfana conocida: '
               'python tools/audit_unconsumed_sources.py', file=sys.stderr)
         print('', file=sys.stderr)
+    elif check_only:
+        # Todo lo de mas arriba esta en verde y aun asi esto imprime. El motivo
+        # es que un log de job que sale vacio no se distingue de un script que
+        # no llego a mirar nada, y este script acaba de mirar 130 ficheros y 5
+        # repos hermanos: callarse seria mentir.
+        if base_conocida:
+            print('audit_unconsumed_sources: sin hallazgos nuevos (%d huerfanas cubiertas por la '
+                  'linea base %s).' % (len(en_base), os.path.basename(ruta_base)),
+                  file=sys.stderr)
+        else:
+            print('audit_unconsumed_sources: sin hallazgos (%d huerfanas en lista blanca, '
+                  '0 nuevas). Trinquete NO activo: no se ha pasado --baseline.'
+                  % len(known), file=sys.stderr)
+        print('', file=sys.stderr)
 
     if not check_only:
         total = len(shared)
+        print('  Hermanos medidos: %s' % ', '.join(hermanos))
         print('=' * 96)
         print('FUENTES DE ABDSharedCode SIN NINGUN PROYECTO CONSUMIDOR')
         print('=' * 96)
-        print('\n  %d fuentes en el modulo, %d alcanzables desde un producto, %d huerfanas.'
-              % (total, len(shared_set & reachable), len(orphans)))
+        print('\n  %d fuentes en el modulo, %d alcanzables desde un producto, %d sin consumidor,'
+              '\n  %d huerfanas, %d solo usadas por los tests del propio modulo.'
+              % (total, len(shared_set & reachable), len(shared_set) - len(shared_set & reachable),
+                 len(orphans), len(solo_probadas)))
         print('\n  HUERFANAS CONOCIDAS (lista blanca):\n')
         for rel, inert in sorted(known):
             mark = '  [INERTE: no lo compila nadie, ni el propio modulo]' if inert else ''
             print('      %-44s%s' % (rel, mark))
-            print('          %s' % ALLOWLIST[rel].replace('\n', ' ')[:100])
+            motivo = ' '.join(ALLOWLIST[rel].split())
+            print('          %s' % (motivo if len(motivo) <= 100 else motivo[:97] + '...'))
         if listed:
             print('\n  LISTA BLANCA DESACTUALIZADA (ya no son huerfanas, borrar la entrada):')
             for r in listed:
                 print('      %s' % r)
-        if new:
-            print('\n  *** HUERFANAS NUEVAS (no estaban en la lista blanca) ***\n')
-            for rel, inert in sorted(new):
+        if nuevos_reales:
+            print('\n  *** HUERFANAS NUEVAS (%s) ***\n'
+                  % ('ni en la lista blanca ni en la linea base' if base_conocida
+                     else 'ni en la lista blanca; trinquete no activo'))
+            for rel, inert in sorted(nuevos_reales):
                 print('      %-44s%s' % (rel, '  [INERTE]' if inert else ''))
+        elif en_base:
+            print('\n  CUBIERTAS POR LA LINEA BASE (%s): %d huerfanas conocidas, aceptadas a\n'
+                  '  proposito porque sus consumidores estan escritos pero sin commitear en los\n'
+                  '  repos hermanos. En cuanto se commiteen, sube los SHA, quita su entrada con\n'
+                  '  --write-baseline y este script vuelve a exigirla.\n'
+                  % (os.path.basename(ruta_base), len(en_base)))
 
-    return 1 if (new or listed) else 0
+        if solo_probadas:
+            print('\n  SIN PRODUCTO QUE LAS USE, PERO SI LAS USA EL TEST DEL PROPIO MODULO\n')
+            print('  No son huerfanas: se compilan y se ejecutan en cada ctest del modulo.')
+            print('  Se listan aparte porque "nadie lo enlaza" y "el modulo lo prueba" son\n'
+                  '  dos hechos distintos, y confundirlos es lo que hacia que las cinco\n'
+                  '  cabeceras SynthCore/S950*.h salieran como huerfanas nuevas.\n')
+            for rel, inert in sorted(solo_probadas):
+                print('      %-44s%s' % (rel, '  [INERTE]' if inert else ''))
+                # Si tiene entrada en la lista blanca, su motivo sigue valiendo y
+                # no debe perderse por haber cambiado de seccion: "nadie lo
+                # enlaza" sigue siendo cierto, y quien lo lea necesita saber que
+                # es una decision y no un olvido.
+                if rel in ALLOWLIST:
+                    print('          %s' % ' '.join(ALLOWLIST[rel].split()))
+            print('\n  Raices: %s' % ', '.join(sorted(os.path.relpath(p, SHARED).replace('\\', '/')
+                                                    for p in tests_raices)))
+            if tests_rotos:
+                print('  DECLARADAS PERO NO COMPILADAS (cuenta como error):')
+                for rel, motivo in tests_rotos:
+                    print('      %-44s%s' % (rel, motivo))
+
+    if escribir:
+        nota = ('Huerfanas conocidas en la foto de la suite fijada por los SHA del '
+                'workflow .github/workflows/shared-code-ci.yml. Se accepts a proposito: '
+                'sus consumidores estan escritos pero sin commitear en los repos '
+                'hermanos. Cuando se commiteen, sube los SHA, borra su entrada con '
+                '--write-baseline y este script vuelve a exigirla.')
+        escribir_linea_base(ruta_base, [o[0] for o in new], nota)
+        print('audit_unconsumed_sources: linea base escrita con %d fuentes en %s'
+              % (len(new), ruta_base), file=sys.stderr)
+        # Escribir la linea base ES aceptar la foto de huerfanas de este momento,
+        # asi que el trinquete no puede quejarse de lo que acaba de escribir. Lo
+        # que si es un problema y no se arregla escribiendo son `listed`
+        # (lista blanca obsoleta) y `tests_rotos` (raices que ya no compila nadie).
+        return 1 if (listed or tests_rotos) else 0
+
+    # `nuevos_reales` NO se reimprime aqui: en --check los lista el bloque corto
+    # de arriba, y en el informe largo los lista la seccion "HUERFANAS NUEVAS" de
+    # stdout. Imprimirlos una tercera vez no anade informacion, solo hace que el
+    # mismo hallazgo aparezca dos veces en el log de un job y obligue a contar
+    # para saber si son 1 o 2. Lo que solo se dice aqui es `base_podada`, que
+    # ningun otro bloque dice.
+    if base_podada:
+        n = len(base_podada)
+        print('audit_unconsumed_sources: %d %s de la linea base ya NO %s huerfana%s. '
+              'La linea base se poda sola; dejarla sin podar la convierte en un escudo '
+              'que ya no protege de nada:'
+              % (n,
+                 'entrada' if n == 1 else 'entradas',
+                 'es' if n == 1 else 'son',
+                 '' if n == 1 else 's'),
+              file=sys.stderr)
+        for r in base_podada:
+            print('  %s' % r, file=sys.stderr)
+        print('  Arreglo: python tools/audit_unconsumed_sources.py --write-baseline',
+              file=sys.stderr)
+        print('', file=sys.stderr)
+
+    if not check_only and base_conocida:
+        print('\n  TRINQUETE: %d huerfanas en la linea base, %d nuevas por encima de ella.'
+              % (len(base_conocida), len(nuevos_reales)))
+    elif not check_only:
+        print('\n  TRINQUETE: NO ACTIVO (no se ha pasado --baseline). %d huerfanas sin '
+              'consumidor, %d en lista blanca, %d nuevas.'
+              % (len(orphans), len(known), len(new)))
+
+    return 1 if (nuevos_reales or base_podada or listed or tests_rotos) else 0
+
+
+
+def _parsear (argv):
+    """
+    Separador de argumentos mas pequeno que argparse, porque el resto de
+    herramientas de este repo no dependen de nada y este tampoco va a empezar.
+    Devuelve (diccionario opcion->[valor, ...], argumentos sueltos).
+    """
+    acc = collections.OrderedDict()
+    sueltos = []
+    i = 0
+
+    while i < len(argv):
+        a = argv[i]
+
+        if a.startswith('--') and '=' not in a and i + 1 < len(argv) and not argv[i + 1].startswith('--'):
+            acc.setdefault(a, []).append(argv[i + 1])
+            i += 2
+            continue
+
+        acc.setdefault(a, []).append(True)
+        i += 1
+
+    for a in acc:
+        if a not in ('--check', '--write-baseline', '--help', '-h'):
+            sueltos.append(a)
+
+    return acc, sueltos
+
+
+
 
 
 if __name__ == '__main__':

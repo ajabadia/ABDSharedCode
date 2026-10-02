@@ -1,0 +1,257 @@
+name: Shared code CI
+
+# El PRIMER workflow de este repo, y con una limitacion que conviene saber antes
+# de fiarse de el: ABDSharedCode no tiene codigo propio que ejecutar. Es codigo
+# que vive aqui y se consume desde fuera (ABDEep, ABDMS2000, ABDNeural,
+# ABDCZ101), y lo unico que se puede comprobar aqui sin esos repos es si el
+# codigo esta sano por si mismo: que sus pruebas corran, que sus herramientas
+# salgan en verde y que el package que publica resuelva sus dependencias.
+#
+# LO QUE ES PUERTA. Los tres trabajos bloquean, y los tres salen en verde.
+#
+# El audit merece una explicacion, porque sin ella su veredicto se lee mal. Compara
+# este repo contra una foto de la suite fijada por SHA, y en esa foto hay 55 fuentes
+# sin consumidor que aqui no lo estan: el trabajo que las consume esta escrito pero
+# SIN COMMITEAR en los repos hermanos. En vez de dejar el job en warning, esa foto
+# esta escrita en `tools/audit-baseline.json` y el script la usa de TRINQUETE: una
+# fuente que ya esta en la linea base no es un fallo nuevo, una que no esta sale 1,
+# y una entrada de la linea base que ya NO hace falta sale 1 tambien, porque si no
+# la linea base seria un escudo que solo crece y nadie podaria nunca.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'tools/**'
+      - 'tests/**'
+      - 'MidiKeyboard/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'CMakeLists.txt'
+      - '.github/actions/**'
+      - '.github/workflows/shared-code-ci.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tools:
+    name: Tools (node:test, sin dependencias)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ABDSharedCode
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # El mismo que usa la accion `pnpm-workspace-bootstrap` en el resto de
+          # la suite, para que una prueba no pase en local con Node 24 y falle
+          # aqui, o al reves.
+          node-version: '20'
+
+      # SIN DEPENDENCIAS, a proposito. Este repo no tiene `package.json` de
+      # tooling, ni vitest, ni runner; el guard de `.gitattributes` esta hecho
+      # con `node:test` y `assert`, que vienen en el runtime. Meter un runner
+      # para veinte pruebas seria meter una cadena de dependencias en un repo que
+      # no la tiene, y el guard que vigila los binarios terminaria dependiendo de
+      # un `pnpm install` que nadie recuerda hacer.
+      #
+      # EL FICHERO SE NOMBRA UNO A UNO, Y NO ES COSA ESTETICA. `node --test
+      # tools/` solo funciona en Node <=20: hasta la 20, `node --test` recibia un
+      # DIRECTORIO y lo buscaba recursivamente; desde la 21 recibe PATRONES GLOB, y
+      # el glob `tools` casa con el propio directorio, que Node carga como modulo
+      # y responde MODULE_NOT_FOUND. El glob explicito tampoco vale como arreglo,
+      # porque en la 20 el argumento se toma literal y no encuentra nada.
+      #
+      # Este job usa Node 20 y la maquina de desarrollo ya va por la 24, asi que
+      # cualquier forma con directorio o glob pasa en un lado y falla en el otro.
+      # Un nombre de fichero explicito es la unica que no depende de la version.
+      #
+      # El precio de eso es que los ficheros hay que nombrarlos, y por eso el
+      # ultimo bloque de la propia suite comprueba que no haya mas `*.test.mjs` en
+      # `tools/` que los que nombra la cabecera del test. Ese guard corre aqui, en
+      # local y en cualquier clon; por eso este job no necesita un paso extra que
+      # compruebe la orden, y por eso antes no habia uno que la comprobara bien.
+      - name: Guard de .gitattributes
+        run: node --test tools/guard_atributos.test.mjs
+
+  midikeyboard:
+    name: MidiKeyboard (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      # La accion vive en ESTE repo, asi que el repo que llama no es el de la
+      # accion: `ajabadia/ABDSharedCode/...`. Sustituye a los tres checkouts, al
+      # manifiesto del workspace y al install. NO pongas un `actions/checkout`
+      # antes: el layout de hermanos solo queda consistente si los tres los hace
+      # ella, y el `path:` del repo llamante es siempre el mismo.
+      - name: Bootstrap del workspace pnpm
+        uses: ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master
+        with:
+          project: ABDSharedCode
+          skip-puppeteer-download: 'true'
+
+      # `pnpm test` es el script del paquete. Los 340 tests incluyen
+      # `host-strip-height.test.js`, que es el contrato de franja de los cuatro
+      # synths que montan el teclado: aqui se ejecutan 331 y 9 se OMITEN con un
+      # motivo impreso, porque este checkout no trae ABDMS2000 ni ABDEep ni los
+      # demas. Que se omitan no es un fallo, pero si desapareciera el motivo
+      # impreso seria un verde que parece una comprobacion.
+      - name: Tests de MidiKeyboard
+        run: pnpm test 2>&1 | tee "$RUNNER_TEMP/midikeyboard.log"
+
+      # La salida del paso anterior, no una segunda pasada: la suite son 340
+      # pruebas con jsdom y tardarse dos veces en lo mismo no compra nada.
+      - name: El motivo del OMITIDO se imprime (un salto callado seria un verde falso)
+        run: |
+          if ! grep -q "OMITIDO: este fichero no se puede ejecutar aqui" "$RUNNER_TEMP/midikeyboard.log"; then
+            echo "::error::el fichero omitido no dice POR QUE. Un skip sin motivo se lee como una comprobacion que paso."
+            exit 1
+          fi
+          echo "el motivo del OMITIDO aparece en la salida: el salto no es silencioso"
+
+  audit:
+    name: Audit de fuentes (trinquete)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ABDSharedCode
+        uses: actions/checkout@v4
+        with:
+          path: ABDSharedCode
+
+      # Los hermanos, por SHA INMUTABLE, que es lo que espera el auditor: calcula
+      # la suite como el directorio PADRE de este repo y luego pregunta a cada
+      # proyecto que CMakeLists tiene. Una rama se moveria sola y el veredicto
+      # pasaria de hoy a manana sin que nadie tocase nada; fijado, el fallo es
+      # siempre el mismo y siempre aqui.
+      #
+      # El SHA de ABDSharedCode sale del propio checkout (el de este commit), y
+      # los otros cinco hay que subirlos aqui cuando se muevan. Es el mismo
+      # trabajo manual que hace `siblings.json` en ABDSharedAssets.
+      - name: Checkout ABDEep (SHA inmutable)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDEep
+          ref: 943652c2086288452effbfc66c07586be93a98c8
+          path: ABDEep
+
+      - name: Checkout ABDMS2000 (SHA inmutable)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDMS2000
+          ref: 351f98a52a50d2a884aa9570d8df84a6eb067194
+          path: ABDMS2000
+
+      - name: Checkout ABDNeural (SHA inmutable)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDNeural
+          ref: f907d4dde18a685bf425429551d9f8761552b3a5
+          path: ABDNeural
+
+      - name: Checkout ABDCZ101 (SHA inmutable)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDCZ101
+          ref: 70689419a1b6bfc22485336fd763fb096b81404d
+          path: ABDCZ101
+
+      - name: Checkout ABDSharedAssets (SHA inmutable)
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: 065ca6c6aef82e8d41cf6a94d650ab28f5c27e4c
+          path: ABDSharedAssets
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # POR QUE HAY UNA LINEA BASE, Y POR QUE ESTO ES PUERTA AUN ASI.
+      #
+      # El auditor mide que fuentes de este repo consume ALGUN producto de la
+      # suite. Con la foto de los SHA de arriba salen 55 fuentes sin consumidor.
+      # Medido, no supuesto: en el arbol de trabajo local salen 0, y la diferencia
+      # son ficheros de ABDEep, ABDMS2000 y ABDNeural que consumen esas fuentes y
+      # estan SIN COMMITEAR (`git status` da 50, 96 y 45 entradas
+      # respectivamente). Ejemplo concreto: `DspEffects/CascadeShelfEq.h` solo lo
+      # incluyen `ABDMS2000/Source/DSP/Effects/Equalizer.{h,cpp}` y
+      # `DSPCoreTests_EqualizerParity.cpp`, los tres modificados o sin versionar, y
+      # en ningun HEAD commiteado de ningun repo.
+      #
+      # La linea base convierte ese "estado de la suite" en deuda inventariada:
+      # `tools/audit-baseline.json` son esas 55, con nombre. El trinquete muerde en
+      # las dos direcciones, y por eso puede ser puerta sin mentir:
+      #   - fuente huerfana que NO esta en la linea base  -> 1 (esto es de este repo)
+      #   - entrada de la linea base que ya no hace falta -> 1 (hay que podarla)
+      # Con eso, subir los SHA de arriba cuando el trabajo se commitee hace CAER el
+      # numero de entradas de la linea base, y el paso de quitar las que sobren es
+      # lo unico que queda por hacer. Sin la segunda regla, la linea base seria un
+      # escudo permanente: a los 55 se les podrian sumar todos los que salieran.
+      #
+      # `--baseline` es un flag y no un defecto a proposito. En local los repos
+      # hermanos tienen ese trabajo sin commitear en el disco, asi que la linea base
+      # describiria una foto que aqui no es la realidad, y el script saldria en rojo
+      # pidiendo podar 55 entradas que en local SI hacen falta. En local, sin el
+      # flag, este script aplica el modo estricto: sale 1 ante cualquier huerfana que
+      # no este en ALLOWLIST. En CI, este workflow pasa el flag y aplica el trinquete.
+      # El trinquete solo puede morder si hay algo contra lo que morder. Si
+      # alguien borra el fichero, o lo deja vacio, el script no dice nada raro:
+      # sencillamente no tiene linea base y las 55 huerfanas conocidas aparecen
+      # como hallazgos nuevos. El veredicto seria el correcto, pero el motivo del
+      # rojo seria el equivocado, asi que se comprueba aqui, antes, y se dice.
+      - name: La linea base esta commiteada y no esta vacia
+        working-directory: ABDSharedCode
+        run: |
+          if [ ! -f tools/audit-baseline.json ]; then
+            echo "::error::tools/audit-baseline.json no esta en el checkout. Sin ella el trinquete no tiene contra que compararse."
+            exit 1
+          fi
+          python -c "import json,sys; d=json.load(open('tools/audit-baseline.json',encoding='utf-8')); n=len(d['fuentes']); print('entradas en la linea base:', n); sys.exit(0 if n else 1)" || {
+            echo "::error::la linea base no parsea, o no tiene la clave fuentes, o esta vacia. Regenerala con --write-baseline."
+            exit 1
+          }
+
+      - name: Audit de fuentes sin consumidor (trinquete)
+        id: audit
+        working-directory: ABDSharedCode
+        run: |
+          # `set +e` para que un codigo de salida 1 no corte el paso antes de
+          # poder leerlo. El paso de al lado es el que decide; este solo mide y
+          # anota. Asi el codigo no se pierde nunca y no hace falta un
+          # continue-on-error, que es justo lo que hacia que este job fuese verde
+          # sin mirar.
+          set +e
+          python tools/audit_unconsumed_sources.py --check --baseline tools/audit-baseline.json
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: El veredicto (esta puerta no se puede dejar en warning)
+        working-directory: ABDSharedCode
+        env:
+          CODIGO: ${{ steps.audit.outputs.exit }}
+        run: |
+          case "$CODIGO" in
+            0)
+              echo "::notice::Audit en verde: ninguna fuente huerfana por encima de la linea base."
+              ;;
+            1)
+              echo "::error::El trinquete muerde: hay una fuente sin consumidor que no esta en la linea base, o una entrada de la linea base que ya no hace falta. El informe completo va debajo."
+              python tools/audit_unconsumed_sources.py --baseline tools/audit-baseline.json || true
+              exit 1
+              ;;
+            2)
+              echo "::error::El audit no se pudo ejecutar (codigo 2, error de invocacion o excepcion). No es un hallazgo: es que la comprobacion no llego a hacerse."
+              exit 1
+              ;;
+            3)
+              echo "::error::El audit no ha podido comprobar (codigo 3): no hay hermanos clonados al lado. Eso es un fallo de ESTE workflow, no un hallazgo. Suele ser un checkout que no se completo."
+              exit 1
+              ;;
+            *)
+              echo "::error::El audit devolvio un codigo inesperado: '$CODIGO'."
+              exit 1
+              ;;
+          esac
