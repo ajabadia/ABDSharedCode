@@ -1639,6 +1639,61 @@ describe('el checkout del llamante antes de la accion', () => {
     }
   });
 
+  it('la accion solo en un COMENTARIO: 0, porque usarla es que aparezca en un `uses:`', {
+    skip: SIN_PY,
+  }, () => {
+    // Caso real, no inventado: ABDNeural, ABDMS2000 y este repo nombran
+    // `pnpm-workspace-bootstrap` en comentarios que explican de donde viene el
+    // layout, y no la llaman. Con la comprobacion ingenua (`if ACCION not in
+    // texto`) esos ficheros entran al parser y salen como "menciona la accion
+    // pero no hay ningun uses: que la traiga": un 2, y para el job entero.
+    // Se vio al medirlo: el primer run con este guard dio 2 en el workflow de
+    // ABDNeural por esto, y no por lo que el guard pretendia vigilar.
+    const d = conWorkflow(`on: push
+jobs:
+  propio:
+    runs-on: windows-latest
+    steps:
+      # El layout viene de pnpm-workspace-bootstrap, pero aqui los checkouts
+      # se hacen a mano porque este repo ES uno de los hermanos.
+      - uses: actions/checkout@v4
+        with:
+          path: ABDNeural
+`);
+    try {
+      const r = corre(['--check', '--workflow', join(d, 'wf.yml')]);
+      assert.equal(r.status, 0,
+        'un comentario no es una llamada. Sale:\n' + (r.stdout || '') + (r.stderr || ''));
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('un paso escrito `- uses:` sin `name:` tambien cuenta, que es la mitad', {
+    skip: SIN_PY,
+  }, () => {
+    // La forma mas corta de escribir un paso. Un lector que solo mira lineas
+    // `clave: valor` no ve estas, porque llevan un `- ` delante, y se queda sin
+    // la mitad de los pasos sin decir nada.
+    const d = conWorkflow(`on: push
+jobs:
+  sin-nombre:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master
+        with:
+          project: ABDEep
+`);
+    try {
+      const r = corre(['--check', '--workflow', join(d, 'wf.yml')]);
+      assert.equal(r.status, 1,
+        'un paso sin name: tambien es un checkout antes. Sale:\n'
+        + (r.stdout || '') + (r.stderr || ''));
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
   it('un workflow que no llama a la accion no da ningun hallazgo, aunque clone', {
     skip: SIN_PY,
   }, () => {
