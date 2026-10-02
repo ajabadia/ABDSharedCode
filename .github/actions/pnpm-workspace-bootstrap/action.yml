@@ -49,9 +49,13 @@ inputs:
     required: false
     default: '20'
   pnpm-version:
-    description: Version de pnpm.
+    description: >-
+      Version de pnpm. Medido: la maquina de desarrollo usa la 12.8.1 y este
+      input era 10, asi que una prueba podia pasar en local y fallar en CI (o al
+      reves) sin que nadie tocase nada. Los dos repos que fijan `packageManager`
+      (la raiz de la suite y ABDSharedCode) ya declaran 12.8.1.
     required: false
-    default: '10'
+    default: '12.8.1'
   shared-code-ref:
     description: >-
       Ref (rama/tag/SHA) de ABDSharedCode. Vacio = la rama por defecto del repo.

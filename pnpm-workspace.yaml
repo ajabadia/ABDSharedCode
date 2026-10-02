@@ -44,6 +44,21 @@
 # ABDSharedAssets, un repo distinto. Este manifiesto hace que el error sea el de
 # verdad ("no package named @abdsynths/shared is present in the workspace") y
 # `tools/bootstrap-workspace.mjs` pone el hermano donde falta.
+# pnpm 12 AVISA DE ESTE FICHERO, Y ES CORRECTO. Medido al ejecutar el paso de la
+# accion con pnpm 12.8.1:
+#
+#   [WARN] The settings in ABDSharedCode/pnpm-workspace.yaml do not apply, because
+#   ABDSharedCode is a project of this workspace. pnpm reads settings only from
+#   the pnpm-workspace.yaml at the workspace root.
+#
+# En la ACCION no importa, porque el manifiesto que cuenta es el de la raiz del
+# workspace, y ese lo genera `tools/bootstrap-workspace.mjs` con `allowBuilds`
+# dentro. Este fichero es el de LOCAL, donde si es el manifiesto del workspace y
+# si aplica.
+#
+# La accion sobrescribe el manifiesto de la raiz del workspace; este no se
+# toca. Es el unico sitio donde hay dos manifiestos, y por eso la accion no
+# llama a este fichero sino al script que genera el suyo.
 packages:
   - MidiKeyboard
   - ../ABDSharedAssets

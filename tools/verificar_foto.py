@@ -50,9 +50,14 @@ Salidas:
   2  mal escrito, o el workflow no se puede leer. No es un hallazgo: es que la
      comprobacion no llego a hacerse, y un 1 aqui seria mentir.
 
+  --listar           imprime `repo sha` de la foto del workflow, una linea por
+                    repo, y sale 0. Es lo que consume el paso del workflow que
+                    comprueba que esos SHA sigan existiendo en el remoto.
+
 Uso:
   python tools/verificar_foto.py
   python tools/verificar_foto.py --check
+  python tools/verificar_foto.py --listar
   python tools/verificar_foto.py --baseline tools/audit-baseline.json
   python tools/verificar_foto.py --workflow .github/workflows/shared-code-ci.yml
 """
@@ -114,7 +119,7 @@ def _parsear (argv):
         i += 1
 
     for a in acc:
-        if a not in ('--check', '--baseline', '--workflow', '--help', '-h'):
+        if a not in ('--check', '--listar', '--baseline', '--workflow', '--help', '-h'):
             sueltos.append(a)
 
     return acc, sueltos
@@ -241,7 +246,7 @@ def main ():
 
     if desconocidos:
         print('verificar_foto: argumento desconocido: %s' % desconocidos[0], file=sys.stderr)
-        print('  --check | --baseline <fichero> | --workflow <fichero> | --help',
+        print('  --check | --listar | --baseline <fichero> | --workflow <fichero> | --help',
               file=sys.stderr)
         return 2
 
@@ -273,6 +278,17 @@ def main ():
         print('  %s' % error_wf, file=sys.stderr)
         print('  Esto NO es un hallazgo: es que la comprobacion no llego a hacerse.', file=sys.stderr)
         return 2
+
+    # `--listar` imprime en stdout y sale 0 sin comparar nada. Lo consume el paso
+    # del workflow que avisa si un SHA dejo de existir en el remoto, que es una
+    # comprobacion distinta de esta: aqui la foto es "la que el workflow clona",
+    # alli es "ese commit sigue existiendo". Que el listado salga de ESTE
+    # script y no de un parser propio en el `run:` es lo que evita que las dos
+    # vistas de "los SHA del workflow" se separen en silencio.
+    if '--listar' in args:
+        for repo in sorted(shas):
+            print('%s %s' % (repo, shas[repo]))
+        return 0
 
     foto, error_base = foto_de_la_linea_base(ruta_base)
     if error_base:

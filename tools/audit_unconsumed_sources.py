@@ -80,6 +80,17 @@ huerfanas de verdad, que es el modo estricto. En CI, el workflow pasa
 --baseline explicitamente y las dos reglas (nueva por encima, y entrada que hay
 que podar) estan activas.
 
+UN CLON DE ESTE REPO AL LADO NO ES UN PRODUCTO DE LA SUITE. El auditor mide que
+fuentes consume cada proyecto HERMANO, y un segundo clon de ABDSharedCode se
+parecia a uno: no se llama ABDSharedCode, asi que el filtro por nombre lo dejaba
+pasar y el veredicto se invertia con un motivo FALSO (la linea base decia "17
+entradas ya no son huerfanas" cuando lo unico que habia pasado es que habia una
+carpeta de mas). Se reconoce porque trae ESTE MISMO SCRIPT, que ningun producto
+de la suite tiene, y se ignora con su motivo impreso. Se probo con el remoto de
+git como criterio y no vale: un clon de un clon (que es lo que se hace al montar
+un sandbox) tiene el remoto apuntando al clon intermedio, no a origin. Medido:
+con 0, 1 y 3 clones de mas al lado, el veredicto es identico.
+
 QUE CUENTA COMO HUERFANA. Una fuente es huerfana si ningun producto la enlaza Y
 el modulo tampoco la compila en sus propios tests. Las dos mitades hacen falta:
 sin la primera, el modulo se llenaria de trabajo a medias que nadie integra;
@@ -104,6 +115,12 @@ import collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.abspath(os.path.join(HERE, '..'))
+
+# El nombre de este mismo fichero, para reconocer a otro clon de este repo al
+# lado (ver `hermanos` en main). Se calcula en vez de escribirlo a mano porque
+# un nombre escrito a mano se queda viejo el dia que el script se renombre, y
+# entonces el marcador dejaria de funcionar en silencio.
+ESTE_SCRIPT = os.path.basename(__file__)
 SUITE = os.path.abspath(os.path.join(SHARED, '..'))
 
 EXTS = ('.h', '.hpp', '.hh', '.cpp', '.c', '.cxx', '.ixx', '.mm')
@@ -228,6 +245,32 @@ def read(path):
 def read_own_cmake():
     """El CMakeLists del propio modulo compartido."""
     return read(os.path.join(SHARED, 'CMakeLists.txt'))
+
+
+def remoto_de (directorio):
+    """
+    La URL del remoto `origin` de un repo, o None si no se puede saber (no es un
+    repo, no hay remoto, o no hay git en la maquina).
+
+    None y "" se distinguen a proposito: None es "no se pudo mirar", que obliga a
+    seguir con el criterio antiguo por nombre; "" es "es un repo sin remoto", que
+    es informacion de sobra. La funcion que la usa solo compara contra el remoto
+    propio, y ahi None y "" se comportan igual de forma segura: no hay nada que
+    comparar y se cuenta como lo que sea por su nombre.
+
+    Se mira `git remote get-url origin` en vez de leer `.git/config` a mano: es la
+    misma respuesta que daria un humano, y no tiene los casos raros del
+    `.git/config` (includes, url en vez de url, repos sin .git).
+    """
+    try:
+        r = subprocess.run(['git', '-C', directorio, 'remote', 'get-url', 'origin'],
+                           capture_output=True, text=True)
+    except (OSError, ValueError):
+        return None
+
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip()
 
 
 def project_of(path):
@@ -374,9 +417,57 @@ def main ():
     # Por eso el codigo es 3 y no 1: un job que recibe 3 sabe que el paso no
     # comprobo nada, y un job que recibe 1 sabe que hay algo que arreglar. Con un
     # solo codigo, un checkout a medias se lee como un hallazgo.
-    hermanos = [d for d in sorted(os.listdir(SUITE))
-                if d not in SKIP and d != os.path.basename(SHARED)
-                and os.path.isdir(os.path.join(SUITE, d, '.git'))]
+    #
+    # QUE ES UN HERMANO, Y POR QUE NO BASTA EL NOMBRE. La condicion de abajo es
+    # "hay un .git y el nombre no es el mio", y hay un caso que se le escapa: un
+    # SEGUNDO CLON de este mismo repo al lado. No se llama `ABDSharedCode`, asi
+    # que no se parece a si mismo, y el auditor lo toma por un producto de la
+    # suite que compila las fuentes de ABDSharedCode. Medido: con un clon
+    # llamado `ci-solo` al lado, todo archivo del modulo aparece "consumido por
+    # {ABDSharedCode, ci-solo}" y el veredicto se invierte: lo que el propio
+    # modulo se compila en sus tests pasa aorphan, y el rojo dice que hay que
+    # arreglar el codigo cuando lo unico que hay que arreglar es la carpeta de
+    # al lado.
+    #
+    # Se distingue por un MARCADOR, no por el remoto de git. El remoto parece
+    # la solucion y no lo es: un clon de un clon (que es justo lo que se hace al
+    # montar un sandbox) tiene el remoto apuntando al clon intermedio, no a
+    # origin, asi que los dos remotos no coinciden y el clon se cuela. Medido.
+    #
+    # El marcador es que el directorio contenga ESTE SCRIPT. Un clon de
+    # ABDSharedCode lo trae (es el propio repo clonado); ningun producto de la
+    # suite lo tiene, comprobado sobre los nueve. Es una pregunta que no depende
+    # de git, de la red ni de como se llamo la carpeta, que es justo lo que
+    # cambia cuando uno clona para trabajar en otra parte.
+    #
+    # Si los dos criterios dieran distinto, el remoto gana: el marcador es
+    # heuristico y el remoto es un hecho. Pero como el remoto no cubre el caso
+    # que importa, el que decide es el marcador.
+    mi_remoto = remoto_de(SHARED)
+
+    hermanos = []
+    for d in sorted(os.listdir(SUITE)):
+        if d in SKIP or not os.path.isdir(os.path.join(SUITE, d, '.git')):
+            continue
+        if d == os.path.basename(SHARED):
+            continue
+
+        dir_proy = os.path.join(SUITE, d)
+        clon_de_este = os.path.isfile(os.path.join(dir_proy, 'tools', ESTE_SCRIPT))
+
+        if not clon_de_este and mi_remoto:
+            r = remoto_de(dir_proy)
+            clon_de_este = bool(r) and r == mi_remoto
+
+        if clon_de_este:
+            print('audit_unconsumed_sources: IGNORADO %s: es otro clon de ESTE repo, '
+                  'no un producto de la suite.' % d, file=sys.stderr)
+            print('  Un clon de mas al lado hace que este script mida lo que compila ese '
+                  'clon, y no lo que compila la suite. Lo que se ha medido de mas, y lo '
+                  'que se ha medido de menos.', file=sys.stderr)
+            continue
+
+        hermanos.append(d)
 
     if not hermanos:
         print('audit_unconsumed_sources: NO SE HA PODIDO COMPROBAR.', file=sys.stderr)
@@ -397,10 +488,28 @@ def main ():
 
     # --- 1. que .cpp del modulo compila cada proyecto ------------------------
     compiled_by = collections.defaultdict(set)   # ruta -> {proyecto}
-    for proj in sorted(os.listdir(SUITE)):
+    # Se recorre `hermanos` y NO el directorio. Los cuatro bucles que miden la
+    # suite (este, el de los targets, el de los includes y el del principio) lo
+    # hacian cada uno por su cuenta con `sorted(os.listdir(SUITE))` y su propio
+    # filtro, y por eso el filtro de "esto es un hermano de verdad" solo se
+    # aplicaba a uno de los cuatro: un clon de mas al lado se ignoraba al contar
+    # los repos, pero se colaba en los otros tres. Medido: con el clon al lado,
+    # ignorarlo aqui no basta, seguian salir 46 huerfanas falsas.
+    #
+    # Que sea una lista ya filtrada y en un solo sitio es lo que hace que el
+    # filtro se pueda auditar. Cuatro copias del mismo criterio son cuatro
+    # sitio donde se puede equivocar, y ya se equivoco una.
+    #
+    # `hermanos` + el modulo, y no solo `hermanos`: antes este bucle recorria el
+    # directorio entero, y de ahi que las fuentes del PROPIO modulo se contaran
+    # como compiladas por el proyecto `ABDSharedCode`. De ahi sale `self_built`
+    # (abajo), que es lo que exime a los tests standalone del modulo de salir
+    # como huerfanas. Quitar el modulo de la lista sin querer hace que `who`
+    # nunca valga {'ABDSharedCode'}, `self_built` queda vacio y todos esos tests
+    # salen como huerfanas nuevas. Medido: 80 en vez de 0, sin ningun clon al
+    # lado. El modulo se anade aqui a proposito y no por descuido.
+    for proj in [os.path.basename(SHARED)] + hermanos:
         dir_proy = os.path.join(SUITE, proj)
-        if not os.path.isdir(dir_proy) or proj in SKIP:
-            continue
         for dp, dn, fn in os.walk(dir_proy):
             dn[:] = [d for d in dn if d not in SKIP and not d.startswith('.')]
             manifests = [f for f in fn if f == 'CMakeLists.txt' or f.endswith('.cmake')]
@@ -424,7 +533,12 @@ def main ():
                             break
 
     # modulo compilandose a si mismo (tests y probes propios)
-    self_built = {p for p, who in compiled_by.items() if who == {'ABDSharedCode'}}
+    self_built = {p for p, who in compiled_by.items()
+                if who == {os.path.basename(SHARED)}}
+    # El nombre del modulo va por la VARIABLE y no escrito a mano en el
+    # conjunto de arriba: `os.path.basename(SHARED)` es el mismo criterio que
+    # usa el filtro de hermanos, y si un dia el modulo viviera en una carpeta con
+    # otro nombre, estas dos piezas no se podrian desincronizar.
 
     # Un target del modulo que un proyecto ENLAZA (ABDShared::SynthCore,
     # ABDShared::HardwareMidiDetect...) consume sus .cpp aunque el consumidor no
@@ -458,10 +572,8 @@ def main ():
                     target_cpp[name].add(cand)
                     break
 
-    for proj in sorted(os.listdir(SUITE)):
+    for proj in hermanos:
         dir_proy = os.path.join(SUITE, proj)
-        if not os.path.isdir(dir_proy) or proj in SKIP or proj == 'ABDSharedCode':
-            continue
         for dp, dn, fn in os.walk(dir_proy):
             dn[:] = [d for d in dn if d not in SKIP and not d.startswith('.')]
             for mf in [f for f in fn if f == 'CMakeLists.txt' or f.endswith('.cmake')]:
@@ -475,10 +587,16 @@ def main ():
     # `src` en el path, asi que `#include "dsp/JunoBBD.h"` desde `src/tests/`
     # significa `src/dsp/JunoBBD.h`. Sin estas bases, medio suite parece huerfano.
     includes = {}          # fichero -> {ruta absoluta a la que resuelve}
-    for proj in sorted(os.listdir(SUITE)):
+    # Incluye el modulo. Antes este bucle recorria el directorio entero y por eso
+    # resolvia los includes de las cabeceras propias del modulo; si se queda solo
+    # con los hermanos, esas cabeceras dejan de resolver sus propias rutas
+    # relativas y aparecen como huerfanas nuevas. Medido: 25 huerfanas falsas
+    # (DspCore/DspMath.h, DspEffects/DspChorus.h, ...) que la version de HEAD no
+    # veia. El bucle de targets (arriba) si excluye el modulo a proposito, y los
+    # dos criterios son distintos: este resuelve includes, el otro busca quien
+    # ENLAZA un target.
+    for proj in [os.path.basename(SHARED)] + hermanos:
         dir_proy = os.path.join(SUITE, proj)
-        if not os.path.isdir(dir_proy) or proj in SKIP:
-            continue
         proj_bases = [dir_proy, norm(os.path.join(dir_proy, 'src')),
                       norm(os.path.join(dir_proy, 'Source')),
                       norm(os.path.join(dir_proy, 'wasm')), SHARED, SUITE]

@@ -163,6 +163,33 @@ jobs:
       - name: La foto de la linea base es la que el workflow va a medir
         run: python tools/verificar_foto.py --check
 
+      # UN SHA QUE YA NO EXISTE, DICHO COMO TAL. `actions/checkout` falla si el
+      # SHA no esta en el remoto (un force-push que lo borre, o un repo
+      # renombrado) y su mensaje habla de refs, no de la linea base: quien lo lee
+      # ve un fallo de checkout en un job que se llama `foto` y no entiende que
+      # lo que se movio fue el suelo del audit.
+      #
+      # El listado sale de `--listar` de este mismo guard, no de un parser
+      # escrito en el `run:`. Dos vistas de "los SHA del workflow" escritas en
+      # dos sitios se separan en silencio, y la que se separa es la que nadie
+      # ejecuta.
+      #
+      # Va con `continue-on-error` a proposito, y es el UNICO paso del repo que
+      # lo lleva: si el remoto no responde, lo que no se ha podido comprobar es
+      # la EXISTENCIA del SHA, y de eso el checkout diria mucho mejor que uno
+      # inventado aqui. Ademas es un aviso, no una puerta: un SHA borrado NO es
+      # un problema de este repo, y el `audit` se encarga de caerse por su cuenta.
+      - name: Los SHA que clona el job de audit existen todavia
+        continue-on-error: true
+        run: |
+          python tools/verificar_foto.py --listar | while read -r repo sha; do
+            if git ls-remote "https://github.com/ajabadia/$repo" | grep -q "^$sha"; then
+              echo "$repo $sha sigue en el remoto"
+            else
+              echo "::warning::El SHA $sha de ajabadia/$repo no aparece en el remoto. O lo han borrado con un force-push, o el repo se ha movido. Si es un force-push, el job de audit no podra clonar ese repo y caera con un mensaje de checkout que no nombra la linea base."
+            fi
+          done
+
   audit:
     name: Audit de fuentes (trinquete)
     runs-on: ubuntu-latest

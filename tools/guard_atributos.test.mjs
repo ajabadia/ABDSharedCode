@@ -50,7 +50,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
+  copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
+  rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -558,6 +559,88 @@ describe('la foto de la linea base, que es lo que impide que el trinquete mienta
       assert.equal(r.code, 1);
       assert.match(r.out, /ABDCZ101/);
     });
+
+  it('un clon de mas al lado se ignora, y un producto de verdad no', {
+    skip: PY === null && 'no hay python',
+  }, () => {
+    // El bug que esto vigila: un SEGUNDO clon de ABDSharedCode al lado se tomaba
+    // por un producto de la suite, porque no se llama ABDSharedCode y el filtro
+    // era por nombre. El veredicto se invertia con un motivo FALSO: la linea
+    // base decia "17 entradas ya no son huerfanas" cuando lo unico que habia
+    // pasado era que habia una carpeta de mas.
+    //
+    // Se monta una suite minima en un temporal y se mira lo que el script DICE
+    // haber medido, que es la lista de `hermanos`. Un test que solo comprueba
+    // que el script arranca no vigila nada: pasaria igual con el bug puesto.
+    const d = mkdtempSync(join(tmpdir(), 'clon-'));
+    try {
+      const raiz = join(d, 'suite');
+      const modulos = join(raiz, 'ABDSharedCode');
+      mkdirSync(join(modulos, 'tools'), { recursive: true });
+      // El modulo necesita ESTE SCRIPT, que es su propia firma.
+      copyFileSync(join(RAIZ, 'tools', 'audit_unconsumed_sources.py'),
+        join(modulos, 'tools', 'audit_unconsumed_sources.py'));
+
+      // Un clon de mas: trae el script, asi que es "otro ABDSharedCode".
+      const clon = join(raiz, 'ci-solo');
+      mkdirSync(join(clon, 'tools'), { recursive: true });
+      copyFileSync(join(RAIZ, 'tools', 'audit_unconsumed_sources.py'),
+        join(clon, 'tools', 'audit_unconsumed_sources.py'));
+
+      // Un producto de verdad: NO trae el script.
+      const producto = join(raiz, 'ABDNeural');
+      mkdirSync(join(producto, 'Source'), { recursive: true });
+      writeFileSync(join(producto, 'Source', 'algo.cpp'), '// nada\n', 'utf8');
+
+      for (const q of [modulos, clon, producto]) {
+        spawnSync('git', ['init', '-q', q], { encoding: 'utf8' });
+      }
+
+      const r = spawnSync(PY, [join(modulos, 'tools', 'audit_unconsumed_sources.py')],
+        { cwd: raiz, encoding: 'utf8' });
+      const salida = (r.stdout || '') + (r.stderr || '');
+
+      assert.match(salida, /Hermanos medidos: ABDNeural(,|$)/m,
+        `un producto de la suite tiene que medirse. Sale:
+${salida}`);
+      assert.doesNotMatch(salida, /Hermanos medidos:[^\n]*ci-solo/,
+        `un clon de este repo NO es un producto de la suite y no puede medirse. Sale:
+${salida}`);
+      assert.match(salida, /IGNORADO ci-solo/,
+        `y no en silencio: tiene que decir que lo ha ignorado y por que. Sale:
+${salida}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it('--listar imprime los SHA del workflow y sale 0, sin comparar nada', {
+    skip: PY === null && 'no hay python',
+  }, () => {
+    // Lo consume el paso del workflow que avisa si un SHA dejo de existir. Si
+    // `--listar` tambien comprobara algo, ese paso heredaria el 1 de una
+    // diferencia de foto que no es lo que quiere mirar.
+    const d = mkdtempSync(join(tmpdir(), 'listar-'));
+    try {
+      const wf = join(d, 'wf.yml');
+      writeFileSync(wf, WORKFLOW_SANO, 'utf8');
+      const r = spawnSync(PY,
+        [GUION, '--listar', '--workflow', wf], { encoding: 'utf8' });
+      assert.equal(r.status, 0);
+      // Se parte por Linea y se filtra la vacia: en Windows stdout llega con
+      // CRLF, y comparar el texto entero contra un array hace fallar el test
+      // solo en esta plataforma, que es la forma de que un test sea verdad a
+      // medias.
+      const lineas = r.stdout
+        .split(String.fromCharCode(10))
+        .map((l) => l.replace(String.fromCharCode(13), ''))
+        .filter((l) => l.trim());
+      assert.deepEqual(lineas.sort(), ['ABDEep aaaaaa111111', 'ABDNeural bbbbbb222222'],
+        `el listado tiene que ser exactamente repo sha, con el nombre recortado: ${r.stdout}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
 
   it('un workflow ilegible: 2, no 1, porque no es un hallazgo', { skip: PY === null && 'no hay python' }, () => {
     const r = spawnSync(PY, [GUION, '--check', '--workflow', join(tmpdir(), 'no-existe-esta.yml')],

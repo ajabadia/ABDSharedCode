@@ -189,6 +189,45 @@ function manifiesto (workspace, suite, paquetes, proyecto, permitirPuppeteer) {
  *
  * @returns {string[]} problemas; vacio = todo bien.
  */
+// DONDE HAY QUE MIRAR LOS ENLACES. En `ABDSharedCode/node_modules` no hay
+  // ninguno, y no porque el install haya fallado: `@abdsynths/midi-keyb` no
+  // depende de nada, DEPENDE DE `@abdsynths/shared` el otro miembro del
+  // workspace, asi que su enlace vive en el `node_modules` de ESE miembro
+  // (`ABDSharedCode/MidiKeyboard/node_modules/@abdsynths/shared`).
+  //
+  // Mirar solo el raiz del proyecto llamante daba un falso rojo con un motivo
+  // que senalaba al manifiesto, que estaba bien. Medido con pnpm 12: install en
+  // verde, `esbuild` postinstall ejecutado, y este paso diciendo "el manifiesto
+  // no los esta resolviendo" con el enlace a un centimetro de ahi.
+//
+// Estas dos funciones son las unicas que saben donde mirar, porque habia dos
+// sitios que lo hacian (la comprobacion y el resumen) y ya se han
+// desincronizado una vez: uno busco en el proyecto y el otro en el miembro.
+function dirsEnlaces (workspace, proyecto, paquetes) {
+  return [
+    resolve(workspace, proyecto, 'node_modules', '@abdsynths'),
+    ...paquetes
+      .filter((p) => p !== proyecto)
+      .map((p) => resolve(workspace, p, 'node_modules', '@abdsynths')),
+  ];
+}
+
+function leerEnlaces (workspace, proyecto, paquetes) {
+  return dirsEnlaces(workspace, proyecto, paquetes)
+    .flatMap((dir) => {
+      // `readdirSync` sobre un enlace simbolico de pnpm revienta con ENOENT en
+      // Windows (`scandir` sobre el junction), y `existsSync` dice que existe.
+      // Un `flatMap` que lanza tumba el script entero con un stack trace que no
+      // dice nada del workspace; lo que se quiere es que la comprobacion falle
+      // con su mensaje, o que pase si otro sitio si tiene los enlaces.
+      try {
+        return readdirSync(dir);
+      } catch (err) {
+        return [];
+      }
+    });
+}
+
 function problemasDeLayout (workspace, suite, proyecto, paquetes) {
   const problemas = [];
   const raizProyecto = resolve(workspace, proyecto);
@@ -211,15 +250,25 @@ function problemasDeLayout (workspace, suite, proyecto, paquetes) {
     }
   }
 
-  const dirEnlaces = resolve(raizProyecto, 'node_modules', '@abdsynths');
-  const enlazados = existsSync(dirEnlaces) ? readdirSync(dirEnlaces) : [];
-
+  // DONDE HAY QUE MIRAR LOS ENLACES. En `ABDSharedCode/node_modules` no hay
+  // ninguno, y no porque el install haya fallado: `@abdsynths/midi-keyb` no
+  // depende de nada, DEPENDE DE `@abdsynths/shared` el otro miembro del
+  // workspace, asi que su enlace vive en el `node_modules` de ESE miembro
+  // (`ABDSharedCode/MidiKeyboard/node_modules/@abdsynths/shared`).
+  //
+  // Mirar solo el raiz del proyecto llamante daba un falso rojo con un motivo
+  // que senalaba al manifiesto, que estaba bien. Medido con pnpm 12: install en
+  // verde, `esbuild` postinstall ejecutado, y este paso diciendo "el manifiesto
+  // no los esta resolviendo" con el enlace a un centimetro de ahi.
+  //
   // Solo se queixa de los enlaces si lo demas esta bien: si falta el directorio
   // del proyecto, decir "no hay enlaces" es un segundo sintomas del primero y
-  // hace que quien lee tenga que decidir cual de los dos es la causa.
-  if (enlazados.length === 0 && problemas.length === 0) {
-    problemas.push(`pnpm no enlazo ningun paquete @abdsynths/* en ${proyecto}/node_modules: `
-      + 'el manifiesto no los esta resolviendo.');
+  // hace que quien lea tenga que decidir cual de los dos es la causa.
+  if (problemas.length === 0 && leerEnlaces(workspace, proyecto, paquetes).length === 0) {
+    problemas.push('pnpm no enlazo ningun paquete @abdsynths/* en ninguno de estos sitios: '
+      + dirsEnlaces(workspace, proyecto, paquetes)
+        .map((d) => d.slice(workspace.length + 1)).join(', ')
+      + '. El manifiesto declara miembros, pero el install no los ha enlazado.');
   }
 
   return problemas;
@@ -515,15 +564,16 @@ function main () {
       return falloDeJob(`el layout del workspace no esta bien:\n  - ${problemas.join('\n  - ')}`);
     }
 
-    const dirEnlaces = resolve(workspace, proyecto, 'node_modules', '@abdsynths');
-    const enlazados = readdirSync(dirEnlaces);
+    const enlazados = leerEnlaces(workspace, proyecto, paquetes);
 
     for (const e of enlazados) {
-      process.stderr.write(`  ${e.padEnd(16)} -> ${resolve(dirEnlaces, e)}\n`);
+      const donde = dirsEnlaces(workspace, proyecto, paquetes)
+        .find((dir) => existsSync(resolve(dir, e)));
+      process.stderr.write(`  ${e.padEnd(16)} -> ${donde ? resolve(donde, e) : '(?)'}\n`);
     }
 
     process.stderr.write(`Workspace listo: ${enlazados.length} paquete(s) @abdsynths/* `
-      + `enlazados en ${proyecto}.\n`);
+      + `enlazados en el workspace.\n`);
     return 0;
   }
 
