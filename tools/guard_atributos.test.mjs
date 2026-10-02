@@ -606,9 +606,21 @@ describe('el verde falso, que es un pipe que se come el codigo de salida', () =>
     const pasos = Number((r.stdout.match(/pasos con codigo ejecutable: (\d+)/) || [])[1]);
     const riesgos = Number(
       (r.stdout.match(/que pueden perder el codigo de salida: (\d+)/) || [])[1]);
-    assert.ok(pasos > 100,
-      `ha mirado ${pasos} pasos, demasiados pocos para una suite entera:\n${r.stdout}`);
-    assert.equal(riesgos, 0, `la suite real tiene ${riesgos} riesgos:\n${r.stdout}`);
+    const repos = Number((r.stdout.match(/repos con workflows: (\d+)/) || [])[1]);
+
+    // EL UMBRAL NO ES 100, Y POR QUE NO. Este mismo script corre en dos sitios con
+    // layouts distintos: en el arbol de trabajo local ve la suite entera (10 repos),
+    // y en el job `tools` de CI ve SOLO este repo, porque ese job no clona a los
+    // hermanos. Medido en el run 37046639690: en CI el recuento es 1 repo y 11
+    // pasos, no 244. Un umbral escrito para el caso grande hace que este test falle
+    // en CI POR MEDIR LO CORRECTO, que es la forma mas rapida de enseñar a ignorar
+    // los rojos de un guard.
+    //
+    // Lo que si es invariante es que ha mirado algo y que no ha encontrado nada.
+    assert.ok(repos >= 1, `el guard no ha visto ningun repo:\n${r.stdout}`);
+    assert.ok(pasos >= 10,
+      `ha mirado ${pasos} pasos, y un workflow entero tiene mas de eso:\n${r.stdout}`);
+    assert.equal(riesgos, 0, `este repo tiene ${riesgos} riesgos:\n${r.stdout}`);
   });
 
   it('una raiz sin workflows: 2, no 0, porque no es un hallazgo', { skip: SIN_PY }, () => {
