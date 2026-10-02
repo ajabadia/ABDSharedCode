@@ -89,16 +89,51 @@ jobs:
     name: MidiKeyboard (vitest)
     runs-on: ubuntu-latest
     steps:
-      # La accion vive en ESTE repo, asi que el repo que llama no es el de la
-      # accion: `ajabadia/ABDSharedCode/...`. Sustituye a los tres checkouts, al
-      # manifiesto del workspace y al install. NO pongas un `actions/checkout`
-      # antes: el layout de hermanos solo queda consistente si los tres los hace
-      # ella, y el `path:` del repo llamante es siempre el mismo.
-      - name: Bootstrap del workspace pnpm
-        uses: ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master
+      # ESTE REPO ES EL QUE LLAMA, Y TAMBIEN EL QUE ESTA DENTRO. Medido: al
+      # pasarle `project: ABDSharedCode` a la accion, los dos checkouts caen
+      # en la MISMA carpeta y el resultado es
+      #
+      #   $GITHUB_WORKSPACE/
+      #     pnpm-workspace.yaml
+      #     ABDSharedCode/          <- el repo llamante
+      #       ABDSharedCode/        <- y otra vez ABDSharedCode, dentro
+      #     ABDSharedAssets/
+      #
+      # con el manifiesto de `packages:` diciendo ABDSharedAssets,
+      # ABDSharedCode/MidiKeyboard y ABDSharedCode. La accion esta disenada para
+      # un llamante EXTERNO (ABDEep, ABDMS2000), donde las dos carpetas no
+      # chocan. Aqui chocan.
+      #
+      # Por eso este trabajo no usa la accion: hace sus propios checkouts (este
+      # repo y ABDSharedAssets) y llama al MISMO script, que es el unico que
+      # sabe como es el workspace. Lo que no se reimplementa es el layout, solo
+      # el `path:` de cada clon, que es lo unico que cambia entre un llamante y
+      # otro. La accion se queda como esta para los tres repos de la suite que
+      # si la necesitan.
+      - name: Checkout ABDSharedCode (este repo)
+        uses: actions/checkout@v4
+
+      - name: Checkout ABDSharedAssets (@abdsynths/shared)
+        uses: actions/checkout@v4
         with:
-          project: ABDSharedCode
-          skip-puppeteer-download: 'true'
+          repository: ajabadia/ABDSharedAssets
+          path: ABDSharedAssets
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '12.8.1'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Bootstrap workspace (tools/bootstrap-workspace.mjs)
+        shell: bash
+        env:
+          ABD_SKIP_PUPPETEER: 'true'
+        run: exec node tools/bootstrap-workspace.mjs
 
       # `pnpm test` es el script del paquete. Los 340 tests incluyen
       # `host-strip-height.test.js`, que es el contrato de franja de los cuatro
@@ -106,8 +141,20 @@ jobs:
       # motivo impreso, porque este checkout no trae ABDMS2000 ni ABDEep ni los
       # demas. Que se omitan no es un fallo, pero si desapareciera el motivo
       # impreso seria un verde que parece una comprobacion.
+      #
+      # `set -o pipefail`, Y POR QUE ESTA AQUI. Medido en el primer push: este
+      # paso salio VERDE con `pnpm test` fallando. `pnpm test | tee log` devuelve
+      # el codigo de `tee`, que es 0 siempre, y el shell por defecto de Actions
+      # (`bash -e`, sin `pipefail`) no lo arregla: asi que un install roto, un
+      # test rojo o un error de pnpm salen como un job en verde. El log de
+      # ese push decia `ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND` debajo de un tick.
+      # Sin esta linea, el log es lo unico que se opone al verde falso, y el log
+      # no se lee solo.
       - name: Tests de MidiKeyboard
-        run: pnpm test 2>&1 | tee "$RUNNER_TEMP/midikeyboard.log"
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee "$RUNNER_TEMP/midikeyboard.log"
 
       # La salida del paso anterior, no una segunda pasada: la suite son 340
       # pruebas con jsdom y tardarse dos veces en lo mismo no compra nada.
@@ -222,11 +269,25 @@ jobs:
           ref: 351f98a52a50d2a884aa9570d8df84a6eb067194
           path: ABDMS2000
 
+      # ABDNeural iba apuntando a f907d4d, que es un commit que NUNCA se
+      # subio: el remoto esta 6 commits por detras. Medido en un laboratorio
+      # con los cinco hermanos clonados cada uno en su SHA de la foto:
+      #
+      #   fatal: unable to read tree (f907d4d...)
+      #
+      # o sea que no es que el checkout avise: no puede ni leer el objeto.
+      # Los otros cuatro SHA siguen validos. Este se repinnea al HEAD del
+      # remoto, que es lo unico que el job puede clonar de verdad.
+      #
+      # LAS 55 HUERFANAS NO CAMBIAN por esto, y no es casualidad: el
+      # trinquete se pasa en ese mismo laboratorio antes de repinnear, y
+      # sigue en 0. Los 6 commits que faltan son de otra persona y estan
+      # sin subir, asi que no se tocan.
       - name: Checkout ABDNeural (SHA inmutable)
         uses: actions/checkout@v4
         with:
           repository: ajabadia/ABDNeural
-          ref: f907d4dde18a685bf425429551d9f8761552b3a5
+          ref: dd07f4c873f46fedf2904d31ce9271e0f1af7475
           path: ABDNeural
 
       - name: Checkout ABDCZ101 (SHA inmutable)
