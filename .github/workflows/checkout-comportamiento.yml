@@ -1,0 +1,295 @@
+name: Comportamiento de actions/checkout
+
+# Vuelve a MEDIR los casos de `actions/checkout` y falla si el comportamiento
+# cambio respecto a la tabla de `tools/checkout-medido.json`.
+#
+# POR QUE ESTE WORKFLOW EXISTE Y NO BASTA CON EL TEST. El test de
+# `guard_atributos.test.mjs` falla cuando el repo usa una version de
+# `actions/checkout` que no esta en `versiones_medidas`. Eso es el aviso de
+# "vuelve a medir", no la medicion: entre "hay que medir" y "esta medido" esta
+# este workflow. Sin el, el aviso se puede repetir indefinidamente y la tabla se
+# queda en una declaracion de intenciones que nadie contrasta con la realidad.
+#
+# QUE SE MIDE Y COMO. Los seis casos de la tabla, con cada version de
+# `versiones_medidas`, y la UNICA pregunta de cada caso es binaria: el primer
+# checkout deja un centinela dentro de su directorio, y despues del segundo
+# checkout el centinela sigue o no sigue. Si no sigue, el segundo borro el
+# primero. Nada de esto mira `git log` ni el tamano del arbol, que dependen del
+# ref y de la cache: el centinela depende solo de la pregunta.
+#
+# `uses:` NO ADMITE EXPRESIONES, ASI QUE LA VERSION VA EN EL PASO. No hay
+# `uses: actions/checkout@${{ matrix.version }}`. Hay un paso literal por
+# version y un `if:` que elige. El caso se elige tambien con `if:`. Es
+# mecanico y se ve entero, que es lo que se pide a un guard: un reader puede
+# comprobar que el caso A clona dos repos distintos sin seguir el flujo.
+#
+# Y SI FALLA, NO ES QUE HAYA CAMBIADO. `medir_checkout.py` sale con 2 cuando no
+# se ha podido medir, y el job lo propaga. Un rojo asi dice "no lo se", que no
+# es lo mismo que "lo se y es distinto", y los dos no debenCore el mismo codigo.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/**'
+      - 'tools/medir_checkout.py'
+      - 'tools/checkout-medido.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checkout-comportamiento
+  cancel-in-progress: true
+
+env:
+  # Refs INMUTABLES y de Propsito. El caso D necesita el MISMO repo con dos
+  # refs distintos, y el caso F necesita un llamante que no sea ABDSharedCode.
+  # Se fijan por SHA y no por rama para que repetir la medicion mide lo mismo.
+  SHARED_ASSETS_R1: '065ca6c6aef82e8d41cf6a94d650ab28f5c27e4c'
+  SHARED_ASSETS_R2: '5ea99414503b261a33329e27ec52615af4b6473c'
+  ABDEEP_REF: '943652c2086288452effbfc66c07586be93a98c8'
+  HERRAMIENTAS: "${{ github.server_url }}/ajabadia/ABDSharedCode/raw/${{ github.sha }}/tools"
+
+jobs:
+  plan:
+    name: Plan de medicion
+    runs-on: ubuntu-latest
+    outputs:
+      casos: ${{ steps.plan.outputs.casos }}
+      versiones: ${{ steps.plan.outputs.versiones }}
+    steps:
+      - name: Leer la tabla
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools/medir_checkout.py
+          sparse-checkout-cone-mode: true
+
+      - id: plan
+        name: Casos y versiones a medir
+        run: |
+          set -euo pipefail
+          python3 tools/medir_checkout.py plan --github-output >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  medir:
+    name: Caso ${{ matrix.caso }} con ${{ matrix.version }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      # fail-fast apagado A PROPOSITO: si el caso A cambia de comportamiento, el
+      # resto de la matriz tambien se tiene que medir, porque un cambio de
+      # checkout suele mover mas de un caso a la vez y con fail-fast solo se
+      # veria el primero.
+      fail-fast: false
+      matrix:
+        caso: ${{ fromJSON(needs.plan.outputs.casos) }}
+        version: ${{ fromJSON(needs.plan.outputs.versiones) }}
+    steps:
+      - name: Version sin pasos de checkout
+        if: ${{ matrix.version != 'v4' && matrix.version != 'v5' }}
+        run: |
+          echo "::error::la version ${{ matrix.version }} no tiene pasos de checkout en este workflow"
+          echo "::error::anadelos o quita la version de checkout-medido.json, que medir no es lo mismo que suponer"
+          exit 1
+
+      - name: 'Bajar la herramienta (sin checkout: el workspace se mide)'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/herramientas"
+          curl -fsSL "$HERRAMIENTAS/medir_checkout.py" -o "$RUNNER_TEMP/herramientas/medir_checkout.py"
+          curl -fsSL "$HERRAMIENTAS/checkout-medido.json" -o "$RUNNER_TEMP/herramientas/checkout-medido.json"
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" plan > /dev/null
+
+      # ---- A: mismo path, repos distintos. El unico que borra. -------------
+      - name: A1 (ABDSharedCode -> dup)
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedCode, path: dup }
+      - name: A1 (ABDSharedCode -> dup)
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedCode, path: dup }
+      - name: A2 (ABDSharedAssets -> dup)
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedAssets, path: dup }
+      - name: A2 (ABDSharedAssets -> dup)
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedAssets, path: dup }
+
+      # ---- B: paths distintos. Conviven. -----------------------------------
+      - name: B1 (ABDSharedCode -> uno)
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedCode, path: uno }
+      - name: B1 (ABDSharedCode -> uno)
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedCode, path: uno }
+      - name: B2 (ABDSharedAssets -> dos)
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedAssets, path: dos }
+      - name: B2 (ABDSharedAssets -> dos)
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedAssets, path: dos }
+
+      # ---- C: mismo path, mismo repo, mismo ref. Idempotente. --------------
+      - name: C1 (ABDSharedAssets@R1 -> dup)
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: C1 (ABDSharedAssets@R1 -> dup)
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: C2 (ABDSharedAssets@R1 -> dup)
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: C2 (ABDSharedAssets@R1 -> dup)
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+
+      # ---- D: mismo path, mismo repo, ref DISTINTO. Cambia, no borra. -------
+      - name: D1 (ABDSharedAssets@R1 -> dup)
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: D1 (ABDSharedAssets@R1 -> dup)
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: D2 (ABDSharedAssets@R2 -> dup)
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R2 }}
+          path: dup
+      - name: D2 (ABDSharedAssets@R2 -> dup)
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R2 }}
+          path: dup
+
+      # ---- E: mismo path, el llamante y luego el propio llamante. ----------
+      - name: E1 (ABDSharedCode -> dup)
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedCode, path: dup }
+      - name: E1 (ABDSharedCode -> dup)
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedCode, path: dup }
+      - name: E2 (ABDSharedCode -> dup)
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedCode, path: dup }
+      - name: E2 (ABDSharedCode -> dup)
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedCode, path: dup }
+
+      # ---- F: el llamante SIN path (raiz) y luego el proyecto con path. -----
+      # `.` es el equivalente de no poner `path:`: el clon cae en la raiz del
+      # workspace, que es justo lo que mide este caso.
+      - name: F1 (ABDEep -> raiz)
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ajabadia/ABDEep
+          ref: ${{ env.ABDEEP_REF }}
+          path: .
+      - name: F1 (ABDEep -> raiz)
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDEep
+          ref: ${{ env.ABDEEP_REF }}
+          path: .
+      - name: F2 (ABDSharedCode -> ABDSharedCode)
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v4' }}
+        uses: actions/checkout@v4
+        with: { repository: ajabadia/ABDSharedCode, path: ABDSharedCode }
+      - name: F2 (ABDSharedCode -> ABDSharedCode)
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with: { repository: ajabadia/ABDSharedCode, path: ABDSharedCode }
+
+      - id: centinela
+        name: Dejar el centinela dentro del primer clon
+        run: |
+          set -euo pipefail
+          case "${{ matrix.caso }}" in
+            A) S=dup ;; B) S=uno ;; C) S=dup ;; D) S=dup ;; E) S=dup ;; F) S=. ;;
+            *) echo "::error::caso desconocido: ${{ matrix.caso }}"; exit 1 ;;
+          esac
+          printf 'medido %s %s\n' "${{ matrix.caso }}" "${{ matrix.version }}" \
+            > "$GITHUB_WORKSPACE/$S/.medido-sentinel"
+          echo "ruta=$GITHUB_WORKSPACE/$S/.medido-sentinel" >> "$GITHUB_OUTPUT"
+          echo "centinela en $GITHUB_WORKSPACE/$S/.medido-sentinel"
+
+      - name: ¿Sigue el centinela?
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" observa \
+            --sentinela "${{ steps.centinela.outputs.ruta }}" \
+            --caso "${{ matrix.caso }}" \
+            --version "${{ matrix.version }}" \
+            > obs.json
+          cat obs.json
+
+      - name: Subir la observacion
+        uses: actions/upload-artifact@v6
+        with:
+          name: obs-${{ matrix.caso }}-${{ matrix.version }}
+          path: obs.json
+          retention-days: 30
+
+  comparar:
+    name: ¿Cambio el comportamiento?
+    needs: [plan, medir]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar la herramienta y la tabla
+        run: |
+          set -euo pipefail
+          curl -fsSL "$HERRAMIENTAS/medir_checkout.py" -o medir_checkout.py
+          curl -fsSL "$HERRAMIENTAS/checkout-medido.json" -o checkout-medido.json
+          python3 medir_checkout.py plan > /dev/null
+
+      - name: Bajar las observaciones
+        uses: actions/download-artifact@v8
+        with:
+          path: observaciones
+
+      - name: Comparar con la tabla
+        run: |
+          set -euo pipefail
+          python3 medir_checkout.py compara --observaciones observaciones
