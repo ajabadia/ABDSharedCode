@@ -40,6 +40,22 @@ README = os.path.join(
 ABRE = '<!-- GENERADO-DESDE-JSON: no editar a mano -->'
 CIERRA = '<!-- /GENERADO-DESDE-JSON -->'
 
+# DONDE QUEDA EL PRIMER CLON DE CADA CASO. Vive AQUI y no en el YAML porque el
+# centinela tiene que escribirse ENTRE los dos checkouts, y el segundo checkout
+# con el mismo `path:` borra el directorio. Si esta ruta se计算出 mal, el
+# centinela acaba de escribir despues del segundo y la medicion dice siempre
+# "no borra". MEDIDO: asi fallo la primera corrida, con los doce jobs en verde
+# y la comparacion diciendo que A no borra cuando la tabla dice que si.
+SEGUNDO_CLON = {
+    'A': 'dup',   # mismo path, repos distintos: el segundo borra
+    'B': 'uno',   # paths distintos: `dup` no se toca, el sentinel va en `uno`
+    'C': 'dup',   # mismo path, mismo repo, mismo ref
+    'D': 'dup',   # mismo path, mismo repo, ref distinto
+    'E': 'dup',   # mismo path, el llamante y luego el propio llamante
+    'F': '.',     # el llamante sin `path:` cae en la raiz del workspace
+}
+SENTINELA = '.medido-sentinel'
+
 
 class NoMedible(Exception):
     """No se ha podido medir. No es un cambio de comportamiento: es un 2."""
@@ -63,6 +79,24 @@ def plan():
         'casos': [{'caso': c['caso'], 'borra': c['borra']} for c in casos],
         'versiones': versiones,
     }
+
+
+def centinela(caso, workspace):
+    """Deja el centinela donde quedo el PRIMER clon. Entre los dos checkouts."""
+    if caso not in SEGUNDO_CLON:
+        raise NoMedible('caso desconocido: %s' % caso)
+    ruta = os.path.join(workspace, SEGUNDO_CLON[caso], SENTINELA)
+    if not os.path.isdir(os.path.dirname(ruta)):
+        raise NoMedible('el primer clon no esta donde se esperaba: %s' % os.path.dirname(ruta))
+    with io.open(ruta, 'w', encoding='utf-8') as f:
+        f.write('medido %s\n' % caso)
+    return ruta
+
+
+def ruta_sentinela(caso, workspace):
+    if caso not in SEGUNDO_CLON:
+        raise NoMedible('caso desconocido: %s' % caso)
+    return os.path.join(workspace, SEGUNDO_CLON[caso], SENTINELA)
 
 
 def observa(sentinela):
@@ -154,9 +188,13 @@ def main(argv=None):
     pl.add_argument('--github-output', action='store_true',
                     help='imprime `clave=[...]` en el formato de $GITHUB_OUTPUT')
     o = sub.add_parser('observa')
-    o.add_argument('--sentinela', required=True)
+    o.add_argument('--sentinela')
+    o.add_argument('--workspace', help='raiz del workspace; el path sale del caso')
     o.add_argument('--caso', default='')
     o.add_argument('--version', default='')
+    cen = sub.add_parser('centinela')
+    cen.add_argument('--caso', required=True)
+    cen.add_argument('--workspace', required=True)
     c = sub.add_parser('compara')
     c.add_argument('--observaciones', required=True)
     r = sub.add_parser('readme')
@@ -178,8 +216,17 @@ def main(argv=None):
                 print(json.dumps(datos, ensure_ascii=False))
             return 0
 
+        if args.cmd == 'centinela':
+            print(centinela(args.caso, args.workspace))
+            return 0
+
         if args.cmd == 'observa':
-            r = observa(args.sentinela)
+            centinela_ = args.sentinela
+            if not centinela_:
+                if not args.workspace:
+                    raise NoMedible('observa necesita --sentinela o --workspace')
+                centinela_ = ruta_sentinela(args.caso, args.workspace)
+            r = observa(centinela_)
             r['caso'] = args.caso
             r['version'] = args.version
             print(json.dumps(r, ensure_ascii=False))
