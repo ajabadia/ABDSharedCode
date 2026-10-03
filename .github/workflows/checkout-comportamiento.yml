@@ -88,7 +88,7 @@ jobs:
         version: ${{ fromJSON(needs.plan.outputs.versiones) }}
     steps:
       - name: Version sin pasos de checkout
-        if: ${{ matrix.version != 'v4' && matrix.version != 'v5' }}
+        if: ${{ matrix.version != 'v5' && matrix.version != 'v7' }}
         run: |
           echo "::error::la version ${{ matrix.version }} no tiene pasos de checkout en este workflow"
           echo "::error::anadelos o quita la version de checkout-medido.json, que medir no es lo mismo que suponer"
@@ -102,176 +102,232 @@ jobs:
           curl -fsSL "$HERRAMIENTAS/checkout-medido.json" -o "$RUNNER_TEMP/herramientas/checkout-medido.json"
           python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" plan > /dev/null
 
-      # ---- A: mismo path, repos distintos. El unico que borra. -------------
-      - name: A1 (ABDSharedCode -> dup)
-        if: ${{ matrix.caso == 'A' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedCode, path: dup }
-      - name: A1 (ABDSharedCode -> dup)
+      # ---- A: mismo path, repos distintos. El UNICO que borra. -----------------
+      - name: 'A1 (ABDSharedCode -> dup) (v5)'
         if: ${{ matrix.caso == 'A' && matrix.version == 'v5' }}
         uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedCode, path: dup }
-      - name: A2 (ABDSharedAssets -> dup)
-        if: ${{ matrix.caso == 'A' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedAssets, path: dup }
-      - name: A2 (ABDSharedAssets -> dup)
-        if: ${{ matrix.caso == 'A' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedAssets, path: dup }
-
-      # ---- B: paths distintos. Conviven. -----------------------------------
-      - name: B1 (ABDSharedCode -> uno)
-        if: ${{ matrix.caso == 'B' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedCode, path: uno }
-      - name: B1 (ABDSharedCode -> uno)
-        if: ${{ matrix.caso == 'B' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedCode, path: uno }
-      - name: B2 (ABDSharedAssets -> dos)
-        if: ${{ matrix.caso == 'B' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedAssets, path: dos }
-      - name: B2 (ABDSharedAssets -> dos)
-        if: ${{ matrix.caso == 'B' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedAssets, path: dos }
-
-      # ---- C: mismo path, mismo repo, mismo ref. Idempotente. --------------
-      - name: C1 (ABDSharedAssets@R1 -> dup)
-        if: ${{ matrix.caso == 'C' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
         with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R1 }}
+          repository: ajabadia/ABDSharedCode
           path: dup
-      - name: C1 (ABDSharedAssets@R1 -> dup)
-        if: ${{ matrix.caso == 'C' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
+      - name: 'A1 (ABDSharedCode -> dup) (v7)'
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
         with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R1 }}
+          repository: ajabadia/ABDSharedCode
           path: dup
-      - name: C2 (ABDSharedAssets@R1 -> dup)
-        if: ${{ matrix.caso == 'C' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R1 }}
-          path: dup
-      - name: C2 (ABDSharedAssets@R1 -> dup)
-        if: ${{ matrix.caso == 'C' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R1 }}
-          path: dup
-
-      # ---- D: mismo path, mismo repo, ref DISTINTO. Cambia, no borra. -------
-      - name: D1 (ABDSharedAssets@R1 -> dup)
-        if: ${{ matrix.caso == 'D' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R1 }}
-          path: dup
-      - name: D1 (ABDSharedAssets@R1 -> dup)
-        if: ${{ matrix.caso == 'D' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R1 }}
-          path: dup
-      - name: D2 (ABDSharedAssets@R2 -> dup)
-        if: ${{ matrix.caso == 'D' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R2 }}
-          path: dup
-      - name: D2 (ABDSharedAssets@R2 -> dup)
-        if: ${{ matrix.caso == 'D' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with:
-          repository: ajabadia/ABDSharedAssets
-          ref: ${{ env.SHARED_ASSETS_R2 }}
-          path: dup
-
-      # ---- E: mismo path, el llamante y luego el propio llamante. ----------
-      - name: E1 (ABDSharedCode -> dup)
-        if: ${{ matrix.caso == 'E' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedCode, path: dup }
-      - name: E1 (ABDSharedCode -> dup)
-        if: ${{ matrix.caso == 'E' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedCode, path: dup }
-      - name: E2 (ABDSharedCode -> dup)
-        if: ${{ matrix.caso == 'E' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedCode, path: dup }
-      - name: E2 (ABDSharedCode -> dup)
-        if: ${{ matrix.caso == 'E' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedCode, path: dup }
-
-      # ---- F: el llamante SIN path (raiz) y luego el proyecto con path. -----
-      # `.` es el equivalente de no poner `path:`: el clon cae en la raiz del
-      # workspace, que es justo lo que mide este caso.
-      - name: F1 (ABDEep -> raiz)
-        if: ${{ matrix.caso == 'F' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with:
-          repository: ajabadia/ABDEep
-          ref: ${{ env.ABDEEP_REF }}
-          path: .
-      - name: F1 (ABDEep -> raiz)
-        if: ${{ matrix.caso == 'F' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with:
-          repository: ajabadia/ABDEep
-          ref: ${{ env.ABDEEP_REF }}
-          path: .
-      - name: F2 (ABDSharedCode -> ABDSharedCode)
-        if: ${{ matrix.caso == 'F' && matrix.version == 'v4' }}
-        uses: actions/checkout@v4
-        with: { repository: ajabadia/ABDSharedCode, path: ABDSharedCode }
-      - name: F2 (ABDSharedCode -> ABDSharedCode)
-        if: ${{ matrix.caso == 'F' && matrix.version == 'v5' }}
-        uses: actions/checkout@v5
-        with: { repository: ajabadia/ABDSharedCode, path: ABDSharedCode }
-
-      - id: centinela
-        name: Dejar el centinela dentro del primer clon
+      - name: 'Centinela del caso A ( ENTRE los dos checkouts )'
+        if: ${{ matrix.caso == 'A' }}
         run: |
           set -euo pipefail
-          case "${{ matrix.caso }}" in
-            A) S=dup ;; B) S=uno ;; C) S=dup ;; D) S=dup ;; E) S=dup ;; F) S=. ;;
-            *) echo "::error::caso desconocido: ${{ matrix.caso }}"; exit 1 ;;
-          esac
-          printf 'medido %s %s\n' "${{ matrix.caso }}" "${{ matrix.version }}" \
-            > "$GITHUB_WORKSPACE/$S/.medido-sentinel"
-          echo "ruta=$GITHUB_WORKSPACE/$S/.medido-sentinel" >> "$GITHUB_OUTPUT"
-          echo "centinela en $GITHUB_WORKSPACE/$S/.medido-sentinel"
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" centinela \
+            --caso 'A' \
+            --workspace "$GITHUB_WORKSPACE"
 
-      - name: ¿Sigue el centinela?
+      - name: 'A2 (ABDSharedAssets -> dup) (v5)'
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          path: dup
+      - name: 'A2 (ABDSharedAssets -> dup) (v7)'
+        if: ${{ matrix.caso == 'A' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          path: dup
+      # ---- B: paths distintos. Conviven, los dos intactos. ---------------------
+      - name: 'B1 (ABDSharedCode -> uno) (v5)'
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: uno
+      - name: 'B1 (ABDSharedCode -> uno) (v7)'
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: uno
+      - name: 'Centinela del caso B ( ENTRE los dos checkouts )'
+        if: ${{ matrix.caso == 'B' }}
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" centinela \
+            --caso 'B' \
+            --workspace "$GITHUB_WORKSPACE"
+
+      - name: 'B2 (ABDSharedAssets -> dos) (v5)'
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          path: dos
+      - name: 'B2 (ABDSharedAssets -> dos) (v7)'
+        if: ${{ matrix.caso == 'B' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          path: dos
+      # ---- C: mismo path, mismo repo, mismo ref. Idempotente. ------------------
+      - name: 'C1 (ABDSharedAssets@R1 -> dup) (v5)'
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: 'C1 (ABDSharedAssets@R1 -> dup) (v7)'
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: 'Centinela del caso C ( ENTRE los dos checkouts )'
+        if: ${{ matrix.caso == 'C' }}
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" centinela \
+            --caso 'C' \
+            --workspace "$GITHUB_WORKSPACE"
+
+      - name: 'C2 (ABDSharedAssets@R1 -> dup) (v5)'
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: 'C2 (ABDSharedAssets@R1 -> dup) (v7)'
+        if: ${{ matrix.caso == 'C' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      # ---- D: mismo path, mismo repo, ref DISTINTO. Cambia, no borra. ----------
+      - name: 'D1 (ABDSharedAssets@R1 -> dup) (v5)'
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: 'D1 (ABDSharedAssets@R1 -> dup) (v7)'
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R1 }}
+          path: dup
+      - name: 'Centinela del caso D ( ENTRE los dos checkouts )'
+        if: ${{ matrix.caso == 'D' }}
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" centinela \
+            --caso 'D' \
+            --workspace "$GITHUB_WORKSPACE"
+
+      - name: 'D2 (ABDSharedAssets@R2 -> dup) (v5)'
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R2 }}
+          path: dup
+      - name: 'D2 (ABDSharedAssets@R2 -> dup) (v7)'
+        if: ${{ matrix.caso == 'D' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: ${{ env.SHARED_ASSETS_R2 }}
+          path: dup
+      # ---- E: mismo path, el llamante y luego el propio llamante. --------------
+      - name: 'E1 (ABDSharedCode -> dup) (v5)'
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: dup
+      - name: 'E1 (ABDSharedCode -> dup) (v7)'
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: dup
+      - name: 'Centinela del caso E ( ENTRE los dos checkouts )'
+        if: ${{ matrix.caso == 'E' }}
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" centinela \
+            --caso 'E' \
+            --workspace "$GITHUB_WORKSPACE"
+
+      - name: 'E2 (ABDSharedCode -> dup) (v5)'
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: dup
+      - name: 'E2 (ABDSharedCode -> dup) (v7)'
+        if: ${{ matrix.caso == 'E' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: dup
+      # ---- F: el llamante SIN path (raiz) y luego el proyecto con path. --------
+      - name: 'F1 (ABDEep -> raiz) (v5)'
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDEep
+          ref: ${{ env.ABDEEP_REF }}
+          path: .
+      - name: 'F1 (ABDEep -> raiz) (v7)'
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDEep
+          ref: ${{ env.ABDEEP_REF }}
+          path: .
+      - name: 'Centinela del caso F ( ENTRE los dos checkouts )'
+        if: ${{ matrix.caso == 'F' }}
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" centinela \
+            --caso 'F' \
+            --workspace "$GITHUB_WORKSPACE"
+
+      - name: 'F2 (ABDSharedCode -> ABDSharedCode) (v5)'
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v5' }}
+        uses: actions/checkout@v5
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: ABDSharedCode
+      - name: 'F2 (ABDSharedCode -> ABDSharedCode) (v7)'
+        if: ${{ matrix.caso == 'F' && matrix.version == 'v7' }}
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedCode
+          path: ABDSharedCode
+
+      # ---- el centinela se mira DESPUES de todos los checkouts del caso. --
+      - name: Sigue el centinela
         run: |
           set -euo pipefail
           python3 "$RUNNER_TEMP/herramientas/medir_checkout.py" observa \
-            --sentinela "${{ steps.centinela.outputs.ruta }}" \
             --caso "${{ matrix.caso }}" \
             --version "${{ matrix.version }}" \
+            --workspace "$GITHUB_WORKSPACE" \
             > obs.json
           cat obs.json
 
       - name: Subir la observacion
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: obs-${{ matrix.caso }}-${{ matrix.version }}
           path: obs.json
           retention-days: 30
-
   comparar:
     name: ¿Cambio el comportamiento?
     needs: [plan, medir]

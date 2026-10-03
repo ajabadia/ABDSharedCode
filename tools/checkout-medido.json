@@ -13,8 +13,8 @@
   ],
   "accion": "actions/checkout",
   "versiones_medidas": [
-    "v4",
-    "v5"
+    "v5",
+    "v7"
   ],
   "medido_contra": {
     "runner": "ubuntu-latest",
@@ -102,5 +102,11 @@
     "forma": "los cinco casos con v4 y con v5 en la misma corrida, diez jobs",
     "veredicto": "sin cambios: los cinco casos dan lo mismo con v5 que con v4",
     "unica_diferencia": "el aviso de Node 20 sale en los jobs de v4 y no en los de v5"
-  }
+  },
+  "sin_rimedir": [
+    "v7"
+  ],
+  "por_que_sin_rimedir": [
+    "v7 sale en el commit que sube los workflows a actions/checkout@v7 y a los ultimos majors. Hasta que el workflow checkout-comportamiento.yml termine la matriz v5+v7 y se escriban aqui los resultados, la lista de versiones medidas es una INTENCION, no una medicion: por eso el campo esta aqui y no escrito y por eso el README no habla de v7 todavia."
+  ]
 }
