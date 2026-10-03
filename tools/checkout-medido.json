@@ -25,6 +25,7 @@
   "casos": [
     {
       "caso": "A",
+      "path_wf": "`dup`, y luego `dup`",
       "paths": "el mismo",
       "repos": "ABDSharedCode, luego ABDSharedAssets",
       "resultado": "el segundo borra el primero",
@@ -32,6 +33,7 @@
     },
     {
       "caso": "B",
+      "path_wf": "`uno` / `dos`",
       "paths": "distintos",
       "repos": "los dos que sean",
       "resultado": "conviven, los dos intactos",
@@ -39,6 +41,7 @@
     },
     {
       "caso": "C",
+      "path_wf": "`dup`, y luego `dup`",
       "paths": "el mismo",
       "repos": "ABDSharedAssets dos veces, mismo ref",
       "resultado": "idempotente, no borra",
@@ -46,6 +49,7 @@
     },
     {
       "caso": "D",
+      "path_wf": "`dup`, y luego `dup`",
       "paths": "el mismo",
       "repos": "ABDSharedAssets con ref distinto",
       "resultado": "cambia al ref nuevo, no borra",
@@ -53,6 +57,7 @@
     },
     {
       "caso": "E",
+      "path_wf": "`dup`, y luego `dup`",
       "paths": "el mismo",
       "repos": "el llamante y luego ABDSharedCode",
       "resultado": "no borra: el llamante ya era ABDSharedCode",
@@ -61,6 +66,7 @@
     },
     {
       "caso": "F",
+      "path_wf": "la raiz del workspace, y luego el del `project`",
       "paths": "la raiz del workspace, y luego el del project",
       "repos": "el llamante SIN `path:`, y luego la accion con project",
       "resultado": "no borra nada, pero deja dos clones del llamante",

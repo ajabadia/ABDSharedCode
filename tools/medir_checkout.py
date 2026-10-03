@@ -30,10 +30,15 @@ import argparse
 import io
 import json
 import os
+import re
 import sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 TABLA = os.path.join(AQUI, 'checkout-medido.json')
+README = os.path.join(
+    AQUI, '..', '.github', 'actions', 'pnpm-workspace-bootstrap', 'README.md')
+ABRE = '<!-- GENERADO-DESDE-JSON: no editar a mano -->'
+CIERRA = '<!-- /GENERADO-DESDE-JSON -->'
 
 
 class NoMedible(Exception):
@@ -105,6 +110,43 @@ def compara(observaciones, esperado):
     return difs
 
 
+def tabla_readme(tabla):
+    """La tabla del README, desde el JSON. Es la UNICA copia."""
+    filas = ['| caso | `path:` | repo | resultado medido |',
+             '|---|---|---|---|']
+    for c in tabla.get('casos') or []:
+        # Senfueza el resultado SOLO cuando borra, que es el caso unico con
+        # consecuencias. El enfasis sale del dato, no de una decision de redaccion.
+        res = c['resultado']
+        if c.get('borra'):
+            res = '**%s**' % res
+        filas.append('| %s | %s | %s | %s |' % (
+            c['caso'], c.get('path_wf', ''), c['repos'], res))
+    return '\n'.join(filas)
+
+
+def readme():
+    """Reescribe el bloque generado del README desde el JSON.
+
+    POR QUE GENERAR Y NO COMPARAR. El README y el JSON contaban la misma tabla
+    dos veces, y un test comparaba las dos copias. Eso convierte cada cambio de
+    la tabla en dos cambios manuales que hay que recordar hacer juntos, y el
+    test solo avisa cuando alguien ya ha cometido el forget: para entonces el
+    rojo es information, no prevencion. Generando, el README no se desincroniza
+    nunca; lo unico que puede desincronizarse es el JSON, que es la fuente.
+    """
+    if not os.path.exists(README):
+        raise NoMedible('no esta el README de la accion: %s' % README)
+    with io.open(README, encoding='utf-8', newline='') as f:
+        texto = f.read()
+    if ABRE not in texto or CIERRA not in texto:
+        raise NoMedible('el README no tiene los marcadores %s / %s' % (ABRE, CIERRA))
+    cuerpo = '%s\n%s\n%s' % (ABRE, tabla_readme(cargar_tabla()), CIERRA)
+    nuevo = re.sub(re.escape(ABRE) + '.*?' + re.escape(CIERRA), lambda _m: cuerpo,
+                   texto, flags=re.S)
+    return texto, nuevo
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest='cmd')
@@ -117,6 +159,9 @@ def main(argv=None):
     o.add_argument('--version', default='')
     c = sub.add_parser('compara')
     c.add_argument('--observaciones', required=True)
+    r = sub.add_parser('readme')
+    r.add_argument('--check', action='store_true',
+                   help='no escribe: sale con 1 si el README no es lo que se generaria')
     args = p.parse_args(argv)
 
     try:
@@ -138,6 +183,25 @@ def main(argv=None):
             r['caso'] = args.caso
             r['version'] = args.version
             print(json.dumps(r, ensure_ascii=False))
+            return 0
+
+        if args.cmd == 'readme':
+            texto, nuevo = readme()
+            if args.check:
+                if texto != nuevo:
+                    sys.stderr.write(
+                        'el README de la accion NO es lo que se genera desde '
+                        'checkout-medido.json\n')
+                    sys.stderr.write('corrige con: python3 tools/medir_checkout.py readme\n')
+                    return 1
+                print('el README esta al dia con checkout-medido.json')
+                return 0
+            if texto == nuevo:
+                print('el README ya estaba al dia')
+                return 0
+            with io.open(README, 'w', encoding='utf-8', newline='') as f:
+                f.write(nuevo)
+            print('README regenerado desde checkout-medido.json')
             return 0
 
         if args.cmd == 'compara':

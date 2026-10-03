@@ -85,6 +85,15 @@ jobs:
       - name: Guard de .gitattributes
         run: node --test tools/guard_atributos.test.mjs
 
+      # EL README DE LA ACCION SE GENERA DESDE EL JSON, Y AQUI SE COMPRUEBA.
+      # Antes el README y `tools/checkout-medido.json` contaban la misma tabla
+      # dos veces y un test comparaba las dos copias. Con generar, la tabla se
+      # escribe una vez: si alguien edita el bloque del README a mano, este paso
+      # sale con 1 y dice que loCorrija con el generador. Sin este paso, la
+      # edicion a mano se colaba hasta el proximo cambio de la tabla.
+      - name: El README de la accion es lo que se genera desde el JSON
+        run: python3 tools/medir_checkout.py readme --check
+
   midikeyboard:
     name: MidiKeyboard (vitest)
     runs-on: ubuntu-latest

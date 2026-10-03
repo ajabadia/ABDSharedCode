@@ -22,14 +22,16 @@ identico en las dos columnas. Duplicarlos en una sola corrida, en vez de
 comparar contra la medicion antigua, es para que un resultado distinto no se
 pueda atribuir al runner.
 
+<!-- GENERADO-DESDE-JSON: no editar a mano -->
 | caso | `path:` | repo | resultado medido |
 |---|---|---|---|
-| A | `dup` | ABDSharedCode, luego ABDSharedAssets | **el segundo borra el primero** |
-| B | `uno` / `dos` | distintos | conviven, los dos intactos |
-| C | `dup` | ABDSharedAssets dos veces, mismo `ref` | idempotente, no borra |
-| D | `dup` | ABDSharedAssets, `ref` distinto | cambia al `ref` nuevo, **no borra** |
-| E | `ABDSharedCode` | el llamante y luego ABDSharedCode | **no borra**: el llamante ya era ABDSharedCode |
-| F | la raiz del workspace, y luego el del `project` | el llamante sin `path:`, y luego la accion con `project` | **no borra nada, pero deja dos clones del llamante** |
+| A | `dup`, y luego `dup` | ABDSharedCode, luego ABDSharedAssets | **el segundo borra el primero** |
+| B | `uno` / `dos` | los dos que sean | conviven, los dos intactos |
+| C | `dup`, y luego `dup` | ABDSharedAssets dos veces, mismo ref | idempotente, no borra |
+| D | `dup`, y luego `dup` | ABDSharedAssets con ref distinto | cambia al ref nuevo, no borra |
+| E | `dup`, y luego `dup` | el llamante y luego ABDSharedCode | no borra: el llamante ya era ABDSharedCode |
+| F | la raiz del workspace, y luego el del `project` | el llamante SIN `path:`, y luego la accion con project | no borra nada, pero deja dos clones del llamante |
+<!-- /GENERADO-DESDE-JSON -->
 
 El caso E salio de medir la consecuencia practica (llamar a la accion con
 `project: ABDSharedCode`) y resulto **degenerado**: el repo llamante de ese
