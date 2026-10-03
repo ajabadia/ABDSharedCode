@@ -124,19 +124,19 @@ runs:
     # disposicion que tiene el checkout local de la suite, donde
     # node_modules/@abdsynths/* son symlinks a ../.
     - name: Checkout calling repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
       with:
         path: ${{ inputs.project }}
 
     - name: Checkout ABDSharedCode (@abdsynths/midi-keyb)
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
       with:
         repository: ajabadia/ABDSharedCode
         path: ABDSharedCode
         ref: ${{ inputs.shared-code-ref }}
 
     - name: Checkout ABDSharedAssets (@abdsynths/shared)
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
       with:
         repository: ajabadia/ABDSharedAssets
         path: ABDSharedAssets
@@ -148,7 +148,7 @@ runs:
     # porque son repos que este workflow no puede clonar por su cuenta.
 
     - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v6.1.0
       with:
         version: ${{ inputs.pnpm-version }}
 
@@ -156,7 +156,7 @@ runs:
     # suite (el del workspace vive en el repo raiz, que no se clona), y
     # setup-node falla en duro si declara cache y no encuentra el lockfile.
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
 

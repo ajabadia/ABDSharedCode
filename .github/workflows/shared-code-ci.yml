@@ -49,10 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ABDSharedCode
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           # El mismo que usa la accion `pnpm-workspace-bootstrap` en el resto de
           # la suite, para que una prueba no pase en local con Node 24 y falle
@@ -120,21 +120,21 @@ jobs:
       # otro. La accion se queda como esta para los tres repos de la suite que
       # si la necesitan.
       - name: Checkout ABDSharedCode (este repo)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Checkout ABDSharedAssets (@abdsynths/shared)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDSharedAssets
           path: ABDSharedAssets
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6.1.0
         with:
           version: '12.8.1'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -201,10 +201,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ABDSharedCode
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -275,7 +275,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ABDSharedCode (este repo)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # Los hermanos, y SOLO para leer sus workflows. Estos mismos SHA son los del
       # job `audit` y los de la foto de la linea base: la lista no se escribe aqui,
@@ -287,37 +287,37 @@ jobs:
       # rama, que es donde alguien esta a punto de meter el `| tee`. Un guard de los
       # repos ya arreglados no ve los que se rompen manana.
       - name: Checkout ABDEep (HEAD)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDEep
           path: ABDEep
 
       - name: Checkout ABDMS2000 (HEAD)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDMS2000
           path: ABDMS2000
 
       - name: Checkout ABDNeural (HEAD)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDNeural
           path: ABDNeural
 
       - name: Checkout ABDCZ101 (HEAD)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDCZ101
           path: ABDCZ101
 
       - name: Checkout ABDSharedAssets (HEAD)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDSharedAssets
           path: ABDSharedAssets
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -367,7 +367,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ABDSharedCode
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: ABDSharedCode
 
@@ -381,14 +381,14 @@ jobs:
       # los otros cinco hay que subirlos aqui cuando se muevan. Es el mismo
       # trabajo manual que hace `siblings.json` en ABDSharedAssets.
       - name: Checkout ABDEep (SHA inmutable)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDEep
           ref: 943652c2086288452effbfc66c07586be93a98c8
           path: ABDEep
 
       - name: Checkout ABDMS2000 (SHA inmutable)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDMS2000
           ref: 351f98a52a50d2a884aa9570d8df84a6eb067194
@@ -409,28 +409,28 @@ jobs:
       # sigue en 0. Los 6 commits que faltan son de otra persona y estan
       # sin subir, asi que no se tocan.
       - name: Checkout ABDNeural (SHA inmutable)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDNeural
           ref: dd07f4c873f46fedf2904d31ce9271e0f1af7475
           path: ABDNeural
 
       - name: Checkout ABDCZ101 (SHA inmutable)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDCZ101
           ref: 70689419a1b6bfc22485336fd763fb096b81404d
           path: ABDCZ101
 
       - name: Checkout ABDSharedAssets (SHA inmutable)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDSharedAssets
           ref: 065ca6c6aef82e8d41cf6a94d650ab28f5c27e4c
           path: ABDSharedAssets
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 

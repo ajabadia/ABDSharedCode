@@ -103,10 +103,12 @@
     "veredicto": "sin cambios: los cinco casos dan lo mismo con v5 que con v4",
     "unica_diferencia": "el aviso de Node 20 sale en los jobs de v4 y no en los de v5"
   },
-  "sin_rimedir": [
-    "v7"
-  ],
-  "por_que_sin_rimedir": [
-    "v7 sale en el commit que sube los workflows a actions/checkout@v7 y a los ultimos majors. Hasta que el workflow checkout-comportamiento.yml termine la matriz v5+v7 y se escriban aqui los resultados, la lista de versiones medidas es una INTENCION, no una medicion: por eso el campo esta aqui y no escrito y por eso el README no habla de v7 todavia."
-  ]
+  "medido_en_v7": {
+    "run": "37163279769",
+    "runner": "ubuntu-latest",
+    "forma": "la matriz de checkout-comportamiento.yml: seis casos por v5 y por v7, doce jobs, y compara los doce contra esta tabla",
+    "veredicto": "sin cambios: v7 se comporta como v5 en los seis casos. Solo A borra, y borra igual que con v5",
+    "medido": "A borra=true; B, C, D, E y F borra=false, en v5 y en v7",
+    "lo_que_se_tenia_que_arreglar_primero": "el centinela iba en la raiz del clon, que es un sitio que git clean limpia aunque el clon no se remplace, y da \"borra\" en C, D y E. Ahora va dentro de .git. MEDIDO: el run 37163103337, con el centinela en el worktree, dio C, D y E con borra=true tambien en v5, o sea que era el instrumento y no checkout"
+  }
 }
