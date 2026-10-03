@@ -54,7 +54,16 @@ SEGUNDO_CLON = {
     'E': 'dup',   # mismo path, el llamante y luego el propio llamante
     'F': '.',     # el llamante sin `path:` cae en la raiz del workspace
 }
-SENTINELA = '.medido-sentinel'
+# DENTRO DE .git, Y POR QUE. El centinela tiene que distinguir "el segundo
+# checkout REEMPLAZO el clon" de "el segundo checkout limpio los ficheros sin
+# trackear". actions/checkout hace `git clean` al final en ambos casos, y
+# `git clean -ffdx` se lleva cualquier fichero sin trackear del worktree: con
+# el centinela en la raiz del clon, los casos C, D y E median "borra" cuando el
+# clon sigue intacto ahi. MEDIDO en el run 37163103337: C, D y E con borra=true
+# en v5 y en v7, cuando la tabla dice que no borra. Dentro de .git, `git clean`
+# no entra, y al borrar el directorio entero se va con el. MEDIDO en local con
+# un clon de verdad: `git clean -ffdx` se lleva el del worktree y deja este.
+SENTINELA = os.path.join('.git', '.medido-sentinel')
 
 
 class NoMedible(Exception):
@@ -122,25 +131,41 @@ def compara(observaciones, esperado):
     casos = esperado.get('casos')
     if not casos:
         raise NoMedible('la tabla no trae `casos`')
-    por_caso = {o['caso']: o for o in observaciones if o.get('caso')}
+    # La clave es el par (caso, version), no el caso. Con la matriz v5 y v7, un
+    # mapa por caso se queda con la ultima medicion que llego y la otra no se
+    # compara nunca: el guard daba por buena la mitad de lo medido sin
+    # decirlo. MEDIDO: al bajar los artefactos del run 37163103337 se vio que
+    # v5 y v7 dan lo mismo, y el guard solo estaba mirando una de las dos.
+    vistas = {}
+    for o in observaciones:
+        caso = o.get('caso')
+        if not caso:
+            difs.append('una observacion no dice que caso es: %r' % (o,))
+            continue
+        version = o.get('version') or ''
+        clave = (caso, version)
+        if clave in vistas:
+            difs.append('%s: hay dos mediciones para %s' % (caso, version or '(sin version)'))
+        vistas[clave] = o
     for caso in casos:
-        visto = por_caso.get(caso['caso'])
-        if visto is None:
-            difs.append('%s: no se midio' % caso['caso'])
-            continue
-        if 'borra' not in visto:
-            difs.append('%s: la medicion no trae `borra`' % caso['caso'])
-            continue
-        if visto['borra'] != caso['borra']:
-            difs.append('%s: la tabla dice borra=%s y se midio borra=%s'
-                        % (caso['caso'], str(caso['borra']).lower(), str(visto['borra']).lower()))
-        if visto.get('version') and visto['version'] not in versiones:
+        for version in versiones:
+            visto = vistas.get((caso['caso'], version))
+            if visto is None:
+                difs.append('%s: no se midio con %s' % (caso['caso'], version))
+                continue
+            if 'borra' not in visto:
+                difs.append('%s (%s): la medicion no trae `borra`' % (caso['caso'], version))
+                continue
+            if visto['borra'] != caso['borra']:
+                difs.append('%s (%s): la tabla dice borra=%s y se midio borra=%s'
+                            % (caso['caso'], version,
+                               str(caso['borra']).lower(), str(visto['borra']).lower()))
+    for caso, version in sorted(vistas):
+        if not version:
+            difs.append('%s: la medicion no dice con que version se midio' % caso)
+        elif version not in versiones:
             difs.append('%s: se midio con %s, que no esta en `versiones_medidas`'
-                        % (caso['caso'], visto['version']))
-    medidos = set(v.get('version') for v in observaciones if v.get('version'))
-    sin_medir = sorted(m for m in medidos if m not in versiones)
-    if sin_medir:
-        difs.append('versiones medidas que no estan en la tabla: %s' % ', '.join(sin_medir))
+                        % (caso, version))
     return difs
 
 
