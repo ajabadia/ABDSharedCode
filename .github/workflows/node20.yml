@@ -1,0 +1,149 @@
+name: Node 20 en las acciones
+
+# Node 20 dejo de recibir parches de seguridad en abril de 2026. Una accion que
+# declara `runs.using: node20` en su action.yml sigue ejecutandose, y por eso
+# nada se rompe al declararla: el rojo aparece semanas despues, cuando GitHub
+# apaga el runtime, y para entonces el commit que la subio ya no esta a la vista.
+# Un rojo de esa clase es el peor sitio para enterarte: no dice que repo, ni que
+# linea, ni que commit.
+#
+# ESTE GUARD ES EL QUE LO DICE ANTES. Repo, fichero, linea, pin y el arreglo, en
+# el commit que lo introduce.
+#
+# POR QUE ESTE FICHERO Y NO UN JOB MAS DE shared-code-ci.yml
+# ===========================================================
+#
+# Porque `verificar_foto.py` lee `shared-code-ci.yml` ENTERO y compara todos los
+# pares `repository:` + `ref:` que encuentra contra la foto de
+# `tools/audit-baseline.json`. Esa foto es la de los seis repos que clona el job
+# `foto`. Anadir ocho checkouts mas a ese fichero hace que la foto los vea, y el
+# job `foto` sale en rojo por un guard que no tiene nada que ver con el.
+#
+# Medido: con los checkouts dentro de shared-code-ci.yml, el job `foto` falla con
+# "la linea base no declara ABDAudioLab: el job foto lo diria". Un guard que se
+# rompe por algo que no es su asunto no es un guard, es ruido.
+#
+# Un workflow aparte deja la foto intacta y, de paso, deja esto con su propio
+# nombre en la pestana: quien ve rojo aqui sabe que es el runtime de las
+# acciones, sin tener que leer el log del job que se ha caido.
+#
+# POR QUE NUEVE CHECKOUTS Y NO UNO. El guard mira los `.github/workflows` de
+# TODA la suite, y un workflow solo ve su propio repo: corriendo en ABDSharedCode
+# sin traer los demas, miraria un repo de nueve y daria un verde que no dice
+# nada sobre los otros ocho.
+#
+# UN SHA Y NO UNA RAMA, por la razon de siempre: con `main` el resultado se
+# moveria solo, y un PR pasaria en verde un dia y en rojo otro sin que nadie
+# haya tocado nada. El precio es el de todos los pines de este repo: cuando un
+# hermano anade un workflow, hay que subir su SHA aqui.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: node20-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Ningun workflow de la suite declara una accion en node20
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout ABDSharedCode (el guard vive aqui)
+        uses: actions/checkout@v7
+        with:
+          path: ABDSharedCode
+          fetch-depth: 1
+
+      - name: Checkout ABDAudioLab
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDAudioLab
+          ref: b313e5cedad65cbcd75d4a22cc27db072f9caa70
+          path: ABDAudioLab
+          fetch-depth: 1
+
+      - name: Checkout ABDBankManager
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDBankManager
+          ref: 41c017fa86bcc7842007959fa100562c463d9cd8
+          path: ABDBankManager
+          fetch-depth: 1
+
+      - name: Checkout ABDCZ101
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDCZ101
+          ref: fe65772b130bb99901b78eed2d83f34dd8fdabca
+          path: ABDCZ101
+          fetch-depth: 1
+
+      - name: Checkout ABDEep
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDEep
+          ref: 48a100546427a9a873b8687aa35041ed585d353e
+          path: ABDEep
+          fetch-depth: 1
+
+      - name: Checkout ABDMS2000
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDMS2000
+          ref: ed5ca0ddf9d16118749c301f0a08b39cf57deef8
+          path: ABDMS2000
+          fetch-depth: 1
+
+      - name: Checkout ABDNeural
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDNeural
+          ref: d4a64294d39e8e89b5ab654feb96f08455d01f97
+          path: ABDNeural
+          fetch-depth: 1
+
+      - name: Checkout ABDOmegaUnified
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDOmegaUnified
+          ref: 744bee028a2942cd62923d521c5ac029a4fad1f4
+          path: ABDOmegaUnified
+          fetch-depth: 1
+
+      - name: Checkout ABDSharedAssets
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDSharedAssets
+          ref: 0ac9ef05b1a15647cb67efacd8485498a813cfb9
+          path: ABDSharedAssets
+          fetch-depth: 1
+
+      # Python lo trae el runner de Ubuntu. Sin esto el guard no se puede ni
+      # ejecutar, y un guard que no corre y sale en verde es peor que no
+      # tenerlo: parece que hay puerta.
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: El guard
+        working-directory: ABDSharedCode
+        run: python3 tools/guard_node20.py --raiz ..
+
+      # LOS PINES DE ARRIBA SON UNA COPIA. El unico sitio del que sale la lista
+      # de repos es `tools/guard_node20.py`, y esto se pide a mano. Por eso el
+      # paso de al lado comprueba que la copia no se haya quedado vieja: si un
+      # hermano se mueve y aqui no, este workflow esta midiendo una foto vieja y
+      # sale en verde sin mirar nada del commit de hoy.
+      - name: Todos los repos con workflows estan en la lista de checkout
+        working-directory: ABDSharedCode
+        run: python3 tools/guard_node20.py --pins-de .github/workflows/node20.yml --raiz ..

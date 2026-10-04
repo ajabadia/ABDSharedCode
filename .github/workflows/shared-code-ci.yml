@@ -85,6 +85,17 @@ jobs:
       - name: Guard de .gitattributes
         run: node --test tools/guard_atributos.test.mjs
 
+      # LAS PRUEBAS DEL GUARD DE NODE 20, Y POR QUE VAN AQUI Y NO EN SU JOB.
+      # Este guard tiene su propio job porque necesita los nueve repos; sus
+      # pruebas no necesitan ninguno, son un workflow sintetico de tres lineas.
+      # Separarlas evita pagar nueve checkouts para probar una tabla.
+      #
+      # La mitad de estas pruebas tienen que SALIR CON 1: si el guard se rompiera
+      # y saliera siempre con 0, aqui se caeria, y con ellas el rojo. Un guard
+      # solo visto pasar no se sabe si pasa.
+      - name: Pruebas del guard de Node 20
+        run: node --test tools/guard_node20.test.mjs
+
       # EL README DE LA ACCION SE GENERA DESDE EL JSON, Y AQUI SE COMPRUEBA.
       # Antes el README y `tools/checkout-medido.json` contaban la misma tabla
       # dos veces y un test comparaba las dos copias. Con generar, la tabla se

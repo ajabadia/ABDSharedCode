@@ -1,6 +1,7 @@
 // Pruebas del guard de `.gitattributes`.
 //
 //   node --test tools/guard_atributos.test.mjs
+//   node --test tools/guard_node20.test.mjs
 //
 // POR QUÉ EL NOMBRE DEL FICHERO Y NO EL DIRECTORIO. La orden de antes era
 // `node --test tools/`, y funciona o no según la versión de Node en un punto que
