@@ -43,7 +43,7 @@ const PY = (() => {
 const SIN_PY = PY === null && 'no hay python en esta maquina';
 
 /** Monta una suite de un solo uso y corre el guard. (codigo, salida) */
-function medir (workflows, extra = []) {
+function medir (workflows, extra = [], acciones = []) {
   const d = mkdtempSync(join(tmpdir(), 'node20-'));
   try {
     const raiz = join(d, 'suite');
@@ -51,6 +51,11 @@ function medir (workflows, extra = []) {
       const wf = join(raiz, repo, '.github', 'workflows');
       mkdirSync(wf, { recursive: true });
       writeFileSync(join(wf, nombre), txt, 'utf8');
+    }
+    for (const [repo, sub, nombre, txt] of acciones) {
+      const dir = join(raiz, repo, '.github', 'actions', sub);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, nombre), txt, 'utf8');
     }
     const r = spawnSync(PY, [GUION, '--raiz', raiz, ...extra], { encoding: 'utf8' });
     return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
@@ -185,6 +190,26 @@ describe('lo que tiene que salir con 0', () => {
         workflow('ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master')]]);
       assert.equal(code, 0);
     });
+
+    it('una accion compuesta con un pin en node20 tambien se mira, va en action.yml',
+      { skip: SIN_PY }, () => {
+        const { code, out } = medir([['ABDEep', 'w.yml', workflow('actions/checkout@v7')]],
+          [],
+          [['ABDSharedCode', 'pnpm-workspace-bootstrap', 'action.yml',
+            'name: x\nruns:\n  using: composite\n  steps:\n    - uses: actions/upload-artifact@v5\n']]);
+        assert.equal(code, 1);
+        assert.match(out, /upload-artifact@v5 corre en node20/);
+      });
+
+    it('y tambien si se llama action.yaml: GitHub acepta las dos extensiones',
+      { skip: SIN_PY }, () => {
+        const { code, out } = medir([['ABDEep', 'w.yml', workflow('actions/checkout@v7')]],
+          [],
+          [['ABDSharedCode', 'mi-accion', 'action.yaml',
+            'name: x\nruns:\n  using: composite\n  steps:\n    - uses: actions/checkout@v4\n']]);
+        assert.equal(code, 1);
+        assert.match(out, /checkout@v4 corre en node20/);
+      });
 
   it('un pin por SHA no se puede comparar con una major, y se imprime sin fallar',
     { skip: SIN_PY }, () => {

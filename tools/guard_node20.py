@@ -100,7 +100,14 @@ RE_REPO = re.compile(r'repository:\s*[\'"]?([\w.-]+/[\w.-]+)')
 
 
 def workflows_de(raiz):
-    """Los ficheros de workflow de todos los repos de la suite, con su repo."""
+    """Los ficheros de workflow de todos los repos de la suite, con su repo.
+
+    Tambien los de las acciones compuestas, que declaran `uses:` igual que un
+    workflow. Se cogen TODOS los .yml/.yaml de `.github/actions/<accion>/`, y no
+    solo `action.yml`: GitHub acepta las dos extensiones, y un repo que lo llame
+    `action.yaml` se quedaba sin mirar sin que el guard dijera nada. Un hueco que
+    parece cobertura es peor que un hueco que se ve.
+    """
     vistos = []
     for repo in sorted(os.listdir(raiz)):
         base = os.path.join(raiz, repo, '.github')
@@ -110,9 +117,12 @@ def workflows_de(raiz):
         acciones = os.path.join(base, 'actions')
         if os.path.isdir(acciones):
             for sub in sorted(os.listdir(acciones)):
-                acciones_sub = os.path.join(acciones, sub, 'action.yml')
-                if os.path.isfile(acciones_sub):
-                    carpetas = carpetas + [acciones_sub]
+                carpeta_accion = os.path.join(acciones, sub)
+                if not os.path.isdir(carpeta_accion):
+                    continue
+                for nombre in sorted(os.listdir(carpeta_accion)):
+                    if nombre.endswith(('.yml', '.yaml')):
+                        carpetas = carpetas + [os.path.join(carpeta_accion, nombre)]
         for carpeta in carpetas:
             if os.path.isfile(carpeta):
                 vistos.append((repo, carpeta))
