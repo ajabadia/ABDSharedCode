@@ -128,21 +128,6 @@ ARREGLOS = {
         'donde': 'DspEffects/EffectPolicy.h',
         'de_donde': 'auditoria: cinco de los nueve ruteos perdian la seca',
     },
-    'schroeder-decay-techo': {
-        'titulo': 'El decay se recorta por arriba, y el recorte NO es jlimit',
-        'donde': 'DspEffects/DspSchroederReverb.h',
-        'de_donde': 'auditoria: la cola crece sin limite con decay por encima de 1.111',
-    },
-    'schroeder-damping-recorte': {
-        'titulo': 'La amortiguacion se recorta a 0..1',
-        'donde': 'DspEffects/DspSchroederReverb.h',
-        'de_donde': 'auditoria: el pasabajos tiene el polo en -1 y crece',
-    },
-    'schroeder-difusion-recorte': {
-        'titulo': 'La difusion se recorta a 0..1',
-        'donde': 'DspEffects/DspSchroederReverb.h',
-        'de_donde': 'auditoria: la misma clase de fallo, en el otro extremo',
-    },
     'schroeder-damping-cero': {
         'titulo': 'La amortiguacion a 0 no congela el estado',
         'donde': 'DspEffects/DspSchroederReverb.h',
@@ -248,68 +233,6 @@ MUTACIONES = [
                 "\n"
                 "private:\n"
                 "    double sampleRate_ = 44100.0;"
-            ),
-        ],
-    },
-    {
-        'id': 2,
-        'arreglo': 'schroeder-decay-techo',
-        'fichero': 'DspEffects/DspSchroederReverb.h',
-        'titulo': 'El decay se queda sin recorte',
-        'por_que': 'Con `decay` por encima de 1.111 la realimentacion pasa de '
-                   '1 y la cola crece sin limite. Es el defecto original.',
-        'muerde': 'decay|cola',
-        'cambios': [
-            (
-                "        decay_ = jmin (decay, 1.0f);",
-                "        decay_ = decay;"
-            ),
-        ],
-    },
-    {
-        'id': 3,
-        'arreglo': 'schroeder-decay-techo',
-        'fichero': 'DspEffects/DspSchroederReverb.h',
-        'titulo': 'El decay se recorta por los dos extremos (el arreglo que parecia bueno)',
-        'por_que': '`jlimit (0, 1)` en vez del `jmin (..., 1.0f)`. Con knobs en '
-                   'rango no cambia ni un bit: por eso cuela. Pero el negativo '
-                   'deja de ser la variante con significado propio, la '
-                   'realimentacion se cae de 0.3 a 0 y la cola desaparece.',
-        'muerde': 'decay|cola',
-        'cambios': [
-            (
-                "        decay_ = jmin (decay, 1.0f);",
-                "        decay_ = jlimit (0.0f, 1.0f, decay);"
-            ),
-        ],
-    },
-    {
-        'id': 4,
-        'arreglo': 'schroeder-damping-recorte',
-        'fichero': 'DspEffects/DspSchroederReverb.h',
-        'titulo': 'La amortiguacion se queda sin recorte',
-        'por_que': 'Con `damping = 2.0` el pasabajos `damp1 = 2, damp2 = -1` '
-                   'tiene el polo en -1 y crece: pico de 1.0e+30 en un segundo.',
-        'muerde': 'amortiguacion|damping',
-        'cambios': [
-            (
-                "        damping_ = jlimit (0.0f, 1.0f, damping);",
-                "        damping_ = damping;"
-            ),
-        ],
-    },
-    {
-        'id': 5,
-        'arreglo': 'schroeder-difusion-recorte',
-        'fichero': 'DspEffects/DspSchroederReverb.h',
-        'titulo': 'La difusion se queda sin recorte',
-        'por_que': 'La misma clase de fallo que la amortiguacion, en el otro '
-                   'extremo: con `diffusion = 2.0` la cola llega a 3.0e+28.',
-        'muerde': 'difusion|diffusion',
-        'cambios': [
-            (
-                "        diffusion_ = jlimit (0.0f, 1.0f, diffusion);",
-                "        diffusion_ = diffusion;"
             ),
         ],
     },

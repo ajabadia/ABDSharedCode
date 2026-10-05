@@ -9,10 +9,10 @@ Repositorio: https://github.com/ajabadia/ABDSharedCode.git
 | Módulo | Contenido | Tipo | Target CMake | Consumidores |
 |---|---|---|---|---|
 | **SynthCore** | Primitivas DSP de los sintetizadores (`abd::synth`): PolyBLEP, ADSR, EnvelopeCurves, PortamentoGlide, LFO, AudioThreadSnapshot, VoiceAllocator, **ModMatrix**, DSPUtils | STATIC | `ABDShared::SynthCore` | ABDMS2000, ABDEep, ABDMS2000/ABDEep/ABDNeural (ModMatrix, header-only) |
-| **DspCore** | Sustrato portado de `juce_core`/`juce_audio_basics` (`abd::dsp`): Maths, Range, SmoothedValue, HeapBlock, AudioBuffer, FloatVectorOperations, MidiMessage/Buffer, Debug, LeakedObjectDetector | INTERFACE (header-only, **sin JUCE**) | `ABDShared::DspCore` | ABDNeural (+ DspEffects) |
-| **DspEffects** | Efectos sobre el sustrato DspCore (`abd::dsp`): Reverb (Freeverb, port literal de `juce::Reverb`), Chorus, Delay, Saturation, `SchroederReverb`; y los de maquina, por politica inyectada: `EffectPolicy` + motores (`MultiHeadEcho`, `RingMod`), etapas de caracter (`TapeColour`, `DiodeBridge`) y perfiles de dispositivo (`Re201Profile` con los doce modos del selector, `ReverbProfile` con las diez variantes del DeepMind 12) | INTERFACE (header-only, **sin JUCE**), linka DspCore | `ABDShared::DspEffects` | ABDNeural, ABDEep, ABDJUNiO601 |
-| **LutDSP** | Evaluación de LUTs y modelado analógico (`abd::lutdsp`): LutEvaluatorSimd (SSE), AnalogLutFilterModule, VoiceDispersionModel, JunoBBD | INTERFACE (header-only) | `ABDShared::LutDSP` | ABDJUNiO601 |
-| **HardwareDrivers** | Codecs de protocolo de hardware (`abd::hw`): SysExCodec, NRPNParser | STATIC | `ABDShared::HardwareDrivers` | ABDMS2000, ABDJUNiO601 |
+| **DspCore** | Sustrato portado de `juce_core`/`juce_audio_basics` (`abd::dsp`): Maths, Range, SmoothedValue, HeapBlock, AudioBuffer, FloatVectorOperations, MidiMessage/Buffer, Debug, LeakedObjectDetector, `DspMath` (trascendentes deterministas) y `ResonantFilterStage` (sección de paso bajo resonante que se auto-oscila y **se asienta** en un nivel) | INTERFACE (header-only, **sin JUCE**) | `ABDShared::DspCore` | ABDNeural (+ DspEffects) |
+| **DspEffects** | Efectos sobre el sustrato DspCore (`abd::dsp`): Reverb (Freeverb, port literal de `juce::Reverb`), Chorus, Delay, Saturation, `SchroederReverb`; y los de maquina, por politica inyectada: `EffectPolicy` + motores (`MultiHeadEcho`, `RingMod`, `JunoBBD`), etapas de caracter (`TapeColour`, `DiodeBridge`, `BbdNoise`) y perfiles de dispositivo (`Re201Profile` con los doce modos del selector, `ReverbProfile` con las diez variantes del DeepMind 12, `JunoBbdProfile` con los dos clones de la Juno) | INTERFACE (header-only, **sin JUCE**), linka DspCore | `ABDShared::DspEffects` | ABDNeural, ABDEep, ABDAudioLab (BBD), ABDJUNiO601 (referencia congelada) |
+| **LutDSP** | Evaluación de LUTs y modelado analógico (`abd::lutdsp`): LutEvaluatorSimd (SSE), AnalogLutFilterModule, VoiceDispersionModel, VoiceAllocator | INTERFACE (header-only) | `ABDShared::LutDSP` | ABDJUNiO601 |
+| **HardwareDrivers** | Codecs de protocolo de hardware (`abd::hw`): SysExCodec, NRPNParser. Enlaza `nlohmann_json` en `PUBLIC` porque `CasioCzVirtualController.h` es superficie pública del módulo e incluye `<nlohmann/json.hpp>` | STATIC | `ABDShared::HardwareDrivers` | ABDMS2000, ABDJUNiO601 |
 | **HardwareMidiDetect** | Detección contract-driven de hardware MIDI (C++ puro + picker WebView2 estilo ABDScope) | INTERFACE | `ABDShared::HardwareMidiDetect` (+ `ABDShared::HardwareMidiPickerAssets`) | ABDAudioLab |
 | **AutoUpdater** | Auto-actualización via GitHub Releases | STATIC | `ABDShared::AutoUpdater` | ABDMS2000, ABDAudioLab |
 | **MidiKeyboard** | Teclado y ruedas compartidos (`@abdsynths/midi-keyb`) | paquete de workspace pnpm, no CMake | — | ABDMS2000 |
@@ -72,6 +72,62 @@ Etapa en curso: extraer a este repo el DSP que hoy vive duplicado en los sintets
   parecen inocentes y no lo son (p. ej. que el array de punteros a canal de
   `AudioBuffer` viva **dentro** del objeto hasta 31 canales y en el heap desde 32).
   Tiene tests standalone propios (`ABDShared_DspCore_Tests`, sin JUCE).
+- **`DspCore/DspResonantFilter.h`** — `abd::dsp::ResonantFilterStage`: un paso bajo
+  de dos estados (TPT) cuyo amortiguamiento puede volverse **negativo**, así que
+  se auto-oscila a la frecuencia de corte, y cuya AGC por potencia de banda hace
+  que esa oscilación **se asienta en un nivel en vez de crecer**
+  (`amplitud = sqrt (-2 * k0 / beta)`). Reescrito limpio desde la idea del estudio
+  Mz950, nada copiado. El nivel asienta a un 0.03–0.4 % de lo predicho y el tercer
+  armónico queda a −84 dB. Los tests comprueban también el **control negativo**:
+  con la AGC apagada el nivel es infinito y la señal crece. Detalle y medido en
+  [`docs/mz950-reaprovechamiento.md`](docs/mz950-reaprovechamiento.md) (fila C1).
+- **`SynthCore/S950PatchFields.h`** — el **catálogo de patches** del Akai S950: 38
+  campos de keygroup y 18 trims de Perform, cada uno con su byte, su rango de panel,
+  su codificación y su nombre de humano. Un panel y un motor que no dicen lo mismo del
+  mismo byte es la forma más barata de perder tiempo, y esto es la tabla que hace que
+  digan lo mismo. Ojo al detalle que la hace necesaria: el 0..99 es lo que **imprime**
+  el panel, no lo que se guarda — los fines de zona van 0..255 porque son el byte bajo
+  de un offset de altura, y el switch de velocidad va 1..128 con un 128 que significa
+  "no hay segunda zona". Reescrito limpio desde la idea del estudio, nada copiado.
+  Detalle y medido en [`docs/mz950-reaprovechamiento.md`](docs/mz950-reaprovechamiento.md)
+  (fila B3).
+  **El mismo catálogo llega a los paneles en JavaScript como un contrato
+  GENERADO**, no como una copia: `ABDSharedAssets/contracts/s950_patch_fields.json`
+  se produce desde esta cabecera y se verifica con `pnpm check:s950-contract` en
+  el paquete compartido. Panel y motor no pueden discrepar sobre el mismo byte;
+  si discrepan, es que el generador no se ha corrido.
+- **`SynthCore/S950Disk.h`** — lee y escribe los bytes **reales** de un programa del
+  S950, y resuelve cada campo por el catálogo de arriba en vez de por offsets escritos a
+  mano. La primera mitad es la geometría del disco (directorio de 64 entradas, tabla de
+  asignación, cadena de bloques) y la segunda son los campos. El detalle que obliga a
+  que sea así: como 70 no divide a 1024, **un keygroup SIEMPRE se parte entre dos
+  bloques**, y esos dos bloques no tienen por qué ser contiguos. Por eso se resuelve byte
+  a byte y no con un `memcpy`, y por eso un byte que cae fuera de la cadena devuelve
+  fallo en vez de un número inventado. Reescrito limpio desde la idea del estudio.
+- **`SynthCore/S950Calibration.h`** — el contrato de las curvas de **unidades
+  medidas** del S950 (envolvente a s, LFO a Hz, warp a s, cutoff a Hz, octavas de
+  la envolvente de filtro, dB del sustain): qué curva existe, en qué unidad y
+  sobre qué rango de panel. **Deliberadamente sin un solo número.** Una tabla de
+  calibración son resultados experimentales, y los del estudio Mz950 son AGPL;
+  en cambio un offset de byte es un hecho de formato que cualquiera redescubre.
+  El coste de no tenerlos es cero hoy: el importador lee y escribe el valor
+  *guardado* y ni lo mira. La regla que lo sostiene es que **`read()` devuelve
+  `std::nullopt` —nunca 0— mientras no haya puntos medidos**, porque un 0 en un
+  tiempo de envolvente es un click, y 0 *es* un número, así que el motor no
+  tendría nada de qué sospechar.
+  **`S950CalibrationHarness.h`** es la salida: convierte una sesión de medición
+  en esa tabla corrigiendo el sesgo de la propia ventana de análisis, y avisa si
+  no ha convergido. No mide — un arnés que midiera sería un banco de pruebas.
+  La tabla **tambien llega a un panel**: `ABDSharedAssets` la vuelca a
+  `contracts/s950_calibration.json` con `pnpm generate:s950-cal` y la indexa en
+  `components/s950Calibration.js`, que con ella puede dibujar los ejes y marcar
+  cuales no estan medidas. El C++ manda y el JSON se genera, como con el
+  catalogo de patches. Y sale de aqui un numero que no era obvio: de las seis
+  curvas solo **dos** tienen eje vertical dibujable, porque las otras cuatro son
+  logaritmicas y un log sin un minimo real —un valor medido— se va a menos
+  infinito. El eje horizontal se dibuja en las seis.
+  Detalle y medido en
+  [`docs/mz950-reaprovechamiento.md`](docs/mz950-reaprovechamiento.md) (filas B4 y B4c).
 - **`DspEffects`** — Reverb, Chorus, Delay y Saturation sobre ese sustrato.
   **Regla de diseño:** el motor expone la **muestra** (`processSample`, `advance`)
   y la **política de producto** —suavizado de parámetros, mapeo de controles
@@ -146,6 +202,20 @@ van en el consumidor, que es quien tiene JUCE y quien asume el riesgo del port.
 [docs/homonimias-cabeceras.md](docs/homonimias-cabeceras.md) — incluye la matriz de
 qué proyecto ha adoptado qué módulo (hoy ABDCZ101 no enlaza ninguno).
 
+**Y lo contrario:** qué hay aquí que no usa ningún producto. Hoy son 17 de 115
+fuentes, todas con motivo escrito en la lista blanca de
+`tools/audit_unconsumed_sources.py` (`--check` devuelve 1 si aparece una nueva).
+El inventario y el porqué están en
+[docs/fuentes-sin-consumidor.md](docs/fuentes-sin-consumidor.md).
+
+**Y lo que se estudia todavia no:** el emulador **Akai S950** (`_RESOURCES/Mz950-main`, AGPLv3)
+resuelve cosas que aqui repetimos. El inventario de que se aprovecha, a donde va cada cosa
+y con que prioridad esta en
+[docs/mz950-reaprovechamiento.md](docs/mz950-reaprovechamiento.md) — y la regla que lo
+gobierna es que **nada se copia**: cada idea se reescribe limpia en el destino, con sus
+pruebas. La primera en aterrizar fue la curva ADSR con esquinas arrastrables, que hoy vive
+en `ABDSharedAssets/components/envelopeCurve.js` y la consume NEURONiK sin copia local.
+
 ## Integración rápida
 
 ```cmake
@@ -186,6 +256,107 @@ escribe `pnpm-workspace.yaml`, instala y verifica que las dependencias
 
 Consumidores actuales: ABDEep (`webui-ci.yml`) y ABDMS2000 (`webui-visual-qa.yml`).
 `@master` es una ref móvil: para congelar la versión, usa un tag o un SHA.
+
+## Pre-commit Hooks (formateo automático de C++)
+
+Este repositorio incluye un hook de `pre-commit` en `.githooks/` que formatea
+automáticamente el código C++ con `clang-format` antes de cada commit. El estilo
+está definido en [`.clang-format`](.clang-format) y es el punto único de verdad
+para el formato de todos los archivos `.h`/`.cpp`.
+
+### Instalación (un solo comando)
+
+**Después de clonar el repositorio, ejecuta esto una sola vez:**
+
+```bash
+bash .githooks/install.sh
+```
+
+Este script ejecuta `git config core.hooksPath .githooks` para que git use los
+hooks de este directorio en lugar de `.git/hooks/`. Solo hay que correrlo una
+vez por clon. Para desinstalar:
+
+```bash
+git config --unset core.hooksPath
+```
+
+### Qué hace el hook
+
+1. **Busca `clang-format` versión 18+.** Si no lo encuentra o la versión es
+anterior, el hook falla y el commit no se completa.
+2. **Revisa que `.clang-format` sea válido** (lo parsea con `--dump-config`).
+3. **Detecta los archivos `.h`/`.cpp` staged.**
+4. **Los formatea in-place** con `clang-format -i` según la configuración de
+`.clang-format`.
+5. **Re-stagea** los archivos formateados automáticamente, de modo que el
+commit incluye el código ya formateado.
+
+> Si necesitas forzar un commit ignorando el hook (por ejemplo, para un commit
+> masivo o un archivo que aún no está formateado), usa:
+> ```bash
+> git commit --no-verify -m "..."
+> ```
+> No es lo habitual; el hook está ahí para que el estilo se mantenga sin que
+> nadie tenga que pensar en ello.
+
+### Estilo de código (`.clang-format`)
+
+La configuración en [`.clang-format`](.clang-format) define el estilo compartido:
+
+| Propiedad | Valor | Ejemplo |
+|---|---|---|
+| Indentación | 4 espacios, sin tabs | `    body();` |
+| Braces | En nueva línea (namespace, clase, struct, función, control) | `class Foo
+{` |
+| Pointers/references | Pegados al tipo | `Type* p`, `Type& p` |
+| Spaces before parens | Solo después de keywords (`if`, `for`, `while`) | `if (x)` / `foo(x)` |
+| Espacio después de C-style cast | No | `(float)x` no `(float) x` |
+| Límite de columna | Ilimitado (`0`) | las líneas largas se preservan |
+| Standard | `c++20` | requiere clang-format 18+ |
+
+### Instalar `clang-format` 18+
+
+| Sistema | Comando |
+|---|---|
+| Ubuntu / Debian | `sudo apt install clang-format-18` |
+| macOS (Homebrew) | `brew install xcode-clang` (o `brew install llvm@18`) |
+| Windows (MSYS2) | `pacman -S mingw-w64-x86_64-clang-format` |
+| Cualquier sistema (pip) | `pip install clang-format==18.*` |
+
+### Verificación en CI
+
+El workflow [`shared-code-ci.yml`](.github/workflows/shared-code-ci.yml) incluye
+un job `clang-format` que ejecuta **el propio hook en modo `VERIFY_ONLY`** sobre todos
+los archivos `.h`/`.cpp` en cada *push* a `master` y en cada *pull request`. El
+modo `VERIFY_ONLY` hace que el hook use `git ls-files` para listar todos los
+archivos trackeados y los compruebe con `clang-format --dry-run --Werror`, sin
+modificar nada en disco.
+
+Además incluye un **test negativo** que crea un archivo C++ deliberadamente mal
+formateado, ejecuta el hook, y verifica que falla (exit ≠ 0). Si el hook no detectara
+el archivo mal formateado, el CI falla diciendo que el hook ignora violaciones.
+
+El hook local y el CI verifican lo mismo: el hook formatea antes de commitear, y
+el CI comprueba que nada se haya escapado —y que el hook funciona realmente.
+
+### Makefile (uso alternativo en local)
+
+Además del hook, este repositorio incluye un [`Makefile`](Makefile) con targets de
+conveniencia para verificar o aplicar el formato sin usar git hooks:
+
+```bash
+make check-format    # verifica estilo sin modificar (dry-run --Werror)
+make format          # formatea todos los .h/.cpp in-place
+make verify          # ejecuta el hook en modo VERIFY_ONLY (equivalente al CI)
+```
+
+| Target | Qué hace | Modifica archivos? |
+|---|---|---|
+| `make check-format` | `clang-format --dry-run --Werror` sobre todos los `.h`/`.cpp` | No |
+| `make format` | `clang-format -i` sobre todos los `.h`/`.cpp` | Sí |
+| `make verify` | Ejecuta `VERIFY_ONLY=1 bash .githooks/pre-commit` | No |
+
+Usa `make help` para ver los targets disponibles.
 
 ## Publicación y versionado
 

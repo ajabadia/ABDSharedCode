@@ -11,6 +11,12 @@ CMakeLists.txt text eol=lf
 *.gitignore text eol=lf
 *.gitattributes text eol=lf
 
+# Pre-commit hooks and formatting config
+.clang-format text eol=lf
+.githooks/pre-commit text eol=lf
+.githooks/install.sh text eol=lf
+Makefile text eol=lf
+
 # Binarios
 *.lib binary
 *.a binary
