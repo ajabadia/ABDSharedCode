@@ -1,13 +1,24 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ABDScope Studio Telemetry</title>
   <script>
+    window.setTheme = function(themeName) {
+      if (!themeName) return;
+      document.documentElement.setAttribute('data-theme', themeName);
+      if (document.body) {
+        document.body.setAttribute('data-theme', themeName);
+        document.body.dataset.theme = themeName;
+        const classes = Array.from(document.body.classList).filter(c => !c.startsWith('theme-') && !c.startsWith('skin-'));
+        classes.push('theme-' + themeName, 'skin-' + themeName);
+        document.body.className = classes.join(' ');
+      }
+    };
     (function() {
       const params = new URLSearchParams(window.location.search);
-      const theme = params.get("theme") || "ms2000";
+      const theme = params.get("theme") || "audiolab";
       document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
@@ -38,15 +49,23 @@
   <script>
     window.addEventListener("DOMContentLoaded", () => {
       const params = new URLSearchParams(window.location.search);
-      const theme = params.get("theme") || "ms2000";
-      document.body.setAttribute("data-theme", theme);
-      document.body.classList.add("theme-" + theme);
+      const theme = params.get("theme") || (document.documentElement.getAttribute("data-theme") || "audiolab");
+      window.setTheme(theme);
       try {
-        if (window.__JUCE__ && window.__JUCE__.backend) {
+        if (window.__JUCE__ && window.__JUCE__.backend && typeof window.__JUCE__.backend.emitEvent === 'function') {
           window.__JUCE__.backend.emitEvent("pageLoaded", {});
         }
       } catch (e) {}
     });
+
+    // React immediately when JuceWebView2Component sets data-theme on documentElement
+    const themeObserver = new MutationObserver(() => {
+      const curTheme = document.documentElement.getAttribute("data-theme") || "audiolab";
+      if (document.body && document.body.getAttribute("data-theme") !== curTheme) {
+        window.setTheme(curTheme);
+      }
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   </script>
   <script type="module">
     import { createScope } from './src/scope.js';

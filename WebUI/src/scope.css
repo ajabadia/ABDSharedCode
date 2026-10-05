@@ -26,6 +26,9 @@
   --scope-font-lcd: 'Courier New', 'Roboto Mono', monospace;
 }
 
+{
+
+
 /* ─── Global Theme-Aware Scrollbars ─── */
 ::-webkit-scrollbar {
   width: 6px;
@@ -452,3 +455,5 @@
   box-sizing: border-box;
   flex-shrink: 0;
 }
+
+

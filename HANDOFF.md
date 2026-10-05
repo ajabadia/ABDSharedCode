@@ -100,4 +100,46 @@ Execution follows the phase plan in the evaluation doc (§6).
 - Interactive demo harness `WebUI/demo/` **removed** (folder + CMake/vitest/start.bat/README/guide references). `index.html` now defaults to the dark canonical theme (`ms2000`); `npm run serve` (was `demo`) serves `WebUI/`.
 - JS tests: **59/59 in both toolchains** (was 56/56; +3 from icons.test.js).
 
-**Still pending:** visual/pixel parity verification on real hosts once ABDMS2000/AudioLab adopt the shared cascade; CHANGELOG/version + remaining doc pass at closure (Fase 4).
+**Estado real verificado en git (2026-09-05, base del desarrollo):**
+
+- **Fase 0 (decisión A1):** ✅ Registrada 2026-09-05. `docs/EVALUATION_ABDSHAREDCODE_ASSETS.md` y `HANDOFF.md` §6. Documento de evaluación es la referencia canónica; este HANDOFF es el contexto de desarrollo.
+
+- **Fase 1 (assets, enriquecer ABDSharedAssets + refactorizar scope.css + módulo de iconos):** ✅ **Commiteada** en 4 commits de `main` (v0.3.2). Estado exacto verificado por diff de commits: `7bdf296` (audiolab-light default theme + pageLoaded listener), `0a296f3` (host-driven default theme con dark/light aliases, CHANGELOG v0.3.2), `5748c73` (migrate per-theme palettes to ABDSharedAssets cascade, eliminar `WebUI/demo/` carpeta + referencias CMake/vitest/start.bat, generar `WebUI/src/icons.js` + `WebUI/tests/icons.test.js` desde `ABDSharedAssets/icons/`, quitar bloques `[data-theme=...]` de `WebUI/src/scope.css`), `ab20906` (nota JUCE 8.0.4 compatibility en docs). Los puntos de cheque del EVALUATION Fase 1 que ya están cumplidos:
+  - `ABDSharedAssets/styles/components/scope.css` enriquecido al set completo de 16 tokens `--scope-*` + alias fuente `--scope-font`/`--scope-font-lcd`.
+  - `WebUI/src/scope.css` sin bloques `[data-theme=...]` (solo `:root` con fallbacks oscuros canónicos).
+  - `WebUI/src/icons.js` + `WebUI/tests/icons.test.js` con paridad contra `ABDSharedAssets/icons/`.
+  - `WebUI/demo/` eliminado (carpeta + referencias).
+  - JS tests 59/59 en ambas toolchains (56 + 3 de paridad de iconos).
+  - CHANGELOG v0.3.2.
+
+  **Estado del EVALUATION respecto a esto:** el doc decía "ejecutada 2026-09-05, sin commitear". En realidad está commiteada. El doc está desactualizado en ese punto.
+
+- **Fase 2 (extraer andamiaje WebView2 común como `ABDShared::WebView2Bridge` en ABDSharedCode):** ❌ **NO existe el módulo del puente** en ABDSharedCode. La preparación sí está commiteada en el scope: `Source/CMakeLists.txt` tiene la dependencia opcional (`if(TARGET ABDShared::WebView2Bridge)` fallback a path relativo), y `Source/JUCE/JuceWebScopeComponent.h` tiene el diff no commiteado que cambia la clase para heredar de `abd::webview2::JuceWebView2Component` (elimina `webBrowser` miembro, `setTheme`, `applyStoredTheme`, `reload`, `resized`, `currentTheme` — todo delegado al puente). Los puntos del EVALUATION que verifican la duplicación real:
+  - La duplicación existe: `ABDScope/Source/JUCE/ScopeResourceProvider.*` vs `ABDSharedCode/HardwareMidiDetect/HardwareMidiPickerResourceProvider.*` — misma forma, namespace distinto (`abd::scope` vs `abd::hwid`). Verificable por diff de ambos archivos.
+  - `JuceWebScopeComponent` (commiteado en `5748c73`) sigue siendo `juce::Component` con su propio `juce::WebBrowserComponent webBrowser` miembro — el refactor a heredar del puente está en `git diff` sin commitear.
+  - ABDAudioLab referencia `WebView2ResourceProvider.cpp` vía path relativo directo (`${CMAKE_CURRENT_SOURCE_DIR}/../ABDSharedCode/WebView2Bridge/WebView2ResourceProvider.cpp` en `target_sources` línea 214), no vía target del orquestador — lo que confirma que el puente existe como archivos pero no como target CMake publicado en `ABDSharedCode/CMakeLists.txt`. Revisar: el archivo existe en `ABDSharedCode/WebView2Bridge/`? (no se ha verificado en esta revisión — hay que confirmar).
+
+- **Fase 3 (absorber ABDScope en ABDSharedCode con historia):** ❌ **Pendiente.** `ABDSharedCode/Scope/` no existe. `git subtree` o merge no ejecutados. Targets `ABDShared::Scope*` no registrados en el orquestador. `ABDAudioLab/CMakeLists.txt` enlaza `ABDScope::ABDScopeCore` (target del repo standalone), no `ABDShared::ScopeCore`. Fricción #5 del EVALUATION (recetas distintas por consumidor) persiste: MS2000 exige `../ABDScope` local sin fallback; ABDAudioLab tiene local + FetchContent; el plan es unificar bajo `ABDShared::Scope*`.
+
+- **Fase 4 (cierre):** ❌ **Pendiente** (depende de Fases 2 y 3).
+
+**Estado del código sin commitear en ABDScope al inicio del desarrollo (verificado con git diff):**
+- `Source/CMakeLists.txt`: añade dependencia opcional a `ABDShared::WebView2Bridge` con fallback a path relativo. **Preparación de Fase 2/3**, no contiene lógica nueva.
+- `Source/JUCE/JuceWebScopeComponent.h`: refactor a `public abd::webview2::JuceWebView2Component` (elimina `webBrowser` miembro, `setTheme`, `applyStoredTheme`, `reload`, `resized`, `currentTheme` miembro). El diff elimina ~57 líneas y añade ~24. **No commiteado** — está como trabajo preparatorio para el puente. Decisión pendiente: commitear estos cambios como "prep for WebView2Bridge extraction" antes de ejecutar Fase 2 (recomendado: da una base estable) o revisarlos dentro de Fase 2.
+
+**ABDAudioLab y consumo de scope (verificado en CMakeLists.txt):**
+- `add_subdirectory ../ABDScope` (local, línea 91) + fallback FetchContent a `github.com/ajabadia/ABDScope.git#main` (líneas 93-102).
+- `target_include_directories` incluye `${CMAKE_CURRENT_SOURCE_DIR}/../ABDScope/Source` (línea 327).
+- `target_link_libraries` enlaza `ABDScope::ABDScopeCore` (línea 366) y también en `ABDAudioLab_Tests` (línea 537).
+- Referencia directa a archivos de ABDSharedCode en `target_sources`: `WebView2ResourceProvider.cpp` (línea 214), `StudioTopology/*`, `HardwareMidiDetect/JuceMidiHardwareBackend.cpp`, `HardwareDrivers/*.cpp`, `AudioComparator/*.cpp` — todos vía path relativo, no vía targets publicados del orquestador de ABDSharedCode. Esto es la "fricción #1" del EVALUATION: los consumidores apuntan a archivos, no a targets publicados.
+
+**Fuente canónica de verdad para el estado de las fases:**
+
+| Artefacto | Rol |
+|---|---|
+| `docs/EVALUATION_ABDSHAREDCODE_ASSETS.md` | Decisión A1 + plan de fases (política) |
+| Este `HANDOFF.md` | Contexto de desarrollador + estado de ejecución (qué se ha hecho) |
+| `CHANGELOG.md` | Versión y cambios commiteados |
+| `git log` + `git diff` | Verificación de commiteado vs no commiteado a cada momento |
+
+**Regla para el desarrollo:** el punto de partida es `main` de ABDScope (v0.3.2, Fase 1 commiteada) **con los 2 ficheros modificados sin commitear** (`Source/CMakeLists.txt` + `Source/JUCE/JuceWebScopeComponent.h`).

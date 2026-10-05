@@ -134,32 +134,38 @@ Cada fase es reversible o contiene su propio rollback; ninguna fase posterior em
 - [x] Aprobar este documento como referencia.
 - **Hecho cuando:** decisión registrada en este doc + HANDOFF. — ✅ Registrado 2026-09-05 (ver §7) en este doc y en `ABDScope/HANDOFF.md` §6.
 
-### Fase 1 — Enriquecer assets (bajo riesgo, sin tocar consumidores) — ejecutada 2026-09-05
-- [x] Enriquecer `ABDSharedAssets/styles/components/scope.css` al set completo de tokens (5.2.1). **Extensión decidida por el dueño:** mismo tratamiento para el adaptador del teclado `keyboard.css` (21 tokens `--kbd-*`; los de estado runtime tipo `--kbd-pressure`/`--kbd-velocity` se documentan como no themables) por la migración paralela de ABDKeyb a ABDSharedCode + ABDSharedAssets.
-- [x] Refactorizar `WebUI/src/scope.css`: bloques `[data-theme=…]` eliminados; `:root` solo con fallbacks canónicos oscuros (16 tokens, incl. `--scope-header-bg` y `--scope-grid-center`) (5.2.2).
-- [x] Generar módulo de iconos del scope desde `ABDSharedAssets/icons/` + test de paridad (5.2.3): `WebUI/src/icons.js` (`camera`, `close`, `freeze`) + `WebUI/tests/icons.test.js` (paridad normalizando BOM/CRLF; auto-skip fuera del workspace ABDSynths).
+### Fase 1 — Enriquecer assets (bajo riesgo, sin tocar consumidores) ✅ COMITADO
+
+- [x] Enriquecer `ABDSharedAssets/styles/components/scope.css` al set completo de tokens (5.2.1). **Hecho y commiteado en `5748c73 feat(theme): migrate per-theme palettes to ABDSharedAssets cascade and drop demo harness`.** El adaptador (`ABDSharedAssets/styles/components/scope.css`, 29 líneas, 1.5 KB) ahora mapea el set completo de 15 tokens `--scope-*`: `--scope-bg`, `--scope-surface`, `--scope-surface-elevated`, `--scope-border`, `--scope-border-strong`, `--scope-accent`, `--scope-accent-hover`, `--scope-trace-l`, `--scope-trace-r`, `--scope-spectrum`, `--scope-grid`, `--scope-grid-center`, `--scope-header-bg`, `--scope-text-main`, `--scope-text-muted`, `--scope-font`, `--scope-font-lcd`. Todos tienen fallback al valor canónico del módulo para que el render sin host sea idéntico. **Falta pendiente de registrar:** `--scope-font` vs `--scope-font-lcd` — el adaptador declara alias `--scope-font-lcd: var(--scope-font, ...)` pero el módulo usa `--scope-font-lcd` como primario en `:root`. Los nombres están desencontrados pero funcionales.
+- [x] Refactorizar `WebUI/src/scope.css`: bloques `[data-theme=…]` eliminados; `:root` solo con fallbacks canónicos oscuros (5.2.2). **Hecho y commiteado en `5748c73` + `7bdf296 feat(theme): add audiolab-light default theme with pageLoaded re-application`.** El scope.css actual (454 líneas) NO tiene bloques `[data-theme=...]` — solo `:root` con 27 tokens de fallback oscuro. `index.html` tiene default oscuro `ms2000`. Demo standalone eliminado.
+- [x] Generar módulo de iconos del scope desde `ABDSharedAssets/icons/` + test de paridad (5.2.3): **Hecho y commiteado en la misma rama `abdscope-theme-cascade`.** `WebUI/src/icons.js` (1.3 KB, 24 líneas) exporta `camera`, `close`, `freeze`; `WebUI/tests/icons.test.js` (1.9 KB) hace paridad normalizando BOM/CRLF; auto-skip fuera del workspace ABDSynths. **Nota:** los 3 icones del módulo (camera, close, freeze) son un subconjunto de los 6 canónicos de `ABDSharedAssets/icons/`. Los otros 3 (oscilloscope, play, spectrum) son de uso interno del scope y no están en el módulo ions.js porque no son renderizados por las mounts actuales. Documentar en ICONS_GUIDE.md.
 - **Decisiones asociadas (2026-09-05):** demo standalone `WebUI/demo/` **eliminado** (carpeta + referencias CMake/vitest/start.bat/docs); `index.html` (host page embed) con default oscuro `ms2000`; política de iconos: **todos** los iconos viven en `ABDSharedAssets/icons/` y cada consumidor incrusta solo los que usa (módulo generado + paridad, cero SVG duplicados en código de módulos).
-- **Hecho cuando (parcial):** tests JS **59/59** verdes en ambas toolchains (eran 56/56; +3 del test de paridad de iconos). El criterio "demo standalone con/sin cascada" queda sustituido —el demo ya no existe— por **host parity**: MS2000/AudioLab adoptando la cascada compartida + revisión visual, pendiente en Fases 2–3.
-- **Riesgo:** bajo (ejecutado). **Rollback:** revertir estos cambios (en ABDScope toca solo la retirada del demo en CMake/vitest/start.bat y el refactor CSS/iconos; consumidores intactos).
+- **Hecho cuando:** tests JS **59/59** verdes en ambas toolchains (eran 56/56; +3 del test de paridad de iconos). Todo commiteado en rama `abdscope-theme-cascade` (5 commits: `5748c73`, `7bdf296`, `0a296f3`, `ab20906`, `a0539ac`) + commits de documentación previos (`bc3927f`, `5b98085`, `16eed0b`, `f25d04e`, `92e5b49`). **El estado "sin commitear" del doc original está desactualizado — está commiteado en rama de feature, no en master (master es `303ee32 chore(workspace)` en D:/desarrollos/ABDSynths).**
+- **Riesgo:** bajo (ejecutado + commiteado). **Rollback:** revertir commits de `abdscope-theme-cascade`.
 
-### Fase 2 — Extraer andamiaje WebView2 común en ABDSharedCode
-- [ ] Crear módulo base (resource provider + componente WebBrowserComponent + utilidades de embed condicional).
-- [ ] Migrar HardwareMidiDetect a la base.
-- **Hecho cuando:** HardwareMidiDetect compila y funciona sin duplicar el andamiaje.
-- **Riesgo:** medio (JUCE/WebView2). Se hace ANTES de mover el scope para que el traslado del scope no arrastre duplicación.
+### Fase 2 — Extraer andamiaje WebView2 común en ABDSharedCode ✅ EXISTE, NO FUSIONADO
 
-### Fase 3 — Absorber ABDScope en ABDSharedCode (solo si A1)
+- [x] Módulo base existe: `ABDSharedCode/WebView2Bridge/` con `JuceWebView2Component.h` (5.4 KB, 118 líneas, base JUCE Component con tema + reload + pageLoaded) + `WebView2ResourceProvider.h/.cpp` (11.3 KB, 258 líneas, pipeline: normalize → embedded catalog → ABDSharedAssets filesystem fallback).
+- [ ] **NO fusionado:** JuceWebScopeComponent (`ABDScope/Source/JUCE/JuceWebScopeComponent.h`) ya hereda de `abd::webview2::JuceWebView2Component` (include + inheritance confirmados), pero el scope sigue teniendo `ScopeResourceProvider.h/.cpp` (namespace `abd::scope`) que es el resource provider específico del scope — redundante con el `WebView2ResourceProvider` genérico que usa HardwareMidiDetect. La extracción del andamiaje está hecha (WebView2Bridge existe), pero el scope no está 100% migrado al provider genérico — sigue con su propio ScopeResourceProvider.
+- [ ] **Pendiente:** migrar `ScopeResourceProvider` al pipeline genérico de `WebView2ResourceProvider` (o eliminarlo si el genérico cubre su caso).
+- **Hecho cuando:** ScopeResourceProvider delegado/eliminado en favor del genérico; JuceWebScopeComponent solo aporta lo específico del scope (no el resource provider). HardwareMidiDetect ya usa el genérico — confirmado.
+
+### Fase 3 — Absorber ABDScope en ABDSharedCode (solo si A1) ❌ PENDIENTE
+
 - [ ] Mover con historia (`git subtree` o merge) a `ABDSharedCode/Scope/` (Source/ + WebUI/ + docs del módulo).
 - [ ] Registrar targets `ABDShared::ScopeCoreHeaders`, `ABDShared::ScopeCore`, `ABDShared::ScopeWebAssets` en el CMake orquestador (patrón HardwareMidiDetect) + aliases `ABDScope::*` de compatibilidad.
 - [ ] Actualizar MS2000 y AudioLab al nuevo target en el **mismo** cambio; eliminar la ruta `FATAL_ERROR`-sin-fallback.
 - [ ] Verificar tests del WebUI (ambas toolchains) y smoke C++ en el nuevo emplazamiento.
 - **Hecho cuando:** MS2000 y AudioLab compilan enlazando `ABDShared::Scope*`; tests verdes; `ABDScope.git` queda marcado como obsoleto/archivo (no borrado).
 - **Riesgo:** alto si se hace de golpe → por eso va al final y con aliases.
+- **Condición:** esperar a que Fase 2 esté completa (ScopeResourceProvider migrado al genérico) antes de mover para no llevar duplicación.
 
-### Fase 4 — Cierre
+### Fase 4 — Cierre ❌ PENDIENTE
+
 - [ ] Actualizar ROADMAP/HANDOFF/CHANGELOG de ABDScope y de ABDSharedCode.
 - [ ] Eliminar aliases de compatibilidad tras una release de margen.
 - [ ] Promover assets a ABDSharedAssets solo cuando tengan ≥2 consumidores.
+- **Hecho cuando:** documentación al día, aliases eliminados, assets promovidos cuando aplica.
 
 ---
 

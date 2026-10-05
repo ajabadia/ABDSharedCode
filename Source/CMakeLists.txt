@@ -44,6 +44,14 @@ endif()
 add_library(ABDScopeCore INTERFACE)
 target_link_libraries(ABDScopeCore INTERFACE ABDScopeCoreHeaders)
 
+if(TARGET ABDShared::WebView2Bridge)
+  target_link_libraries(ABDScopeCore INTERFACE ABDShared::WebView2Bridge)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../ABDSharedCode")
+  target_include_directories(ABDScopeCore INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../ABDSharedCode>
+  )
+endif()
+
 target_include_directories(ABDScopeCore INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/JUCE>
 )
