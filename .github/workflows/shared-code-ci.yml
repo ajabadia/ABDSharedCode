@@ -465,7 +465,7 @@ jobs:
       # siempre el mismo y siempre aqui.
       #
       # El SHA de ABDSharedCode sale del propio checkout (el de este commit), y
-      # los otros cinco hay que subirlos aqui cuando se muevan. Es el mismo
+      # los otros seis hay que subirlos aqui cuando se muevan. Es el mismo
       # trabajo manual que hace `siblings.json` en ABDSharedAssets.
       - name: Checkout ABDEep (SHA inmutable)
         uses: actions/checkout@v7
@@ -515,6 +515,20 @@ jobs:
           repository: ajabadia/ABDSharedAssets
           ref: 065ca6c6aef82e8d41cf6a94d650ab28f5c27e4c
           path: ABDSharedAssets
+
+      # ABDBankManager entra en la foto (2026-10-06): es el consumidor del modulo
+      # BankManager (el corte, en ABDBankManager/DOCS/bank-manager-module-cut.md),
+      # y con el aqui el trinquete dejo de necesitar las 9 entradas _BANCO de
+      # ALLOWLIST — el propio script prometia que sobrarian al entrar, y asi se
+      # hizo: ver el bloque de comentario que las substituye en
+      # tools/audit_unconsumed_sources.py. Las 55 huerfanas de la linea base no
+      # cambian: este producto no consume ninguna (medido, no supuesto).
+      - name: Checkout ABDBankManager (SHA inmutable)
+        uses: actions/checkout@v7
+        with:
+          repository: ajabadia/ABDBankManager
+          ref: a1d6daed45056013914e3a4ac479c2bd2ae01b52
+          path: ABDBankManager
 
       - name: Setup Python
         uses: actions/setup-python@v7
