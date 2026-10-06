@@ -1,15 +1,16 @@
 #include "NRPNParser.h"
 #include <algorithm>
 
-namespace abd::hw {
+namespace abd::hw
+{
 
 void NRPNParser::reset() noexcept
 {
-    currentChannel_ = 1;
+    currentChannel_  = 1;
     currentNRPN_MSB_ = -1;
     currentNRPN_LSB_ = -1;
-    currentDataMSB_ = -1;
-    currentDataLSB_ = -1;
+    currentDataMSB_  = -1;
+    currentDataLSB_  = -1;
 }
 
 bool NRPNParser::processCC(int channel, int ccNumber, int ccValue, NRPNMessage& outMsg) noexcept
@@ -25,25 +26,25 @@ bool NRPNParser::processCC(int channel, int ccNumber, int ccValue, NRPNMessage& 
     {
         case 99: // NRPN MSB
             currentNRPN_MSB_ = ccValue & 0x7F;
-            currentDataMSB_ = -1;
-            currentDataLSB_ = -1;
+            currentDataMSB_  = -1;
+            currentDataLSB_  = -1;
             break;
 
         case 98: // NRPN LSB
             currentNRPN_LSB_ = ccValue & 0x7F;
-            currentDataMSB_ = -1;
-            currentDataLSB_ = -1;
+            currentDataMSB_  = -1;
+            currentDataLSB_  = -1;
             break;
 
-        case 6:  // Data Entry MSB
+        case 6: // Data Entry MSB
             if (currentNRPN_MSB_ >= 0 && currentNRPN_LSB_ >= 0)
             {
                 currentDataMSB_ = ccValue & 0x7F;
-                outMsg.channel = currentChannel_;
-                outMsg.nrpnMSB = currentNRPN_MSB_;
-                outMsg.nrpnLSB = currentNRPN_LSB_;
-                outMsg.dataMSB = currentDataMSB_;
-                outMsg.dataLSB = currentDataLSB_;
+                outMsg.channel  = currentChannel_;
+                outMsg.nrpnMSB  = currentNRPN_MSB_;
+                outMsg.nrpnLSB  = currentNRPN_LSB_;
+                outMsg.dataMSB  = currentDataMSB_;
+                outMsg.dataLSB  = currentDataLSB_;
                 return true;
             }
             break;
@@ -52,11 +53,11 @@ bool NRPNParser::processCC(int channel, int ccNumber, int ccValue, NRPNMessage& 
             if (currentNRPN_MSB_ >= 0 && currentNRPN_LSB_ >= 0 && currentDataMSB_ >= 0)
             {
                 currentDataLSB_ = ccValue & 0x7F;
-                outMsg.channel = currentChannel_;
-                outMsg.nrpnMSB = currentNRPN_MSB_;
-                outMsg.nrpnLSB = currentNRPN_LSB_;
-                outMsg.dataMSB = currentDataMSB_;
-                outMsg.dataLSB = currentDataLSB_;
+                outMsg.channel  = currentChannel_;
+                outMsg.nrpnMSB  = currentNRPN_MSB_;
+                outMsg.nrpnLSB  = currentNRPN_LSB_;
+                outMsg.dataMSB  = currentDataMSB_;
+                outMsg.dataLSB  = currentDataLSB_;
                 return true;
             }
             break;
@@ -69,7 +70,7 @@ bool NRPNParser::processCC(int channel, int ccNumber, int ccValue, NRPNMessage& 
 }
 
 void NRPNParser::appendNRPNToBuffer(juce::MidiBuffer& buffer, int channel, int nrpnMSB, int nrpnLSB,
-                                     int dataValue, bool use14Bit, int samplePosition) noexcept
+                                    int dataValue, bool use14Bit, int samplePosition) noexcept
 {
     int ch = std::max(1, std::min(16, channel));
 

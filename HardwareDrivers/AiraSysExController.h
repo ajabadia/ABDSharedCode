@@ -1,8 +1,8 @@
 #pragma once
 
+#include "FskAudioModem.h"
 #include "HardwareController.h"
 #include "RoutingValidator.h"
-#include "FskAudioModem.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <vector>
 
@@ -40,9 +40,9 @@ public:
     [[nodiscard]] static uint8_t mapHardwareIdToAiraModel(const juce::String& hardwareId)
     {
         if (hardwareId.contains("BITRAZER")) return static_cast<uint8_t>(AiraModel::Bitrazer);
-        if (hardwareId.contains("DEMORA"))   return static_cast<uint8_t>(AiraModel::Demora);
-        if (hardwareId.contains("TORCIDO"))  return static_cast<uint8_t>(AiraModel::Torcido);
-        if (hardwareId.contains("SCOOPER"))  return static_cast<uint8_t>(AiraModel::Scooper);
+        if (hardwareId.contains("DEMORA")) return static_cast<uint8_t>(AiraModel::Demora);
+        if (hardwareId.contains("TORCIDO")) return static_cast<uint8_t>(AiraModel::Torcido);
+        if (hardwareId.contains("SCOOPER")) return static_cast<uint8_t>(AiraModel::Scooper);
         return static_cast<uint8_t>(AiraModel::GenericModular);
     }
 
@@ -50,26 +50,39 @@ public:
     {
         switch (targetModel)
         {
-            case AiraModel::Bitrazer: return "Roland AIRA Bitrazer";
-            case AiraModel::Demora:   return "Roland AIRA Demora";
-            case AiraModel::Torcido:  return "Roland AIRA Torcido";
-            case AiraModel::Scooper:  return "Roland AIRA Scooper";
-            default:                  return "Roland AIRA Modular";
+            case AiraModel::Bitrazer:
+                return "Roland AIRA Bitrazer";
+            case AiraModel::Demora:
+                return "Roland AIRA Demora";
+            case AiraModel::Torcido:
+                return "Roland AIRA Torcido";
+            case AiraModel::Scooper:
+                return "Roland AIRA Scooper";
+            default:
+                return "Roland AIRA Modular";
         }
     }
 
     bool connect() override
     {
         auto midiOutputs = juce::MidiOutput::getAvailableDevices();
-        auto midiInputs = juce::MidiInput::getAvailableDevices();
+        auto midiInputs  = juce::MidiInput::getAvailableDevices();
 
         juce::String searchKeyword = "AIRA";
         switch (targetModel)
         {
-            case AiraModel::Bitrazer: searchKeyword = "BITRAZER"; break;
-            case AiraModel::Demora:   searchKeyword = "DEMORA"; break;
-            case AiraModel::Torcido:  searchKeyword = "TORCIDO"; break;
-            case AiraModel::Scooper:  searchKeyword = "SCOOPER"; break;
+            case AiraModel::Bitrazer:
+                searchKeyword = "BITRAZER";
+                break;
+            case AiraModel::Demora:
+                searchKeyword = "DEMORA";
+                break;
+            case AiraModel::Torcido:
+                searchKeyword = "TORCIDO";
+                break;
+            case AiraModel::Scooper:
+                searchKeyword = "SCOOPER";
+                break;
         }
 
         juce::MidiDeviceInfo targetOutDevice, targetInDevice;
@@ -80,7 +93,7 @@ public:
             if (d.name.containsIgnoreCase(searchKeyword) || d.name.containsIgnoreCase("AIRA"))
             {
                 targetOutDevice = d;
-                foundOut = true;
+                foundOut        = true;
                 break;
             }
         }
@@ -90,7 +103,7 @@ public:
             if (d.name.containsIgnoreCase(searchKeyword) || d.name.containsIgnoreCase("AIRA"))
             {
                 targetInDevice = d;
-                foundIn = true;
+                foundIn        = true;
                 break;
             }
         }
@@ -139,8 +152,8 @@ public:
         // GRF knob parameters map directly to CC 11..16 or SysEx 10 00 00 01..08
         if (paramIndex >= 1 && paramIndex <= 8)
         {
-            uint8_t addr[4] = { 0x10, 0x00, 0x00, static_cast<uint8_t>(paramIndex) };
-            uint8_t data[1] = { val };
+            uint8_t addr[4] = {0x10, 0x00, 0x00, static_cast<uint8_t>(paramIndex)};
+            uint8_t data[1] = {val};
             sendDataSet1(addr, data, 1);
             return true;
         }
@@ -162,10 +175,10 @@ public:
 
         slotTypes[static_cast<size_t>(slotIndex)] = typeId & 0x1F;
 
-        uint8_t offset = static_cast<uint8_t>(slotIndex * 5);
-        uint8_t addr[4] = { 0x10, 0x10, 0x00, offset };
-        uint8_t data[1] = { static_cast<uint8_t>(typeId & 0x1F) };
-        
+        uint8_t offset  = static_cast<uint8_t>(slotIndex * 5);
+        uint8_t addr[4] = {0x10, 0x10, 0x00, offset};
+        uint8_t data[1] = {static_cast<uint8_t>(typeId & 0x1F)};
+
         sendDataSet1(addr, data, 1);
         return true;
     }
@@ -175,9 +188,9 @@ public:
         if (!isConnected() || slotIndex < 0 || slotIndex >= 6 || paramIndex < 1 || paramIndex > 4)
             return false;
 
-        uint8_t offset = static_cast<uint8_t>(slotIndex * 5 + paramIndex);
-        uint8_t addr[4] = { 0x10, 0x10, 0x00, offset };
-        uint8_t data[1] = { static_cast<uint8_t>(rawValue & 0x7F) };
+        uint8_t offset  = static_cast<uint8_t>(slotIndex * 5 + paramIndex);
+        uint8_t addr[4] = {0x10, 0x10, 0x00, offset};
+        uint8_t data[1] = {static_cast<uint8_t>(rawValue & 0x7F)};
 
         sendDataSet1(addr, data, 1);
         return true;
@@ -198,8 +211,8 @@ public:
             }
         }
 
-        uint8_t addr[4] = { 0x10, 0x20, sourceId, destId };
-        uint8_t data[1] = { static_cast<uint8_t>(isConnectedCable ? 0x01 : 0x00) };
+        uint8_t addr[4] = {0x10, 0x20, sourceId, destId};
+        uint8_t data[1] = {static_cast<uint8_t>(isConnectedCable ? 0x01 : 0x00)};
 
         sendDataSet1(addr, data, 1);
         return true;
@@ -211,8 +224,8 @@ public:
             return;
 
         // Request Main Module + Submodules block (Address: 10 00 00 00, Size: 00 00 01 00)
-        uint8_t addr[4] = { 0x10, 0x00, 0x00, 0x00 };
-        uint8_t size[4] = { 0x00, 0x00, 0x01, 0x00 };
+        uint8_t addr[4] = {0x10, 0x00, 0x00, 0x00};
+        uint8_t size[4] = {0x00, 0x00, 0x01, 0x00};
         sendDataRequest1(addr, size);
     }
 
@@ -221,7 +234,7 @@ public:
         if (message.isSysEx())
         {
             const auto* data = message.getSysExData();
-            int size = message.getSysExDataSize();
+            int size         = message.getSysExDataSize();
             // Process incoming SysEx response if necessary
             juce::ignoreUnused(data, size);
         }
@@ -274,13 +287,13 @@ private:
         packet.reserve(13 + dataSize);
 
         packet.push_back(0xF0);
-        packet.push_back(0x41); // Roland ID
-        packet.push_back(0x10); // Device ID
-        packet.push_back(0x00); // Model ID #1
-        packet.push_back(0x00); // Model ID #2
-        packet.push_back(0x00); // Model ID #3
+        packet.push_back(0x41);                              // Roland ID
+        packet.push_back(0x10);                              // Device ID
+        packet.push_back(0x00);                              // Model ID #1
+        packet.push_back(0x00);                              // Model ID #2
+        packet.push_back(0x00);                              // Model ID #3
         packet.push_back(static_cast<uint8_t>(targetModel)); // Model ID #4 (15H..18H)
-        packet.push_back(0x12); // Command ID (DT1)
+        packet.push_back(0x12);                              // Command ID (DT1)
 
         packet.push_back(addr[0]);
         packet.push_back(addr[1]);
@@ -307,13 +320,13 @@ private:
         packet.reserve(18);
 
         packet.push_back(0xF0);
-        packet.push_back(0x41); // Roland ID
-        packet.push_back(0x10); // Device ID
-        packet.push_back(0x00); // Model ID #1
-        packet.push_back(0x00); // Model ID #2
-        packet.push_back(0x00); // Model ID #3
+        packet.push_back(0x41);                              // Roland ID
+        packet.push_back(0x10);                              // Device ID
+        packet.push_back(0x00);                              // Model ID #1
+        packet.push_back(0x00);                              // Model ID #2
+        packet.push_back(0x00);                              // Model ID #3
         packet.push_back(static_cast<uint8_t>(targetModel)); // Model ID #4 (15H..18H)
-        packet.push_back(0x11); // Command ID (RQ1)
+        packet.push_back(0x11);                              // Command ID (RQ1)
 
         packet.push_back(addr[0]);
         packet.push_back(addr[1]);
@@ -326,7 +339,7 @@ private:
         packet.push_back(size[3]);
 
         // Calculate checksum for addr + size
-        uint8_t checkPayload[8] = { addr[0], addr[1], addr[2], addr[3], size[0], size[1], size[2], size[3] };
+        uint8_t checkPayload[8] = {addr[0], addr[1], addr[2], addr[3], size[0], size[1], size[2], size[3]};
         packet.push_back(calculateChecksum(checkPayload, 8));
 
         packet.push_back(0xF7);
@@ -338,7 +351,7 @@ private:
     std::unique_ptr<juce::MidiOutput> midiOut;
     std::unique_ptr<juce::MidiInput> midiIn;
     RoutingValidator routingValidator;
-    std::array<uint8_t, 6> slotTypes { 0 };
+    std::array<uint8_t, 6> slotTypes{0};
     FskAudioModem fskModem;
 };
 

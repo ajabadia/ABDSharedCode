@@ -25,7 +25,7 @@ void CasioCzVirtualController::setMidiChannel(int channel) noexcept
 
 void CasioCzVirtualController::registerCustomOpcode(int paramIndex, uint8_t opcodeMSB, uint8_t opcodeLSB, int maxRaw)
 {
-    opcodeRegistry[paramIndex] = { opcodeMSB, opcodeLSB, maxRaw };
+    opcodeRegistry[paramIndex] = {opcodeMSB, opcodeLSB, maxRaw};
 }
 
 bool CasioCzVirtualController::loadParameterMappingJson(const juce::String& jsonString)
@@ -43,7 +43,7 @@ bool CasioCzVirtualController::loadParameterMappingJson(const juce::String& json
 
                 uint8_t msb = static_cast<uint8_t>(op.value("msb", 0));
                 uint8_t lsb = static_cast<uint8_t>(op.value("lsb", 0));
-                int maxRaw = op.value("maxRaw", 99);
+                int maxRaw  = op.value("maxRaw", 99);
                 registerCustomOpcode(idx, msb, lsb, maxRaw);
             }
             return true;
@@ -60,7 +60,7 @@ bool CasioCzVirtualController::connect()
 {
     disconnect();
 
-    auto devices = juce::MidiOutput::getAvailableDevices();
+    auto devices  = juce::MidiOutput::getAvailableDevices();
     int targetIdx = -1;
 
     for (int i = 0; i < devices.size(); ++i)
@@ -77,7 +77,7 @@ bool CasioCzVirtualController::connect()
 
     if (targetIdx != -1)
     {
-        midiDevice = juce::MidiOutput::openDevice(devices[targetIdx].identifier);
+        midiDevice           = juce::MidiOutput::openDevice(devices[targetIdx].identifier);
         isCurrentlyConnected = (midiDevice != nullptr);
         return isCurrentlyConnected;
     }
@@ -142,8 +142,7 @@ bool CasioCzVirtualController::sendCzParameter(uint8_t opcodeMSB, uint8_t opcode
         opcodeMSB,
         opcodeLSB,
         msn,
-        lsn
-    };
+        lsn};
 
     auto msg = juce::MidiMessage::createSysExMessage(sysexPayload, sizeof(sysexPayload));
     return sendMidiMessage(msg);
@@ -167,12 +166,12 @@ bool CasioCzVirtualController::sendCzEnvelopeStep(int envType, int line, int ste
 
 void CasioCzVirtualController::initializeCanonicalCzOpcodes()
 {
-    registerCustomOpcode(1,  0x00, 0x01, 99);  // DCO1 Waveform Choice
-    registerCustomOpcode(2,  0x00, 0x02, 3);   // DCO1 Octave Select
-    registerCustomOpcode(10, 0x00, 0x0A, 99);  // DCW1 Key Follow
-    registerCustomOpcode(20, 0x00, 0x14, 99);  // DCA1 Key Follow
-    registerCustomOpcode(50, 0x00, 0x3C, 3);   // Line Select
-    registerCustomOpcode(51, 0x00, 0x3D, 99);  // Detune Amount
+    registerCustomOpcode(1, 0x00, 0x01, 99);  // DCO1 Waveform Choice
+    registerCustomOpcode(2, 0x00, 0x02, 3);   // DCO1 Octave Select
+    registerCustomOpcode(10, 0x00, 0x0A, 99); // DCW1 Key Follow
+    registerCustomOpcode(20, 0x00, 0x14, 99); // DCA1 Key Follow
+    registerCustomOpcode(50, 0x00, 0x3C, 3);  // Line Select
+    registerCustomOpcode(51, 0x00, 0x3D, 99); // Detune Amount
 
     for (int step = 1; step <= 8; ++step)
     {

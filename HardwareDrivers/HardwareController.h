@@ -1,15 +1,15 @@
 #pragma once
 
-#include <juce_core/juce_core.h>
-#include <juce_audio_basics/juce_audio_basics.h>
 #include <cstdint>
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_core/juce_core.h>
 
 namespace abd::hw
 {
 
 /**
  * @brief Pure abstract contract for musical hardware control.
- * 
+ *
  * Guarantees aseptic separation between the measurement sequencer
  * and the physical device (Digital MIDI CC, Roland SysEx, Eurorack Manual Operator, or Mock).
  */
@@ -19,7 +19,7 @@ public:
     virtual ~IHardwareController() = default;
 
     /**
-     * @brief Returns true if this controller is automatic (MIDI/SysEx), 
+     * @brief Returns true if this controller is automatic (MIDI/SysEx),
      * or false if it requires human operator intervention.
      */
     [[nodiscard]] virtual bool isAutomatic() const noexcept = 0;

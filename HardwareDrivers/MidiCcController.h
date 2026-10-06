@@ -52,9 +52,7 @@ public:
         {
             for (const auto& d : midiOutputs)
             {
-                if (d.identifier == targetDeviceIdentifier 
-                    || d.name == targetDeviceIdentifier
-                    || d.name.containsIgnoreCase(targetDeviceIdentifier))
+                if (d.identifier == targetDeviceIdentifier || d.name == targetDeviceIdentifier || d.name.containsIgnoreCase(targetDeviceIdentifier))
                 {
                     midiOut = juce::MidiOutput::openDevice(d.identifier);
                     return midiOut != nullptr;
@@ -103,8 +101,8 @@ public:
 
         uint8_t paramMsb = static_cast<uint8_t>((nrpnParam >> 7) & 0x7F);
         uint8_t paramLsb = static_cast<uint8_t>(nrpnParam & 0x7F);
-        uint8_t valMsb = static_cast<uint8_t>((value14Bit >> 7) & 0x7F);
-        uint8_t valLsb = static_cast<uint8_t>(value14Bit & 0x7F);
+        uint8_t valMsb   = static_cast<uint8_t>((value14Bit >> 7) & 0x7F);
+        uint8_t valLsb   = static_cast<uint8_t>(value14Bit & 0x7F);
 
         midiOut->sendMessageNow(juce::MidiMessage::controllerEvent(channel, 99, paramMsb));
         midiOut->sendMessageNow(juce::MidiMessage::controllerEvent(channel, 98, paramLsb));
@@ -168,7 +166,7 @@ public:
 
 private:
     juce::String targetDeviceIdentifier;
-    int channel { 1 };
+    int channel{1};
     std::unique_ptr<juce::MidiOutput> midiOut;
     std::map<int, uint8_t> cachedValues;
     std::map<int, int> nrpnMapping;

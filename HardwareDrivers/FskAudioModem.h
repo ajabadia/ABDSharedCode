@@ -10,10 +10,10 @@
 
 #pragma once
 
+#include <cmath>
+#include <cstdint>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <vector>
-#include <cstdint>
-#include <cmath>
 
 namespace abd::hw
 {
@@ -24,11 +24,11 @@ namespace abd::hw
  */
 struct FskModemConfig
 {
-    float markFrequencyHz  { 12000.0f }; /**< Carrier frequency for binary 0 (Mark): 12 kHz. */
-    float spaceFrequencyHz { 14000.0f }; /**< Carrier frequency for binary 1 (Space): 14 kHz. */
-    float baudRate         { 1200.0f };  /**< Symbol rate in bauds (symbols per second). */
-    float amplitude        { 0.75f };    /**< Audio peak amplitude [0.0 .. 1.0]. */
-    int preambleBits       { 16 };       /**< Preamble clock synchronization bits. */
+    float markFrequencyHz{12000.0f};  /**< Carrier frequency for binary 0 (Mark): 12 kHz. */
+    float spaceFrequencyHz{14000.0f}; /**< Carrier frequency for binary 1 (Space): 14 kHz. */
+    float baudRate{1200.0f};          /**< Symbol rate in bauds (symbols per second). */
+    float amplitude{0.75f};           /**< Audio peak amplitude [0.0 .. 1.0]. */
+    int preambleBits{16};             /**< Preamble clock synchronization bits. */
 };
 
 /**
@@ -37,11 +37,11 @@ struct FskModemConfig
  */
 struct FskCarrierDetection
 {
-    bool detected { false };        /**< True if dual-frequency FSK signature is confirmed. */
-    float markPowerDb { -100.0f };  /**< Power level in dB around Mark frequency (12 kHz). */
-    float spacePowerDb { -100.0f }; /**< Power level in dB around Space frequency (14 kHz). */
-    float noisePowerDb { -100.0f }; /**< Out-of-band noise/spectral baseline power in dB. */
-    float snrDb { 0.0f };           /**< Signal-to-noise ratio in dB. */
+    bool detected{false};        /**< True if dual-frequency FSK signature is confirmed. */
+    float markPowerDb{-100.0f};  /**< Power level in dB around Mark frequency (12 kHz). */
+    float spacePowerDb{-100.0f}; /**< Power level in dB around Space frequency (14 kHz). */
+    float noisePowerDb{-100.0f}; /**< Out-of-band noise/spectral baseline power in dB. */
+    float snrDb{0.0f};           /**< Signal-to-noise ratio in dB. */
 };
 
 /**

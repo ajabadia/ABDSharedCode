@@ -26,18 +26,18 @@ float FskAudioModem::computeGoertzelPower(const float* samples,
         return 0.0f;
 
     // Standard Goertzel algorithm
-    float k = 0.5f + (static_cast<float>(numSamples) * targetFreqHz / static_cast<float>(sampleRate));
+    float k     = 0.5f + (static_cast<float>(numSamples) * targetFreqHz / static_cast<float>(sampleRate));
     float omega = (2.0f * 3.14159265358979323846f / static_cast<float>(numSamples)) * k;
     float coeff = 2.0f * std::cos(omega);
 
-    float s_prev = 0.0f;
+    float s_prev  = 0.0f;
     float s_prev2 = 0.0f;
 
     for (int i = 0; i < numSamples; ++i)
     {
         float s = samples[i] + coeff * s_prev - s_prev2;
         s_prev2 = s_prev;
-        s_prev = s;
+        s_prev  = s;
     }
 
     float power = (s_prev * s_prev) + (s_prev2 * s_prev2) - (coeff * s_prev * s_prev2);
@@ -50,7 +50,7 @@ juce::AudioBuffer<float> FskAudioModem::modulate(const uint8_t* data, size_t siz
 {
     if (sampleRate < 8000.0) sampleRate = 48000.0;
     double samplesPerBitExact = sampleRate / static_cast<double>(config.baudRate > 100.0f ? config.baudRate : 4800.0f);
-    int samplesPerBit = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
+    int samplesPerBit         = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
 
     // Assemble bitstream: Preamble + (StartBit + 8 DataBits + StopBit per byte) + Trailer
     std::vector<int> bits;
@@ -83,13 +83,13 @@ juce::AudioBuffer<float> FskAudioModem::modulate(const uint8_t* data, size_t siz
     buffer.clear();
     auto* writePtr = buffer.getWritePointer(0);
 
-    double phase = 0.0;
+    double phase       = 0.0;
     const double twoPi = 2.0 * 3.14159265358979323846;
-    int sampleIdx = 0;
+    int sampleIdx      = 0;
 
     for (int bit : bits)
     {
-        double freq = (bit == 0) ? config.markFrequencyHz : config.spaceFrequencyHz;
+        double freq     = (bit == 0) ? config.markFrequencyHz : config.spaceFrequencyHz;
         double phaseInc = (twoPi * freq) / sampleRate;
 
         for (int s = 0; s < samplesPerBit; ++s)
@@ -104,29 +104,29 @@ juce::AudioBuffer<float> FskAudioModem::modulate(const uint8_t* data, size_t siz
 }
 
 FskCarrierDetection FskAudioModem::detectCarrier(const juce::AudioBuffer<float>& buffer,
-                                                double sampleRate,
-                                                float snrThresholdDb) const
+                                                 double sampleRate,
+                                                 float snrThresholdDb) const
 {
     FskCarrierDetection res;
     if (buffer.getNumSamples() <= 0 || sampleRate <= 0.0)
         return res;
 
     const float* readPtr = buffer.getReadPointer(0);
-    int numSamples = buffer.getNumSamples();
+    int numSamples       = buffer.getNumSamples();
 
     // 1. Measure power around Mark (12 kHz) and Space (14 kHz)
-    float markPower = computeGoertzelPower(readPtr, numSamples, sampleRate, config.markFrequencyHz);
+    float markPower  = computeGoertzelPower(readPtr, numSamples, sampleRate, config.markFrequencyHz);
     float spacePower = computeGoertzelPower(readPtr, numSamples, sampleRate, config.spaceFrequencyHz);
 
     // 2. Measure out-of-band power at reference guard frequencies (8 kHz and 18 kHz)
-    float ref1 = computeGoertzelPower(readPtr, numSamples, sampleRate, 8000.0f);
-    float ref2 = computeGoertzelPower(readPtr, numSamples, sampleRate, std::min(static_cast<float>(sampleRate * 0.45), 18000.0f));
-    float noiseFloor = std::max({ ref1, ref2, 1e-12f });
+    float ref1       = computeGoertzelPower(readPtr, numSamples, sampleRate, 8000.0f);
+    float ref2       = computeGoertzelPower(readPtr, numSamples, sampleRate, std::min(static_cast<float>(sampleRate * 0.45), 18000.0f));
+    float noiseFloor = std::max({ref1, ref2, 1e-12f});
 
     float carrierPower = std::max(markPower, spacePower);
-    res.markPowerDb = 10.0f * std::log10(std::max(markPower, 1e-12f));
-    res.spacePowerDb = 10.0f * std::log10(std::max(spacePower, 1e-12f));
-    res.noisePowerDb = 10.0f * std::log10(noiseFloor);
+    res.markPowerDb    = 10.0f * std::log10(std::max(markPower, 1e-12f));
+    res.spacePowerDb   = 10.0f * std::log10(std::max(spacePower, 1e-12f));
+    res.noisePowerDb   = 10.0f * std::log10(noiseFloor);
 
     res.snrDb = 10.0f * std::log10(carrierPower / noiseFloor);
 
@@ -140,16 +140,16 @@ FskCarrierDetection FskAudioModem::detectCarrier(const juce::AudioBuffer<float>&
 }
 
 std::vector<uint8_t> FskAudioModem::demodulate(const juce::AudioBuffer<float>& buffer,
-                                              double sampleRate) const
+                                               double sampleRate) const
 {
     std::vector<uint8_t> result;
     if (buffer.getNumSamples() <= 0 || sampleRate <= 0.0)
         return result;
 
-    const float* samples = buffer.getReadPointer(0);
-    int totalSamples = buffer.getNumSamples();
+    const float* samples      = buffer.getReadPointer(0);
+    int totalSamples          = buffer.getNumSamples();
     double samplesPerBitExact = sampleRate / static_cast<double>(config.baudRate > 100.0f ? config.baudRate : 4800.0f);
-    int samplesPerBit = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
+    int samplesPerBit         = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
 
     // Decode bit by bit across the buffer
     int totalBits = totalSamples / samplesPerBit;
@@ -159,8 +159,8 @@ std::vector<uint8_t> FskAudioModem::demodulate(const juce::AudioBuffer<float>& b
     for (int b = 0; b < totalBits; ++b)
     {
         const float* bitSamples = samples + (b * samplesPerBit);
-        float pMark = computeGoertzelPower(bitSamples, samplesPerBit, sampleRate, config.markFrequencyHz);
-        float pSpace = computeGoertzelPower(bitSamples, samplesPerBit, sampleRate, config.spaceFrequencyHz);
+        float pMark             = computeGoertzelPower(bitSamples, samplesPerBit, sampleRate, config.markFrequencyHz);
+        float pSpace            = computeGoertzelPower(bitSamples, samplesPerBit, sampleRate, config.spaceFrequencyHz);
 
         decodedBits.push_back((pSpace > pMark) ? 1 : 0);
     }
@@ -195,5 +195,3 @@ std::vector<uint8_t> FskAudioModem::demodulate(const juce::AudioBuffer<float>& b
 }
 
 } // namespace abd::hw
-
-

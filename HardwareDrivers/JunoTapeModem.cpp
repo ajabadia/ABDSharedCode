@@ -35,41 +35,41 @@ uint8_t JunoTapeModem::calculateChecksum(const uint8_t* data, size_t size) noexc
 }
 
 float JunoTapeModem::computeGoertzelPower(const float* samples,
-                                         int numSamples,
-                                         double sampleRate,
-                                         float targetFreqHz) noexcept
+                                          int numSamples,
+                                          double sampleRate,
+                                          float targetFreqHz) noexcept
 {
     if (samples == nullptr || numSamples <= 0 || sampleRate <= 0.0)
         return 0.0f;
 
-    float k = 0.5f + (static_cast<float>(numSamples) * targetFreqHz / static_cast<float>(sampleRate));
+    float k     = 0.5f + (static_cast<float>(numSamples) * targetFreqHz / static_cast<float>(sampleRate));
     float omega = (2.0f * 3.14159265358979323846f / static_cast<float>(numSamples)) * k;
     float coeff = 2.0f * std::cos(omega);
 
-    float s_prev = 0.0f;
+    float s_prev  = 0.0f;
     float s_prev2 = 0.0f;
 
     for (int i = 0; i < numSamples; ++i)
     {
         float s = samples[i] + coeff * s_prev - s_prev2;
         s_prev2 = s_prev;
-        s_prev = s;
+        s_prev  = s;
     }
 
     float power = (s_prev * s_prev) + (s_prev2 * s_prev2) - (coeff * s_prev * s_prev2);
-    float norm = static_cast<float>(numSamples * numSamples);
+    float norm  = static_cast<float>(numSamples * numSamples);
     return std::max(0.0f, power / (norm > 0.0f ? norm : 1.0f));
 }
 
 juce::AudioBuffer<float> JunoTapeModem::encodeToAudio(const uint8_t* data,
-                                                     size_t size,
-                                                     double sampleRate) const
+                                                      size_t size,
+                                                      double sampleRate) const
 {
     if (sampleRate < 8000.0)
         sampleRate = 48000.0;
 
     double samplesPerBitExact = sampleRate / static_cast<double>(config.baudRate > 100.0f ? config.baudRate : 1300.0f);
-    int samplesPerBit = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
+    int samplesPerBit         = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
 
     // [SyncByte] + [LenLSB, LenMSB] + [Payload] + [Checksum]
     std::vector<uint8_t> frame;
@@ -86,7 +86,7 @@ juce::AudioBuffer<float> JunoTapeModem::encodeToAudio(const uint8_t* data,
     // Build complete bitstream: pilot (mark bits) + UART frames + trailer
     std::vector<int> allBits;
     int pilotBits = std::max(8, static_cast<int>(std::round(
-        config.pilotDurationSec * (config.baudRate > 100.0f ? config.baudRate : 1300.0f))));
+                                    config.pilotDurationSec * (config.baudRate > 100.0f ? config.baudRate : 1300.0f))));
     allBits.reserve(static_cast<size_t>(pilotBits) + frame.size() * 10 + 8);
 
     // Pilot tone (continuous mark = 1 = 2600 Hz)
@@ -112,15 +112,15 @@ juce::AudioBuffer<float> JunoTapeModem::encodeToAudio(const uint8_t* data,
     buffer.clear();
     auto* writePtr = buffer.getWritePointer(0);
 
-    double phase = 0.0;
+    double phase       = 0.0;
     const double twoPi = 2.0 * 3.14159265358979323846;
-    int sampleIdx = 0;
+    int sampleIdx      = 0;
 
     // Continuous-phase FSK synthesis
     for (int bit : allBits)
     {
         // Space (0) = 1300 Hz, Mark (1) = 2600 Hz
-        double freq = (bit == 0) ? config.spaceFrequencyHz : config.markFrequencyHz;
+        double freq     = (bit == 0) ? config.spaceFrequencyHz : config.markFrequencyHz;
         double phaseInc = (twoPi * freq) / sampleRate;
 
         for (int s = 0; s < samplesPerBit; ++s)
@@ -135,18 +135,18 @@ juce::AudioBuffer<float> JunoTapeModem::encodeToAudio(const uint8_t* data,
 }
 
 JunoTapeCarrierDetection JunoTapeModem::detectCarrier(const juce::AudioBuffer<float>& buffer,
-                                                     double sampleRate,
-                                                     float snrThresholdDb) const
+                                                      double sampleRate,
+                                                      float snrThresholdDb) const
 {
     JunoTapeCarrierDetection result;
     if (buffer.getNumSamples() < 64 || sampleRate <= 0.0)
         return result;
 
     const auto* readPtr = buffer.getReadPointer(0);
-    int numSamples = buffer.getNumSamples();
+    int numSamples      = buffer.getNumSamples();
 
     // Use Goertzel on the full buffer for carrier detection (large N = good resolution)
-    float markPower = computeGoertzelPower(readPtr, numSamples, sampleRate, config.markFrequencyHz);
+    float markPower  = computeGoertzelPower(readPtr, numSamples, sampleRate, config.markFrequencyHz);
     float spacePower = computeGoertzelPower(readPtr, numSamples, sampleRate, config.spaceFrequencyHz);
     float noisePower = computeGoertzelPower(readPtr, numSamples, sampleRate, 5000.0f);
 
@@ -159,25 +159,25 @@ JunoTapeCarrierDetection JunoTapeModem::detectCarrier(const juce::AudioBuffer<fl
     result.noisePowerDb = toDb(noisePower);
 
     float peakTonePower = std::max(markPower, spacePower);
-    float noiseFloor = std::max(noisePower, 1e-9f);
-    result.snrDb = 10.0f * std::log10(peakTonePower / noiseFloor);
+    float noiseFloor    = std::max(noisePower, 1e-9f);
+    result.snrDb        = 10.0f * std::log10(peakTonePower / noiseFloor);
 
     result.detected = (result.snrDb >= snrThresholdDb) && (result.pilotPowerDb > -50.0f || result.spacePowerDb > -50.0f);
     return result;
 }
 
 std::vector<uint8_t> JunoTapeModem::decodeFromAudio(const juce::AudioBuffer<float>& buffer,
-                                                   double sampleRate) const
+                                                    double sampleRate) const
 {
     std::vector<uint8_t> emptyResult;
     if (buffer.getNumSamples() < 128 || sampleRate <= 0.0)
         return emptyResult;
 
     double samplesPerBitExact = sampleRate / static_cast<double>(config.baudRate > 100.0f ? config.baudRate : 1300.0f);
-    int samplesPerBit = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
+    int samplesPerBit         = std::max(1, static_cast<int>(std::round(samplesPerBitExact)));
 
     const auto* samples = buffer.getReadPointer(0);
-    int totalSamples = buffer.getNumSamples();
+    int totalSamples    = buffer.getNumSamples();
 
     // Zero-crossing counter for a window of samples.
     // Mark (2600 Hz) = 2 cycles per bit → ~4 zero crossings
@@ -213,7 +213,7 @@ std::vector<uint8_t> JunoTapeModem::decodeFromAudio(const juce::AudioBuffer<floa
         for (int b = 0; b < numBits; ++b)
         {
             const float* bitSamples = samples + offset + (b * samplesPerBit);
-            int crossings = countZeroCrossings(bitSamples, samplesPerBit);
+            int crossings           = countZeroCrossings(bitSamples, samplesPerBit);
             decodedBits.push_back((crossings >= zeroCrossThreshold) ? 1 : 0);
         }
 
@@ -259,7 +259,7 @@ std::vector<uint8_t> JunoTapeModem::decodeFromAudio(const juce::AudioBuffer<floa
             std::vector<uint8_t> candidatePayload(rawBytes.begin() + static_cast<ptrdiff_t>(s + 3),
                                                   rawBytes.begin() + static_cast<ptrdiff_t>(s + 3 + payloadLen));
             uint8_t expectedChecksum = rawBytes[s + 3 + payloadLen];
-            uint8_t actualChecksum = calculateChecksum(candidatePayload.data(), candidatePayload.size());
+            uint8_t actualChecksum   = calculateChecksum(candidatePayload.data(), candidatePayload.size());
 
             if (actualChecksum == expectedChecksum)
             {
@@ -272,5 +272,3 @@ std::vector<uint8_t> JunoTapeModem::decodeFromAudio(const juce::AudioBuffer<floa
 }
 
 } // namespace abd::hw
-
-

@@ -10,10 +10,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <vector>
-#include <cstdint>
-#include <cstddef>
 
 namespace abd::hw
 {
@@ -24,13 +24,13 @@ namespace abd::hw
  */
 struct JunoTapeConfig
 {
-    float spaceFrequencyHz       { 1300.0f }; /**< Space / binary 0: 1.3 kHz. */
-    float markFrequencyHz        { 2600.0f }; /**< Mark / binary 1: 2.6 kHz. */
-    float baudRate               { 1300.0f }; /**< 1300 symbols/sec (1 cycle of 1.3 kHz = 2 cycles of 2.6 kHz per bit). */
-    float pilotFrequencyHz       { 2600.0f }; /**< Continuous high pilot tone before data frames. */
-    float pilotDurationSec       { 0.30f };   /**< Duration of lead-in pilot tone in seconds. */
-    float amplitude              { 0.75f };   /**< Peak audio amplitude [0.0 .. 1.0]. */
-    uint8_t syncByte             { 0xA5 };    /**< Frame synchronization byte. */
+    float spaceFrequencyHz{1300.0f}; /**< Space / binary 0: 1.3 kHz. */
+    float markFrequencyHz{2600.0f};  /**< Mark / binary 1: 2.6 kHz. */
+    float baudRate{1300.0f};         /**< 1300 symbols/sec (1 cycle of 1.3 kHz = 2 cycles of 2.6 kHz per bit). */
+    float pilotFrequencyHz{2600.0f}; /**< Continuous high pilot tone before data frames. */
+    float pilotDurationSec{0.30f};   /**< Duration of lead-in pilot tone in seconds. */
+    float amplitude{0.75f};          /**< Peak audio amplitude [0.0 .. 1.0]. */
+    uint8_t syncByte{0xA5};          /**< Frame synchronization byte. */
 };
 
 /**
@@ -39,11 +39,11 @@ struct JunoTapeConfig
  */
 struct JunoTapeCarrierDetection
 {
-    bool detected { false };         /**< True if Juno tape FSK tones are identified. */
-    float pilotPowerDb { -100.0f };  /**< Power level in dB at 2.6 kHz. */
-    float spacePowerDb { -100.0f };  /**< Power level in dB at 1.3 kHz. */
-    float noisePowerDb { -100.0f };  /**< Baseline noise power in dB. */
-    float snrDb { 0.0f };            /**< Signal-to-noise ratio in dB. */
+    bool detected{false};        /**< True if Juno tape FSK tones are identified. */
+    float pilotPowerDb{-100.0f}; /**< Power level in dB at 2.6 kHz. */
+    float spacePowerDb{-100.0f}; /**< Power level in dB at 1.3 kHz. */
+    float noisePowerDb{-100.0f}; /**< Baseline noise power in dB. */
+    float snrDb{0.0f};           /**< Signal-to-noise ratio in dB. */
 };
 
 /**

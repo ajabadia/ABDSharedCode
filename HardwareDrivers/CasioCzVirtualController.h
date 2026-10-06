@@ -1,14 +1,14 @@
 ﻿#pragma once
 
+#include "CasioNibbleCodec.h"
+#include "HardwareController.h"
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_core/juce_core.h>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <vector>
-#include <memory>
-#include "HardwareController.h"
-#include "CasioNibbleCodec.h"
-#include <juce_audio_devices/juce_audio_devices.h>
 
 namespace abd::hw
 {
@@ -48,9 +48,9 @@ public:
 
     struct OpcodePair
     {
-        uint8_t msb { 0 };
-        uint8_t lsb { 0 };
-        int maxRawValue { 99 };
+        uint8_t msb{0};
+        uint8_t lsb{0};
+        int maxRawValue{99};
     };
 
     void registerCustomOpcode(int paramIndex, uint8_t opcodeMSB, uint8_t opcodeLSB, int maxRaw = 99);
@@ -71,10 +71,10 @@ public:
 
 private:
     std::unique_ptr<juce::MidiOutput> midiDevice;
-    juce::String targetPortName { "ABDAudioLab_MIDI_Out" };
-    int midiChannel { 1 };
-    bool isCurrentlyConnected { false };
-    int settlingDelayMs { 5 };
+    juce::String targetPortName{"ABDAudioLab_MIDI_Out"};
+    int midiChannel{1};
+    bool isCurrentlyConnected{false};
+    int settlingDelayMs{5};
 
     std::unordered_map<int, OpcodePair> opcodeRegistry;
     std::vector<juce::MidiMessage> sentMessages;
