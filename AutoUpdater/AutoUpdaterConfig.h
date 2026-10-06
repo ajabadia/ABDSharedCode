@@ -14,8 +14,8 @@ struct AutoUpdaterConfig
     juce::String apiUrl = "https://api.github.com/repos/";
 
     int checkIntervalHours = 24;
-    bool checkOnStartup = true;
-    bool allowPrerelease = false;
+    bool checkOnStartup    = true;
+    bool allowPrerelease   = false;
 
     juce::String appName;
     juce::String userAgent;

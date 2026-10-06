@@ -1,8 +1,8 @@
 #pragma once
 
+#include "AutoUpdaterConfig.h"
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
-#include "AutoUpdaterConfig.h"
 
 namespace ABDShared
 {
@@ -54,8 +54,8 @@ private:
     AutoUpdaterConfig config;
     UpdateCallback updateCallback;
     UpdateInfo lastUpdateInfo;
-    bool updateAvailable = false;
-    bool enabled = true;
+    bool updateAvailable    = false;
+    bool enabled            = true;
     bool manualCheckPending = false;
     juce::Time lastCheckTime;
 

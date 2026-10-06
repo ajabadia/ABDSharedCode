@@ -8,7 +8,7 @@ AutoUpdater::AutoUpdater(const AutoUpdaterConfig& cfg)
       config(cfg)
 {
     loadLastCheckTime();
-    
+
     if (config.checkOnStartup)
     {
         checkForUpdates(true);
@@ -49,22 +49,22 @@ void AutoUpdater::run()
     {
         if (enabled)
         {
-            auto now = juce::Time::getCurrentTime();
+            auto now                 = juce::Time::getCurrentTime();
             auto hoursSinceLastCheck = (now - lastCheckTime).inHours();
-            
+
             if (hoursSinceLastCheck >= config.checkIntervalHours)
             {
                 checkForUpdates(false);
             }
         }
-        
+
         wait(3600000);
     }
 }
 
 void AutoUpdater::handleAsyncUpdate()
 {
-    if (manualCheckPending || 
+    if (manualCheckPending ||
         (enabled && (juce::Time::getCurrentTime() - lastCheckTime).inHours() >= config.checkIntervalHours))
     {
         performCheck();
@@ -79,7 +79,7 @@ void AutoUpdater::performCheck()
     if (fetchLatestRelease(info))
     {
         lastUpdateInfo = info;
-        lastCheckTime = juce::Time::getCurrentTime();
+        lastCheckTime  = juce::Time::getCurrentTime();
         saveLastCheckTime();
 
         if (isNewerVersion(info.version, config.currentVersion))
@@ -98,7 +98,7 @@ void AutoUpdater::performCheck()
     }
     else if (wasManual)
     {
-        info.version = config.currentVersion;
+        info.version    = config.currentVersion;
         updateAvailable = false;
         notifyUpdateAvailable(info, true);
     }
@@ -108,7 +108,7 @@ void AutoUpdater::performCheck()
 bool AutoUpdater::fetchLatestRelease(UpdateInfo& outInfo)
 {
     juce::URL apiUrl(config.apiUrl + config.repoOwner + "/" + config.repoName + "/releases/latest");
-    
+
     auto stream = std::unique_ptr<juce::InputStream>(apiUrl.createInputStream(
         juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
             .withConnectionTimeoutMs(10000)
@@ -121,7 +121,7 @@ bool AutoUpdater::fetchLatestRelease(UpdateInfo& outInfo)
     }
 
     juce::String json = stream->readEntireStreamAsString();
-    
+
     if (json.isEmpty())
     {
         log("[AutoUpdater] Empty response from GitHub API");
@@ -150,17 +150,17 @@ void AutoUpdater::parseReleaseJson(const juce::String& json, UpdateInfo& outInfo
     if (obj == nullptr)
         return;
 
-    outInfo.version = obj->getProperty("tag_name").toString();
+    outInfo.version      = obj->getProperty("tag_name").toString();
     outInfo.releaseNotes = obj->getProperty("body").toString();
-    outInfo.releaseDate = obj->getProperty("published_at").toString();
-    outInfo.isPrerelease = (bool) obj->getProperty("prerelease");
+    outInfo.releaseDate  = obj->getProperty("published_at").toString();
+    outInfo.isPrerelease = (bool)obj->getProperty("prerelease");
 
     auto assets = obj->getProperty("assets");
     if (assets.isArray())
     {
-        auto* assetArray = assets.getArray();
+        auto* assetArray         = assets.getArray();
         juce::String targetAsset = getPlatformAssetName();
-        
+
         for (int i = 0; i < assetArray->size(); ++i)
         {
             auto* assetObj = assetArray->getUnchecked(i).getDynamicObject();
@@ -170,7 +170,7 @@ void AutoUpdater::parseReleaseJson(const juce::String& json, UpdateInfo& outInfo
                 if (name == targetAsset)
                 {
                     outInfo.downloadUrl = assetObj->getProperty("browser_download_url").toString();
-                    outInfo.fileName = name;
+                    outInfo.fileName    = name;
                     break;
                 }
             }
@@ -193,8 +193,7 @@ juce::String AutoUpdater::getPlatformAssetName() const
 
 bool AutoUpdater::isNewerVersion(const juce::String& remote, const juce::String& local) const
 {
-    auto parseVersion = [](const juce::String& v) -> juce::Array<int>
-    {
+    auto parseVersion = [](const juce::String& v) -> juce::Array<int> {
         juce::Array<int> parts;
         auto tokens = juce::StringArray::fromTokens(v, ".", "");
         for (auto& t : tokens)
@@ -202,10 +201,10 @@ bool AutoUpdater::isNewerVersion(const juce::String& remote, const juce::String&
         return parts;
     };
 
-    auto r = parseVersion(remote);
-    auto l = parseVersion(local);
+    auto r             = parseVersion(remote);
+    auto l             = parseVersion(local);
     const int numParts = juce::jmax(r.size(), l.size());
-    
+
     for (int i = 0; i < numParts; ++i)
     {
         int rv = i < r.size() ? r[i] : 0;
@@ -253,7 +252,7 @@ void AutoUpdater::loadLastCheckTime()
     auto file = getStateFile();
     if (file.existsAsFile())
     {
-        auto json = file.loadFileAsString();
+        auto json   = file.loadFileAsString();
         auto result = juce::JSON::parse(json);
         if (result.isObject())
         {
