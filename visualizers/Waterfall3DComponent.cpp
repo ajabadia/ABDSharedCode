@@ -1,8 +1,9 @@
 #include "Waterfall3DComponent.h"
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
-namespace abd::vis {
+namespace abd::vis
+{
 
 Waterfall3DComponent::Waterfall3DComponent()
 {
@@ -31,7 +32,7 @@ void Waterfall3DComponent::resetCamera() noexcept
 {
     xOffsetIncrement = 1.5f;
     yOffsetIncrement = 2.0f;
-    zoom3DFactor = 1.0f;
+    zoom3DFactor     = 1.0f;
     repaint();
 }
 
@@ -55,10 +56,10 @@ void Waterfall3DComponent::mouseDown(const juce::MouseEvent& e)
 
 void Waterfall3DComponent::mouseDrag(const juce::MouseEvent& e)
 {
-    auto delta = e.getPosition() - lastMousePos;
+    auto delta       = e.getPosition() - lastMousePos;
     xOffsetIncrement = juce::jlimit(0.2f, 6.0f, xOffsetIncrement + (static_cast<float>(delta.getX()) * 0.01f));
     yOffsetIncrement = juce::jlimit(0.2f, 6.0f, yOffsetIncrement + (static_cast<float>(delta.getY()) * 0.01f));
-    lastMousePos = e.getPosition();
+    lastMousePos     = e.getPosition();
     repaint();
 }
 
@@ -106,14 +107,14 @@ void Waterfall3DComponent::paint(juce::Graphics& g)
         return;
     }
 
-    const size_t totalPoints = trajectoryCache.size();
-    const size_t numSlices = 24;
+    const size_t totalPoints    = trajectoryCache.size();
+    const size_t numSlices      = 24;
     const size_t pointsPerSlice = totalPoints / numSlices;
 
     if (pointsPerSlice < 2)
         return;
 
-    const float baseWidth = gridBounds.getWidth() * 0.75f * zoom3DFactor;
+    const float baseWidth  = gridBounds.getWidth() * 0.75f * zoom3DFactor;
     const float baseHeight = gridBounds.getHeight() * 0.45f * zoom3DFactor;
 
     const float startOriginX = gridBounds.getX() + (gridBounds.getWidth() * 0.15f);
@@ -126,7 +127,7 @@ void Waterfall3DComponent::paint(juce::Graphics& g)
     {
         mountainPath.clear();
 
-        const float depth = static_cast<float>(s) / static_cast<float>(numSlices - 1);
+        const float depth  = static_cast<float>(s) / static_cast<float>(numSlices - 1);
         const float xShift = (static_cast<float>(s) * xOffsetIncrement * 5.0f * zoom3DFactor);
         const float yShift = -(static_cast<float>(s) * yOffsetIncrement * 4.0f * zoom3DFactor);
 
@@ -134,7 +135,7 @@ void Waterfall3DComponent::paint(juce::Graphics& g)
         const float sliceOriginY = startOriginY + yShift;
 
         const size_t sliceStartIdx = static_cast<size_t>(s) * pointsPerSlice;
-        const size_t sliceEndIdx = std::min(sliceStartIdx + pointsPerSlice, totalPoints);
+        const size_t sliceEndIdx   = std::min(sliceStartIdx + pointsPerSlice, totalPoints);
 
         if (sliceEndIdx <= sliceStartIdx)
             continue;
@@ -144,10 +145,10 @@ void Waterfall3DComponent::paint(juce::Graphics& g)
         for (size_t k = sliceStartIdx; k < sliceEndIdx; ++k)
         {
             float normX = static_cast<float>(k - sliceStartIdx) / static_cast<float>(sliceEndIdx - sliceStartIdx - 1);
-            float px = sliceOriginX + (normX * baseWidth);
+            float px    = sliceOriginX + (normX * baseWidth);
 
             float metricNorm = std::clamp((trajectoryCache[k].primaryMetric + 60.0f) / 70.0f, 0.0f, 1.0f);
-            float py = sliceOriginY - (metricNorm * baseHeight);
+            float py         = sliceOriginY - (metricNorm * baseHeight);
 
             mountainPath.lineTo(px, py);
         }

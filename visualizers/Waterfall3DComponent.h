@@ -1,10 +1,11 @@
 #pragma once
 
+#include "PreScanPoint.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <vector>
-#include "PreScanPoint.h"
 
-namespace abd::vis {
+namespace abd::vis
+{
 
 /**
  * @class Waterfall3DComponent
@@ -45,10 +46,10 @@ private:
     juce::Colour getPaletteColor(float depthRatio) const noexcept;
 
     std::vector<PreScanPoint> trajectoryCache;
-    float xOffsetIncrement{ 1.5f };
-    float yOffsetIncrement{ 2.0f };
-    float zoom3DFactor{ 1.0f };
-    bool useThermalPalette{ false };
+    float xOffsetIncrement{1.5f};
+    float yOffsetIncrement{2.0f};
+    float zoom3DFactor{1.0f};
+    bool useThermalPalette{false};
     juce::Point<int> lastMousePos;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Waterfall3DComponent)
