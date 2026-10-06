@@ -203,6 +203,28 @@ ALLOWLIST = {
         'el test standalone del propio modulo; lo compila su CMake, ningun producto',
     'SynthCore/SynthCoreTests.cpp':
         'el test standalone del propio modulo; lo compila su CMake, ningun producto',
+    'Scope/Source/tests/StandaloneSmoke.cpp':
+        'el smoke standalone del propio modulo (target ABDScope_CppSmoke); lo '
+        'compila su CMake sin condiciones, ningun producto lo enlaza',
+    'Scope/Source/tests/TestScopeTap.cpp':
+        'test GTest del propio modulo (BUILD_TESTING + GTest en su CMake); lo '
+        'compila su CMake, ningun producto',
+    'Scope/Source/tests/TestSpscRingBuffer.cpp':
+        'idem TestScopeTap.cpp: test GTest del modulo Scope, sin producto que lo '
+        'enlace',
+    'Scope/Source/tests/TestTriggerDetector.cpp':
+        'idem TestScopeTap.cpp: test GTest del modulo Scope, sin producto que lo '
+        'enlace',
+    'Scope/Source/StandaloneDemo/Main.cpp':
+        'demo nativa standalone de Scope; su compuerta CMAKE_SOURCE_DIR == '
+        'CURRENT_SOURCE_DIR la excluye de todo build de producto (y de este)',
+    'Scope/Source/JUCE/JuceScopeComponent.h':
+        'componente JUCE nativo NO WebView del modulo; hoy solo lo incluye el demo '
+        'standalone, los productos enlazan JuceWebScopeComponent',
+    'Scope/Source/JUCE/ScopeResourceProvider.cpp':
+        'no lo incluye nadie (es .cpp): lo propaga ABDShared::ScopeCore via '
+        'target_sources INTERFACE a cada consumidor, y el mapa target->cpp de este '
+        'script solo resuelve targets llamados ABDShared_ del CMakeLists raiz',
 }
 
 
@@ -229,6 +251,7 @@ TESTS_PROPIOS = {
     'DspEffects/DspEffectsTests.cpp',
     'SynthCore/SynthCoreTests.cpp',
     'Segmented/SegmentedProbe.cpp',
+    'Scope/Source/tests/StandaloneSmoke.cpp',
 }
 
 
@@ -606,9 +629,21 @@ def main ():
     # ENLAZA un target.
     for proj in [os.path.basename(SHARED)] + hermanos:
         dir_proy = os.path.join(SUITE, proj)
+        # Las dos ultimas bases NO son del proyecto: son los include dirs que
+        # ABDScopeCoreHeaders/ABDScopeCore propagan a CUALQUIER consumidor
+        # (Scope/Source y Scope/Source/Core, ver INTEGRATION_GUIDE, "Modulo:
+        # Scope"). El consumidor compila `<ScopeDataCollector.h>` y
+        # `<JUCE/JuceWebScopeComponent.h>` a pelo porque el target pone esos
+        # directorios en su path, y sin ellos aqui el alcance no podria ver que
+        # los productos consumen esas cabeceras. Van AL FINAL: la resolucion se
+        # queda con la PRIMERA base que acierte, asi que solo los includes que
+        # antes no resolvian a ningun sitio ganan arista nueva, y ninguna
+        # resolucion existente se mueve.
         proj_bases = [dir_proy, norm(os.path.join(dir_proy, 'src')),
                       norm(os.path.join(dir_proy, 'Source')),
-                      norm(os.path.join(dir_proy, 'wasm')), SHARED, SUITE]
+                      norm(os.path.join(dir_proy, 'wasm')), SHARED, SUITE,
+                      norm(os.path.join(SHARED, 'Scope', 'Source')),
+                      norm(os.path.join(SHARED, 'Scope', 'Source', 'Core'))]
         for p in walk_sources(dir_proy):
             sdir = os.path.dirname(p)
             bases = [sdir] + proj_bases

@@ -2206,6 +2206,75 @@ target_link_libraries(TuProyecto PRIVATE ABDShared::LutDSP)
 
 ---
 
+## Módulo: Scope
+
+Osciloscopio analítico multi-lane embebido en WebView2: taps nativos C++ que capturan a rate de bloque (master, pre-FX, osc-mix, post-filter...), snapshot lock-free a 60 FPS y WebUI embebida como binary data. Este módulo vivía en el repo hermano `ABDScope`; desde v0.4.0 es un subtree aquí (`Scope/`), con los temas e iconos canónicos en `ABDSharedAssets`.
+
+### Integración en CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::ScopeCore)
+```
+
+**No** hagas `add_subdirectory(../ABDScope)` ni un `FetchContent` del repo
+`ABDScope`: el módulo ya está registrado aquí y dos `add_subdirectory` del
+mismo módulo en un mismo build matan la configuración con
+`add_library cannot create target ABDScopeCore because another target with the
+same name already exists`. Trae tu JUCE **antes** de anadir ABDSharedCode, para
+que `juce_add_binary_data` exista en alcance y la WebUI se embeba.
+
+Tres aliases, según lo que necesites:
+
+| Target | Qué da |
+|---|---|
+| `ABDShared::ScopeCore` | core + glue JUCE (componente WebView2 + resource provider) + WebUI embebida. El que enlaza un producto. |
+| `ABDShared::ScopeCoreHeaders` | solo el core C++ header-only, sin JUCE: tests, tools y TUs DSP. |
+| `ABDShared::ScopeWebAssets` | los binarios de la WebUI (solo existe si `juce_add_binary_data` está en alcance; sin JUCE la WebUI se sirve por filesystem). |
+
+Los include dirs que propaga `ScopeCoreHeaders` son `Scope/Source` y
+`Scope/Source/Core`, así que los includes son a pelo:
+
+```cpp
+#include <ScopeDataCollector.h>           // core header-only
+#include <JUCE/JuceWebScopeComponent.h>   // componente WebView2
+```
+
+Bajo EMSCRIPTEN el glue JUCE no se enlaza (el puente `WebView2Bridge` no
+existe sin `juce_gui_extra` y el probe cae al fallback), pero el core
+header-only sigue disponible: cualquier TU WASM que quiera capturar
+telemetría puede incluir `<ScopeDataCollector.h>` igual que la nativa.
+
+### Componentes
+
+- **`abd::scope::ScopeDataCollector`**: recolector de telemetría lock-free (POE) que expone los taps registrados y sus snapshots a 60 FPS. Es lo que el motor produce y lo que el componente consume.
+- **`abd::scope::ScopeTap` / `TapId` / `ScopeTapType`**: canal de captura nativo por bloque (flush al terminar cada buffer de audio), con id estable para nombrar lanes en la WebUI.
+- **`abd::scope::ScopeFrameSerializer`**: serializa los frames capturados para el puente WebView2.
+- **`abd::scope::TriggerDetector`** y **`SpscRingBuffer`**: armónicas del core (trigger de forma de onda y cola SPSC) usadas por los taps.
+- **`abd::scope::JuceWebScopeComponent`** (`JUCE/`): componente JUCE WebView2 que embebe la WebUI del osciloscopio (multi-lane + waterfall) y la alimenta desde un `ScopeDataCollector`.
+- **`abd::scope::ScopeResourceProvider`** (`JUCE/`): sirve los assets embebidos (catálogo binario + fallback a `ABDSharedAssets`).
+
+### Ejemplo de Uso
+
+```cpp
+#include <ScopeDataCollector.h>
+#include <JUCE/JuceWebScopeComponent.h>
+
+// El motor expone su recolector (p. ej. ABDMS2000 SynthEngine::getScopeCollector)
+auto &collector = engine.getScopeCollector();
+
+// Componente WebView2 con la WebUI embebida: collector, sample rate, FPS
+auto webScope = std::make_unique<abd::scope::JuceWebScopeComponent>(
+    collector, engine.getSampleRate(), 30);
+webScope->setTheme("ms2000"); // tema canónico de ABDSharedAssets
+
+// Activar los lanes (taps) al mostrar la ventana
+for (size_t i = 0; i < collector.getTapCount(); ++i)
+    if (auto *tap = const_cast<abd::scope::ScopeTap *>(collector.getTap(i)))
+        tap->setActive(true);
+```
+
+---
+
 ## Integración Ecosistema: ABDBankManager y Contratos Normativos (Three-Tier Architecture)
 
 El ecosistema ABDSynths adopta una **Arquitectura en Tres Niveles** para unificar el perfilado en laboratorio (`ABDAudioLab`) y la gestión de bancos de patches (`ABDBankManager`):

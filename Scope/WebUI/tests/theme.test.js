@@ -4,7 +4,24 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const WORKSPACE_ROOT = resolve(here, '../../..');
+
+// Walk up until a sibling ABDSharedAssets appears. A fixed '../../..' only
+// works when this repo sits at the suite root (standalone ABDScope); inside
+// ABDSharedCode/Scope it lands on ABDSharedCode, where ABDSharedAssets does not
+// exist — and the parity suite below would describe.skip in silence, which is
+// worse than failing: the guard would still report green.
+const findWorkspaceRoot = (start) => {
+  let dir = start;
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(resolve(dir, 'ABDSharedAssets'))) return dir;
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return resolve(start, '../../..'); // suite not cloned: hasWorkspace stays false
+};
+
+const WORKSPACE_ROOT = findWorkspaceRoot(here);
 const ABS_ASSETS = resolve(WORKSPACE_ROOT, 'ABDSharedAssets');
 const THEMES_DIR = resolve(ABS_ASSETS, 'styles', 'themes');
 const ADAPTER_PATH = resolve(ABS_ASSETS, 'styles', 'components', 'scope.css');

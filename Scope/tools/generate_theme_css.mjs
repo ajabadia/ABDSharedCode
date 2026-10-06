@@ -12,10 +12,13 @@
  * Kept in sync by WebUI/tests/theme.test.js.
  *
  * Resolved paths:
- *   ROOT            — workspace root with ABDSharedAssets/ beside ABDScope/
- *   SCOPE_WEBUI     — ABDScope/WebUI
- *   SCOPE_SRC       — ABDScope/WebUI/src
- *   OUT_PATH        — ABDScope/WebUI/src/theme.generated.css
+ *   ROOT            — workspace root: first dir ABOVE this file (or cwd) that
+ *                     contains ABDSharedAssets/ (suite root in both layouts:
+ *                     standalone ABDScope/ and subtree ABDSharedCode/Scope/)
+ *   SCOPE_WEBUI     — <this module>/WebUI (derived from THIS file, never from
+ *                     ROOT: ROOT/ABDScope only exists in the standalone repo)
+ *   SCOPE_SRC       — <this module>/WebUI/src
+ *   OUT_PATH        — <this module>/WebUI/src/theme.generated.css
  *   THEMES_DIR      — ABDSharedAssets/styles/themes
  *   ADAPTER_PATH    — ABDSharedAssets/styles/components/scope.css
  */
@@ -26,6 +29,24 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+// Primer directorio, subiendo desde `start`, que contiene ABDSharedAssets/.
+// Busqueda hacia arriba y no un ../../.. fijo: en el repo standalone este
+// script esta en ABDScope/tools (ABDSharedAssets es hermano de ABDScope), y en
+// el subtree esta en ABDSharedCode/Scope/tools (ABDSharedAssets es hermano de
+// ABDSharedCode, tres niveles mas arriba). La misma clase de bug que
+// WebUI/tests/theme.test.js: una raiz escrita a mano solo es cierta en uno de
+// los dos layouts, y en el otro falla — o peor, escribe en el repo equivocado.
+function findRootFrom(start) {
+  let dir = start;
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(resolve(dir, 'ABDSharedAssets'))) return dir;
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return null;
+}
+
 function resolveRoot() {
   const argv = process.argv;
   const explicit = argv.find((a) => !a.startsWith('--') && /ABDSharedAssets/.test(a));
@@ -34,35 +55,28 @@ function resolveRoot() {
     if (existsSync(p)) return resolve(p, '..');
   }
 
-  const cwd = process.cwd();
-  const dot = resolve(cwd, 'ABDSharedAssets');
-  if (existsSync(dot)) return cwd;
+  const fromCwd = findRootFrom(process.cwd());
+  if (fromCwd) return fromCwd;
 
-  const parent = resolve(cwd, '..');
-  const sibling = resolve(parent, 'ABDSharedAssets');
-  if (existsSync(sibling)) return parent;
-
-  const cwdAlt = join(cwd, 'ABDSharedAssets');
-  if (existsSync(cwdAlt)) return cwd;
-
-  const fallback = resolve(HERE, '..');
-  const fb = resolve(fallback, 'ABDSharedAssets');
-  if (existsSync(fb)) return fallback;
+  const fromHere = findRootFrom(HERE);
+  if (fromHere) return fromHere;
 
   throw new Error(
     [
       'No se encuentra ABDSharedAssets desde el workspace actual.',
-      'Este script espera ejecutarse desde la raíz del workspace',
-      '(donde existe ABDSharedAssets/ y ABDScope/), o bien pasar la ruta',
-      'base explícita como primer argumento no opcional.',
+      'Sube por los directorios hasta encontrarla (raíz de la suite) o pasa',
+      'la ruta base explícita como primer argumento no opcional.',
       '',
-      `cwd actual: ${cwd}`,
+      `cwd actual: ${process.cwd()}`,
     ].join('\n')
   );
 }
 
 const ROOT = resolveRoot();
-const SCOPE_DIR = join(ROOT, 'ABDScope');
+// SCOPE_DIR sale de ESTE fichero y no de ROOT: ROOT/ABDScope solo existe en el
+// repo standalone. Aqui el modulo es ROOT/ABDSharedCode/Scope, y HERE/.. es el
+// directorio WebUI del modulo en los dos layouts.
+const SCOPE_DIR = resolve(HERE, '..');
 const SCOPE_WEBUI = join(SCOPE_DIR, 'WebUI');
 const SCOPE_SRC = join(SCOPE_WEBUI, 'src');
 
