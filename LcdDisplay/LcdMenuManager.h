@@ -1,7 +1,7 @@
 #pragma once
 
-#include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include <vector>
 
 namespace abd::ui
@@ -30,9 +30,19 @@ class LcdMenuManager
 public:
     LcdMenuManager() = default;
 
-    enum class State { Idle, Navigation, Edit };
+    enum class State
+    {
+        Idle,
+        Navigation,
+        Edit
+    };
 
-    enum class ItemType { Parameter, MidiCC, Action };
+    enum class ItemType
+    {
+        Parameter,
+        MidiCC,
+        Action
+    };
 
     struct LcdMenuItem
     {
@@ -42,22 +52,22 @@ public:
         std::vector<LcdMenuItem> sub;
 
         LcdMenuItem() = default;
-        LcdMenuItem (const char* lbl, const char* pid, ItemType t = ItemType::Parameter)
-            : label (lbl), paramId (pid), type (t) {}
-        LcdMenuItem (juce::String lbl, std::vector<LcdMenuItem> children)
-            : label (std::move (lbl)), sub (std::move (children)) {}
+        LcdMenuItem(const char* lbl, const char* pid, ItemType t = ItemType::Parameter)
+            : label(lbl), paramId(pid), type(t) {}
+        LcdMenuItem(juce::String lbl, std::vector<LcdMenuItem> children)
+            : label(std::move(lbl)), sub(std::move(children)) {}
     };
 
     // --- hooks -------------------------------------------------------------
 
     /** En EDIT, Encoder/cursores mueven el valor: dir puede ser cualquier entero. */
-    std::function<void (const LcdMenuItem&, int)> onEdit;
+    std::function<void(const LcdMenuItem&, int)> onEdit;
 
     /** Un ítem Action se confirma con OK. */
-    std::function<void (const LcdMenuItem&)> onAction;
+    std::function<void(const LcdMenuItem&)> onAction;
 
     /** En IDLE, Encoder gira: preview rápido de parámetros (opcional). */
-    std::function<void (const LcdMenuItem&, int)> onPreview;
+    std::function<void(const LcdMenuItem&, int)> onPreview;
 
     // --- árbol -------------------------------------------------------------
     // Nota de propiedad: la pila de navegación guarda PUNTEROS a los vectores
@@ -66,9 +76,9 @@ public:
     // esta restricción porque copia).
 
     /** Reemplazar el árbol del menú (datos del synth; puede cambiar en vivo). */
-    void setMenu (std::vector<LcdMenuItem> items)
+    void setMenu(std::vector<LcdMenuItem> items)
     {
-        rootItems = std::move (items);
+        rootItems = std::move(items);
         exitToIdle();
     }
 
@@ -80,67 +90,77 @@ public:
     {
         if (state == State::Edit)
         {
-            state = State::Navigation; // cancelar edición
+            state   = State::Navigation; // cancelar edición
             editing = nullptr;
         }
         else if (state == State::Navigation)
         {
-            if (path.size() > 1) path.pop_back(); // subir un nivel
-            else exitToIdle();
+            if (path.size() > 1)
+                path.pop_back(); // subir un nivel
+            else
+                exitToIdle();
         }
         else
         {
             state = State::Navigation;
-            path = { { &rootItems, 0 } };
+            path  = {{&rootItems, 0}};
         }
     }
 
     void onOkPress()
     {
-        if (state != State::Navigation) { if (state == State::Edit) { editing = nullptr; state = State::Navigation; } return; }
+        if (state != State::Navigation)
+        {
+            if (state == State::Edit)
+            {
+                editing = nullptr;
+                state   = State::Navigation;
+            }
+            return;
+        }
         auto* item = currentItem();
         if (item == nullptr) return;
 
-        if (! item->sub.empty())
+        if (!item->sub.empty())
         {
-            path.push_back ({ &item->sub, 0 });
+            path.push_back({&item->sub, 0});
         }
         else if (item->type == ItemType::Action)
         {
-            if (onAction) onAction (*item);
+            if (onAction) onAction(*item);
         }
         else
         {
             editing = item;
-            state = State::Edit;
+            state   = State::Edit;
         }
     }
 
-    void onEncoderRotate (int delta)
+    void onEncoderRotate(int delta)
     {
         if (state == State::Edit)
         {
-            if (editing != nullptr && onEdit) onEdit (*editing, delta);
+            if (editing != nullptr && onEdit) onEdit(*editing, delta);
         }
         else if (state == State::Navigation)
         {
-            auto& level = path.back();
-            const int size = (int) level.items->size();
+            auto& level    = path.back();
+            const int size = (int)level.items->size();
             if (size > 0) level.index = ((level.index + delta) % size + size) % size;
         }
-        else if (! rootItems.empty() && onPreview)
+        else if (!rootItems.empty() && onPreview)
         {
             previewIndex = previewIndex < 0
-                ? (delta > 0 ? 0 : (int) rootItems.size() - 1)
-                : ((previewIndex + delta) % (int) rootItems.size() + (int) rootItems.size()) % (int) rootItems.size();
-            onPreview (rootItems[(size_t) previewIndex], delta);
+                               ? (delta > 0 ? 0 : (int)rootItems.size() - 1)
+                               : ((previewIndex + delta) % (int)rootItems.size() + (int)rootItems.size()) % (int)rootItems.size();
+            onPreview(rootItems[(size_t)previewIndex], delta);
         }
     }
 
     /** Cursores: ‹ › = ±1, ^ v = ±5 (ajuste grueso), como el D-pad del 8.3. */
-    void onArrow (int dir)
+    void onArrow(int dir)
     {
-        onEncoderRotate (dir);
+        onEncoderRotate(dir);
     }
 
     // --- getters (los que tenía el nativo, más el fotograma) ----------------
@@ -154,14 +174,14 @@ public:
         if (state == State::Idle) return {};
         if (path.size() <= 1) return "MAIN MENU";
         const auto& parentLevel = path[path.size() - 2];
-        return parentLevel.items->at ((size_t) parentLevel.index).label;
+        return parentLevel.items->at((size_t)parentLevel.index).label;
     }
 
     juce::String getLine2() const
     {
         if (state != State::Navigation) return {};
         auto* item = currentItem();
-        return item != nullptr ? ">" + item->label : juce::String (">");
+        return item != nullptr ? ">" + item->label : juce::String(">");
     }
 
     const LcdMenuItem* getCurrentItem() const
@@ -174,7 +194,7 @@ public:
     struct Snapshot
     {
         State state = State::Idle;
-        int depth = 0;
+        int depth   = 0;
         juce::StringArray breadcrumb;
     };
 
@@ -182,9 +202,9 @@ public:
     {
         Snapshot s;
         s.state = state;
-        s.depth = (int) path.size();
+        s.depth = (int)path.size();
         for (const auto& level : path)
-            s.breadcrumb.add (level.items->at ((size_t) level.index).label);
+            s.breadcrumb.add(level.items->at((size_t)level.index).label);
         return s;
     }
 
@@ -192,32 +212,32 @@ private:
     struct Level
     {
         const std::vector<LcdMenuItem>* items = nullptr;
-        int index = 0;
+        int index                             = 0;
     };
 
     std::vector<LcdMenuItem> rootItems;
     std::vector<Level> path; // punteros a los vectores del árbol del synth
     const LcdMenuItem* editing = nullptr;
-    int previewIndex = -1;
-    State state = State::Idle;
+    int previewIndex           = -1;
+    State state                = State::Idle;
 
     const LcdMenuItem* currentItem() const
     {
         if (path.empty()) return nullptr;
         const auto& level = path.back();
         if (level.items->empty()) return nullptr;
-        return &level.items->at ((size_t) level.index);
+        return &level.items->at((size_t)level.index);
     }
 
     void exitToIdle()
     {
         state = State::Idle;
         path.clear();
-        editing = nullptr;
+        editing      = nullptr;
         previewIndex = -1;
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LcdMenuManager)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LcdMenuManager)
 };
 
 } // namespace abd::ui

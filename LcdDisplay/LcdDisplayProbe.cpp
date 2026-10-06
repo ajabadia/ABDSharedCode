@@ -14,27 +14,31 @@ struct Probe
 
     Probe()
     {
-        menu.setMenu ({
-            { "GLOBAL", { { "MASTER VOL", "masterLevel" }, { "MIDI CH", "midiChannel" } } },
-            { "PANIC", "RESET_ALL", LcdMenuManager::ItemType::Action },
+        menu.setMenu({
+            {"GLOBAL", {{"MASTER VOL", "masterLevel"}, {"MIDI CH", "midiChannel"}}},
+            {"PANIC", "RESET_ALL", LcdMenuManager::ItemType::Action},
         });
 
-        menu.onEdit = [] (const LcdMenuManager::LcdMenuItem& item, int dir) {
-            juce::ignoreUnused (item, dir);
+        menu.onEdit = [](const LcdMenuManager::LcdMenuItem& item, int dir) {
+            juce::ignoreUnused(item, dir);
         };
-        menu.onAction = [] (const LcdMenuManager::LcdMenuItem& item) { juce::ignoreUnused (item); };
-        menu.onPreview = [] (const LcdMenuManager::LcdMenuItem& item, int dir) { juce::ignoreUnused (item, dir); };
+        menu.onAction = [](const LcdMenuManager::LcdMenuItem& item) {
+            juce::ignoreUnused(item);
+        };
+        menu.onPreview = [](const LcdMenuManager::LcdMenuItem& item, int dir) {
+            juce::ignoreUnused(item, dir);
+        };
 
-        display.setLine (0, "NEURONiK");
-        display.setLine (1, "BANK A");
-        display.pushMessage ("saving", "GUARDANDO...", 1, 1500);
-        display.showParameterPreview ("CUTOFF", "0.75");
+        display.setLine(0, "NEURONiK");
+        display.setLine(1, "BANK A");
+        display.pushMessage("saving", "GUARDANDO...", 1, 1500);
+        display.showParameterPreview("CUTOFF", "0.75");
 
         menu.onMenuPress();
         menu.onOkPress();
-        menu.onEncoderRotate (1);
-        display.setLine (0, menu.getLine1());
-        display.setLine (1, menu.getLine2());
+        menu.onEncoderRotate(1);
+        display.setLine(0, menu.getLine1());
+        display.setLine(1, menu.getLine2());
     }
 };
 
