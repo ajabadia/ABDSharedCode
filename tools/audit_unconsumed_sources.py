@@ -153,27 +153,16 @@ def strip_vars(path):
 # Lista blanca: huerfanos CONOCIDOS, con el motivo. Anadir aqui es una decision
 # consciente; lo que no este y aparezca, sale como NUEVO.
 # ---------------------------------------------------------------------------
-# Los nueve ficheros del modulo BankManager NO son huerfanos de verdad: los
-# enlaza ABDBankManager via ABDShared::BankManagerCore y sus unidades se
-# compilan y se ejecutan en ABDBankManager/cpp/tests/BankManagerCoreTests.cpp.
-# Esta auditoria no los ve porque su consumidor esta fuera de la foto de
-# productos que miden los SHA del workflow (el corte esta documentado en
-# ABDBankManager/DOCS/bank-manager-module-cut.md). Cuando ABDBankManager entre
-# en la foto, estas entradas sobraran y el trinquete obligara a borrarlas.
-_BANCO = (
-    'modulo BankManager; lo enlaza ABDBankManager, que esta fuera de la foto de '
-    'esta auditoria, y lo prueba su test cpp/tests/BankManagerCoreTests.cpp'
-)
+# Las nueve entradas _BANCO del modulo BankManager se borraron el 2026-10-06,
+# el mismo dia en que ABDBankManager entro en la foto de productos del workflow
+# (el corte, en ABDBankManager/DOCS/bank-manager-module-cut.md). Eran exactamente
+# lo que su propio comentario prometia: "cuando ABDBankManager entre en la foto,
+# estas entradas sobraran y el trinquete obligara a borrarlas". Con el consumidor
+# en la foto, el script las marcaba como entrada de lista blanca ya consumida y
+# salia con 1 hasta que se quitaran. El modulo sigue en BankManager/, ahora
+# consumido y sin figurar en esta lista.
+# ---------------------------------------------------------------------------
 ALLOWLIST = {
-    'BankManager/ABDBankManagerCore.h': _BANCO,
-    'BankManager/ABDBankManagerCore.cpp': _BANCO,
-    'BankManager/BankManagerWebViewAdapter.h': _BANCO,
-    'BankManager/BankManagerWebViewAdapter.cpp': _BANCO,
-    'BankManager/FactoryContentLoader.h': _BANCO,
-    'BankManager/FactoryContentLoader.cpp': _BANCO,
-    'BankManager/Pro800Midi.h': _BANCO,
-    'BankManager/Pro800Midi.cpp': _BANCO,
-    'BankManager/HardwareMidiPipe.h': _BANCO,
     'DspEffects/MultiHeadEcho.h':
         'motor de maquina sin todavia consumidor; sus 3 defectos se corrigieron y '
         'prueban aqui, y un 4º candidato (releer la linea de cinta) se midio y se '
