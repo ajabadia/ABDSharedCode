@@ -3,11 +3,13 @@
 #include <atomic>
 #include <cstdint>
 
-namespace abd::synth {
+namespace abd::synth
+{
 
-struct AudioThreadSnapshot {
+struct AudioThreadSnapshot
+{
     static constexpr size_t kScopeBufferSize = 512;
-    static constexpr size_t kMaxVoices = 32;
+    static constexpr size_t kMaxVoices       = 32;
 
     float vuLeft{0.0f};
     float vuRight{0.0f};

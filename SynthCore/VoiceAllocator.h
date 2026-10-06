@@ -21,26 +21,26 @@
 
 #pragma once
 
-#include <array>
-#include <vector>
-#include <cstdint>
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <vector>
 
 namespace abd::synth
 {
 
 enum class PolyMode
 {
-    Poly1 = 0,   // Natural round-robin voice cycling (Juno-106 standard)
-    Poly2 = 1,   // Last-note reuse / legato prioritized allocation
-    Unison = 2   // All available voices triggered simultaneously
+    Poly1  = 0, // Natural round-robin voice cycling (Juno-106 standard)
+    Poly2  = 1, // Last-note reuse / legato prioritized allocation
+    Unison = 2  // All available voices triggered simultaneously
 };
 
 struct VoiceState
 {
-    int midiNote = -1;
-    float velocity = 0.0f;
-    bool active = false;
+    int midiNote             = -1;
+    float velocity           = 0.0f;
+    bool active              = false;
     uint32_t noteOnTimestamp = 0;
 };
 
@@ -57,13 +57,13 @@ struct VoiceState
  */
 struct StealHint
 {
-    int slotIndex = -1;
-    int midiNote = -1;
-    bool isVoiceActive = false;
-    bool isKeyHeld = false;
-    bool isLatched = false;
-    bool isReleasing = false;
-    float envelopeLevel = 0.0f;
+    int slotIndex         = -1;
+    int midiNote          = -1;
+    bool isVoiceActive    = false;
+    bool isKeyHeld        = false;
+    bool isLatched        = false;
+    bool isReleasing      = false;
+    float envelopeLevel   = 0.0f;
     uint32_t triggerStamp = 0;
 };
 
@@ -88,10 +88,10 @@ public:
         {
             voices[i] = VoiceState{};
         }
-        roundRobinIndex = 0;
+        roundRobinIndex  = 0;
         timestampCounter = 0;
-        mode = PolyMode::Poly1;
-        policy = StealPolicy::LegacyTimestamp;
+        mode             = PolyMode::Poly1;
+        policy           = StealPolicy::LegacyTimestamp;
     }
 
     void setPolyMode(PolyMode newMode) noexcept { mode = newMode; }
@@ -113,9 +113,9 @@ public:
         {
             for (size_t i = 0; i < MaxVoices; ++i)
             {
-                voices[i].midiNote = midiNote;
-                voices[i].velocity = velocity;
-                voices[i].active = true;
+                voices[i].midiNote        = midiNote;
+                voices[i].velocity        = velocity;
+                voices[i].active          = true;
                 voices[i].noteOnTimestamp = timestampCounter;
                 allocated.push_back(static_cast<int>(i));
             }
@@ -129,7 +129,7 @@ public:
             {
                 if (voices[i].active && voices[i].midiNote == midiNote)
                 {
-                    voices[i].velocity = velocity;
+                    voices[i].velocity        = velocity;
                     voices[i].noteOnTimestamp = timestampCounter;
                     allocated.push_back(static_cast<int>(i));
                     return allocated;
@@ -144,7 +144,7 @@ public:
         //    and on steals; a repeated-note retrigger keeps the cursor.
         if (chosen >= 0)
         {
-            const auto& st = voices[static_cast<size_t>(chosen)];
+            const auto& st         = voices[static_cast<size_t>(chosen)];
             const bool isRetrigger = st.active && st.midiNote == midiNote;
             if (!isRetrigger)
                 roundRobinIndex = (static_cast<size_t>(chosen) + 1) % MaxVoices;
@@ -152,9 +152,9 @@ public:
 
         if (chosen >= 0)
         {
-            voices[chosen].midiNote = midiNote;
-            voices[chosen].velocity = velocity;
-            voices[chosen].active = true;
+            voices[chosen].midiNote        = midiNote;
+            voices[chosen].velocity        = velocity;
+            voices[chosen].active          = true;
             voices[chosen].noteOnTimestamp = timestampCounter;
             allocated.push_back(chosen);
         }
@@ -184,7 +184,7 @@ public:
     {
         for (size_t i = 0; i < MaxVoices; ++i)
         {
-            voices[i].active = false;
+            voices[i].active   = false;
             voices[i].midiNote = -1;
         }
     }
@@ -270,7 +270,7 @@ public:
         }
 
         // 4. Release-phase stealing: releasing or key-up voice closest to silence
-        int bestSlot = -1;
+        int bestSlot    = -1;
         float lowestAmp = 9999.0f;
         for (size_t h = 0; h < hintCount; ++h)
         {
@@ -281,7 +281,7 @@ public:
                 if (s.envelopeLevel < lowestAmp)
                 {
                     lowestAmp = s.envelopeLevel;
-                    bestSlot = s.slotIndex;
+                    bestSlot  = s.slotIndex;
                 }
             }
         }
@@ -290,7 +290,7 @@ public:
 
         // 5. FIFO sustain stealing: oldest held note
         uint32_t oldestStamp = UINT32_MAX;
-        bestSlot = -1;
+        bestSlot             = -1;
         for (size_t h = 0; h < hintCount; ++h)
         {
             const StealHint& s = hints[h];
@@ -298,7 +298,7 @@ public:
             if (s.triggerStamp < oldestStamp)
             {
                 oldestStamp = s.triggerStamp;
-                bestSlot = s.slotIndex;
+                bestSlot    = s.slotIndex;
             }
         }
         if (bestSlot != -1)
@@ -328,10 +328,10 @@ public:
     {
         if (slotIndex < 0 || slotIndex >= static_cast<int>(MaxVoices)) return;
         ++timestampCounter;
-        const auto& st = voices[static_cast<size_t>(slotIndex)];
-        const bool isRetrigger = st.active && st.midiNote == midiNote;
-        voices[static_cast<size_t>(slotIndex)].midiNote = midiNote;
-        voices[static_cast<size_t>(slotIndex)].active = true;
+        const auto& st                                         = voices[static_cast<size_t>(slotIndex)];
+        const bool isRetrigger                                 = st.active && st.midiNote == midiNote;
+        voices[static_cast<size_t>(slotIndex)].midiNote        = midiNote;
+        voices[static_cast<size_t>(slotIndex)].active          = true;
         voices[static_cast<size_t>(slotIndex)].noteOnTimestamp = timestampCounter;
         if (!isRetrigger)
             roundRobinIndex = (static_cast<size_t>(slotIndex) + 1) % MaxVoices;
@@ -344,7 +344,7 @@ public:
     void markSlotReleased(int slotIndex) noexcept
     {
         if (slotIndex < 0 || slotIndex >= static_cast<int>(MaxVoices)) return;
-        voices[static_cast<size_t>(slotIndex)].active = false;
+        voices[static_cast<size_t>(slotIndex)].active   = false;
         voices[static_cast<size_t>(slotIndex)].midiNote = -1;
     }
 
@@ -375,13 +375,13 @@ private:
         }
 
         // Oldest active voice (smallest timestamp)
-        int oldestVoice = 0;
+        int oldestVoice   = 0;
         uint32_t oldestTs = UINT32_MAX;
         for (size_t i = 0; i < MaxVoices; ++i)
         {
             if (voices[i].noteOnTimestamp < oldestTs)
             {
-                oldestTs = voices[i].noteOnTimestamp;
+                oldestTs    = voices[i].noteOnTimestamp;
                 oldestVoice = static_cast<int>(i);
             }
         }
@@ -394,9 +394,9 @@ private:
     }
 
     std::array<VoiceState, MaxVoices> voices;
-    PolyMode mode = PolyMode::Poly1;
-    StealPolicy policy = StealPolicy::LegacyTimestamp;
-    size_t roundRobinIndex = 0;
+    PolyMode mode             = PolyMode::Poly1;
+    StealPolicy policy        = StealPolicy::LegacyTimestamp;
+    size_t roundRobinIndex    = 0;
     uint32_t timestampCounter = 0;
 };
 

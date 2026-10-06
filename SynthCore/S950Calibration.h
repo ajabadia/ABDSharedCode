@@ -130,8 +130,8 @@ enum class CalCurveId
 /** Un punto medido de una curva: el valor de panel y lo que se midio ahi. */
 struct CalPoint
 {
-    int    stored;   // el valor de panel, el mismo dominio que S950PatchFields
-    double value;    // en la unidad de la curva
+    int stored;   // el valor de panel, el mismo dominio que S950PatchFields
+    double value; // en la unidad de la curva
 };
 
 //==============================================================================
@@ -142,16 +142,16 @@ struct CalPoint
 struct CalCurveInfo
 {
     CalCurveId id;
-    const char* code;        // clave estable, para un host o un fichero
-    const char* name;        // lo que ve la persona
-    const char* unit;        // "s", "Hz", "octavas", "dB"
-    const char* axisLabel;   // que es el eje X: el valor de panel
+    const char* code;      // clave estable, para un host o un fichero
+    const char* name;      // lo que ve la persona
+    const char* unit;      // "s", "Hz", "octavas", "dB"
+    const char* axisLabel; // que es el eje X: el valor de panel
 
-    int storedLo;            // rango de panel que la curva cubre
+    int storedLo; // rango de panel que la curva cubre
     int storedHi;
 
-    bool risesWithStored;    // true = mas byte, mas valor (un attack mas lento)
-    bool logarithmic;        // si el eje se escala en log, que casi siempre
+    bool risesWithStored; // true = mas byte, mas valor (un attack mas lento)
+    bool logarithmic;     // si el eje se escala en log, que casi siempre
 
     /** Si el valor tiene que ser ESTRICTAMENTE POSITIVO.
 
@@ -177,23 +177,23 @@ struct CalCurveInfo
 };
 
 inline constexpr CalCurveInfo calibrationCurves[] =
-{
-    { CalCurveId::EnvelopeTime,     "envelopeTime",     "Envelope time",  "s",
-      "Attack / Decay / Release",  0, 99, false, true,  true,  false },
-    { CalCurveId::LfoRate,          "lfoRate",          "LFO rate",       "Hz",
-      "LFO rate",                  0, 99, true,  false, true,  false },
-    { CalCurveId::WarpTime,         "warpTime",         "Warp time",      "s",
-      "Warp time",                 0, 99, true,  true,  true,  false },
-    { CalCurveId::FilterCutoff,     "filterCutoff",     "Filter cutoff",  "Hz",
-      "Soft / Loud filter",        0, 99, true,  true,  true,  false },
-    { CalCurveId::FilterEnvOctaves, "filterEnvOctaves", "Filter env",     "octaves",
-      "VCF amount",              -50, 50, false, false, false, false },
-    { CalCurveId::SustainDb,        "sustainDb",        "Sustain level",  "dB",
-      "Attack / Decay / Sustain",  0, 99, false, true,  false, false },
+    {
+        {CalCurveId::EnvelopeTime, "envelopeTime", "Envelope time", "s",
+         "Attack / Decay / Release", 0, 99, false, true, true, false},
+        {CalCurveId::LfoRate, "lfoRate", "LFO rate", "Hz",
+         "LFO rate", 0, 99, true, false, true, false},
+        {CalCurveId::WarpTime, "warpTime", "Warp time", "s",
+         "Warp time", 0, 99, true, true, true, false},
+        {CalCurveId::FilterCutoff, "filterCutoff", "Filter cutoff", "Hz",
+         "Soft / Loud filter", 0, 99, true, true, true, false},
+        {CalCurveId::FilterEnvOctaves, "filterEnvOctaves", "Filter env", "octaves",
+         "VCF amount", -50, 50, false, false, false, false},
+        {CalCurveId::SustainDb, "sustainDb", "Sustain level", "dB",
+         "Attack / Decay / Sustain", 0, 99, false, true, false, false},
 };
 
 inline constexpr int calibrationCurveCount =
-    static_cast<int> (sizeof (calibrationCurves) / sizeof (calibrationCurves[0]));
+    static_cast<int>(sizeof(calibrationCurves) / sizeof(calibrationCurves[0]));
 
 //==============================================================================
 /** Una calibracion: las curvas, con sus puntos medidos.
@@ -220,13 +220,13 @@ public:
     //==========================================================================
     /** La forma de una curva, medida o no. Nunca devuelve `nullptr`: un id
         invalido es un bug de compilacion, no una condicion de ejecucion. */
-    static const CalCurveInfo& curveInfo (CalCurveId id) noexcept
+    static const CalCurveInfo& curveInfo(CalCurveId id) noexcept
     {
-        return calibrationCurves[static_cast<int> (id)];
+        return calibrationCurves[static_cast<int>(id)];
     }
 
     /** La forma de una curva por su codigo, o `nullptr`. */
-    static const CalCurveInfo* findCurve (const char* code) noexcept
+    static const CalCurveInfo* findCurve(const char* code) noexcept
     {
         if (code == nullptr)
             return nullptr;
@@ -236,7 +236,11 @@ public:
             const char* a = calibrationCurves[i].code;
             const char* b = code;
 
-            while (*a != '\0' && *a == *b) { ++a; ++b; }
+            while (*a != '\0' && *a == *b)
+            {
+                ++a;
+                ++b;
+            }
 
             if (*a == *b)
                 return &calibrationCurves[i];
@@ -248,24 +252,24 @@ public:
     //==========================================================================
     /** Cuantos puntos medidos tiene una curva. CERO es lo normal hoy, y no es
         un error. */
-    int pointCount (CalCurveId id) const noexcept
+    int pointCount(CalCurveId id) const noexcept
     {
-        return static_cast<int> (points[static_cast<int> (id)].size());
+        return static_cast<int>(points[static_cast<int>(id)].size());
     }
 
     /** Si una curva tiene lo MINIMO para ser usable: dos puntos, porque entre
         uno solo no se puede interpolar nada. Un punto es una medida suelta, que
         es informacion de una sesion de medicion, no una curva. */
-    bool isMeasured (CalCurveId id) const noexcept { return pointCount (id) >= 2; }
+    bool isMeasured(CalCurveId id) const noexcept { return pointCount(id) >= 2; }
 
     /** El punto i de una curva, o `nullptr` si no existe. */
-    const CalPoint* pointAt (CalCurveId id, int index) const noexcept
+    const CalPoint* pointAt(CalCurveId id, int index) const noexcept
     {
-        const auto& p = points[static_cast<int> (id)];
-        if (index < 0 || index >= static_cast<int> (p.size()))
+        const auto& p = points[static_cast<int>(id)];
+        if (index < 0 || index >= static_cast<int>(p.size()))
             return nullptr;
 
-        return &p[static_cast<std::size_t> (index)];
+        return &p[static_cast<std::size_t>(index)];
     }
 
     //==========================================================================
@@ -287,15 +291,15 @@ public:
 
         @returns  el valor en la unidad de la curva, o `nullopt`.
     */
-    std::optional<double> read (CalCurveId id, int stored,
-                                bool allowExtrapolate = false) const noexcept
+    std::optional<double> read(CalCurveId id, int stored,
+                               bool allowExtrapolate = false) const noexcept
     {
-        const auto& p = points[static_cast<int> (id)];
+        const auto& p = points[static_cast<int>(id)];
 
         if (p.size() < 2)
-            return std::nullopt;   // sin medir, o con un solo punto: no hay curva
+            return std::nullopt; // sin medir, o con un solo punto: no hay curva
 
-        const bool log = calibrationCurves[static_cast<int> (id)].logarithmic;
+        const bool log = calibrationCurves[static_cast<int>(id)].logarithmic;
 
         // UN PUNTO MEDIDO SE DEVUELVE EXACTO, Y PRIMERO DE TODO.
         //
@@ -313,19 +317,19 @@ public:
         // Detras del primer punto medido.
         if (stored < p.front().stored)
         {
-            if (! allowExtrapolate)
+            if (!allowExtrapolate)
                 return std::nullopt;
 
-            return slopeTo (p, stored, log, 0);
+            return slopeTo(p, stored, log, 0);
         }
 
         // Delante del ultimo.
         if (stored > p.back().stored)
         {
-            if (! allowExtrapolate)
+            if (!allowExtrapolate)
                 return std::nullopt;
 
-            return slopeTo (p, stored, log, static_cast<int> (p.size()) - 1);
+            return slopeTo(p, stored, log, static_cast<int>(p.size()) - 1);
         }
 
         // Entre dos puntos medidos: lineal en log si el eje es log, lineal si
@@ -335,14 +339,14 @@ public:
             if (stored > p[i].stored)
                 continue;
 
-            const double span = static_cast<double> (p[i].stored) - static_cast<double> (p[i - 1].stored);
+            const double span = static_cast<double>(p[i].stored) - static_cast<double>(p[i - 1].stored);
 
             if (span <= 0.0)
                 return p[i].value;
 
-            const double t = (static_cast<double> (stored) - static_cast<double> (p[i - 1].stored)) / span;
+            const double t = (static_cast<double>(stored) - static_cast<double>(p[i - 1].stored)) / span;
 
-            if (! log)
+            if (!log)
                 return p[i - 1].value + t * (p[i].value - p[i - 1].value);
 
             // En log, los dos extremos tienen que ser positivos; si no lo son,
@@ -350,10 +354,10 @@ public:
             if (p[i - 1].value <= 0.0 || p[i].value <= 0.0)
                 return p[i - 1].value + t * (p[i].value - p[i - 1].value);
 
-            const double a = std::log (p[i - 1].value);
-            const double b = std::log (p[i].value);
+            const double a = std::log(p[i - 1].value);
+            const double b = std::log(p[i].value);
 
-            return std::exp (a + t * (b - a));
+            return std::exp(a + t * (b - a));
         }
 
         return std::nullopt;
@@ -365,10 +369,10 @@ public:
         con una curva propia que quiere usar mientras la del S950 no esta
         medida. Y es peligroso a proposito —cambia un `nullopt` por un numero
         sin que nadie lo note—, asi que el nombre lo dice. */
-    double readOr (CalCurveId id, int stored, double fallback,
-                   bool allowExtrapolate = false) const noexcept
+    double readOr(CalCurveId id, int stored, double fallback,
+                  bool allowExtrapolate = false) const noexcept
     {
-        const auto v = read (id, stored, allowExtrapolate);
+        const auto v = read(id, stored, allowExtrapolate);
         return v.has_value() ? *v : fallback;
     }
 
@@ -389,10 +393,10 @@ public:
 
         Un `stored` repetido con el MISMO valor se acepta y se ignora, que es lo
         que pasa cuando la misma lectura se pasa dos veces. */
-    bool addPoint (CalCurveId id, int stored, double value,
-                   const char** why = nullptr) noexcept
+    bool addPoint(CalCurveId id, int stored, double value,
+                  const char** why = nullptr) noexcept
     {
-        const auto& info = curveInfo (id);
+        const auto& info = curveInfo(id);
 
         if (stored < info.storedLo || stored > info.storedHi)
         {
@@ -400,7 +404,7 @@ public:
             return false;
         }
 
-        if (! (value == value) || std::isinf (value))
+        if (!(value == value) || std::isinf(value))
         {
             if (why != nullptr) *why = "el valor medido no es un numero";
             return false;
@@ -412,7 +416,7 @@ public:
             return false;
         }
 
-        auto& p = points[static_cast<int> (id)];
+        auto& p = points[static_cast<int>(id)];
 
         for (const auto& existing : p)
         {
@@ -420,26 +424,26 @@ public:
                 continue;
 
             if (existing.value == value)
-                return true;   // la misma lectura, dos veces
+                return true; // la misma lectura, dos veces
 
             if (why != nullptr) *why = "dos medidas del mismo ajuste no coinciden, y la media no la midio nadie";
             return false;
         }
 
-        p.push_back (CalPoint { stored, value });
+        p.push_back(CalPoint{stored, value});
 
         // Ordenado por `stored`, siempre. Insertar en su sitio es O(n) y la tabla
         // tiene veinte puntos; ordenarlo al final obliga a `read()` a mirar en
         // un orden que alguien puede haber cambiado.
-        std::sort (p.begin(), p.end(),
-                   [] (const CalPoint& a, const CalPoint& b) { return a.stored < b.stored; });
+        std::sort(p.begin(), p.end(),
+                  [](const CalPoint& a, const CalPoint& b) { return a.stored < b.stored; });
 
         return true;
     }
 
     /** Descarta todos los puntos de una curva. Para empezar de cero cuando una
         sesion de medicion se ha estropeado. */
-    void clear (CalCurveId id) noexcept { points[static_cast<int> (id)].clear(); }
+    void clear(CalCurveId id) noexcept { points[static_cast<int>(id)].clear(); }
 
     /** Vacia todas las curvas. Devuelve la calibracion al estado de salida de
         fabrica, que es "nada medido". */
@@ -464,10 +468,10 @@ private:
         coherente con la interpolacion: una recta en un eje de tiempo que se
         corta en 0 es un tiempo negativo, y un tiempo negativo es un cambio de
         signo, que es un click. */
-    double slopeTo (const std::vector<CalPoint>& p, int atStored,
-                    bool log, int anchorIndex) const noexcept
+    double slopeTo(const std::vector<CalPoint>& p, int atStored,
+                   bool log, int anchorIndex) const noexcept
     {
-        const int n = static_cast<int> (p.size());
+        const int n = static_cast<int>(p.size());
 
         // Un par de puntos: el del anclaje y su vecino. Al anclar en el ultimo
         // punto el vecino va hacia atras, que es lo unico que se puede.
@@ -481,25 +485,25 @@ private:
         }
 
         if (a < 0 || b < 0 || a >= n || b >= n)
-            return p[static_cast<std::size_t> (anchorIndex)].value;
+            return p[static_cast<std::size_t>(anchorIndex)].value;
 
-        const double s0 = static_cast<double> (p[static_cast<std::size_t> (a)].stored);
-        const double s1 = static_cast<double> (p[static_cast<std::size_t> (b)].stored);
-        const double v0 = p[static_cast<std::size_t> (a)].value;
-        const double v1 = p[static_cast<std::size_t> (b)].value;
+        const double s0 = static_cast<double>(p[static_cast<std::size_t>(a)].stored);
+        const double s1 = static_cast<double>(p[static_cast<std::size_t>(b)].stored);
+        const double v0 = p[static_cast<std::size_t>(a)].value;
+        const double v1 = p[static_cast<std::size_t>(b)].value;
 
         if (s1 == s0)
             return v0;
 
-        const double t = (static_cast<double> (atStored) - s0) / (s1 - s0);
+        const double t = (static_cast<double>(atStored) - s0) / (s1 - s0);
 
-        if (! log || v0 <= 0.0 || v1 <= 0.0)
+        if (!log || v0 <= 0.0 || v1 <= 0.0)
             return v0 + t * (v1 - v0);
 
-        return std::exp (std::log (v0) + t * (std::log (v1) - std::log (v0)));
+        return std::exp(std::log(v0) + t * (std::log(v1) - std::log(v0)));
     }
 
-    std::vector<CalPoint> points[static_cast<int> (CalCurveId::count)];
+    std::vector<CalPoint> points[static_cast<int>(CalCurveId::count)];
 };
 
 } // namespace abd::synth

@@ -1,11 +1,13 @@
 #pragma once
 
-namespace abd::synth {
+namespace abd::synth
+{
 
 /**
  * @brief Exponential Portamento / Glide processor for smooth note pitch transitions.
  */
-class PortamentoGlide {
+class PortamentoGlide
+{
 public:
     PortamentoGlide() = default;
 
@@ -19,11 +21,11 @@ public:
     float getCurrentPitch() const noexcept { return currentPitch_; }
 
 private:
-    double sampleRate_{ 44100.0 };
-    float currentPitch_{ 60.0f };
-    float targetPitch_{ 60.0f };
-    float timeParam_{ 0.0f };
-    double slewMultiplier_{ 0.0 };
+    double sampleRate_{44100.0};
+    float currentPitch_{60.0f};
+    float targetPitch_{60.0f};
+    float timeParam_{0.0f};
+    double slewMultiplier_{0.0};
 
     void updateMultiplier() noexcept;
 };

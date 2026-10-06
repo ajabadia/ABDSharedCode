@@ -5,41 +5,46 @@
 //
 // Style mirrors ABDMS2000/Source/Tests/DSPCoreTests.cpp (check() + counters).
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <limits>
 #include <type_traits>
-#include <algorithm>
 
-#include "DSPUtils.h"
-#include "PolyBLEP.h"
-#include "EnvelopeCurves.h"
 #include "ADSREnvelope.h"
-#include "PortamentoGlide.h"
-#include "LFO.h"
 #include "AudioThreadSnapshot.h"
+#include "DSPUtils.h"
+#include "EnvelopeCurves.h"
+#include "LFO.h"
+#include "PolyBLEP.h"
+#include "PortamentoGlide.h"
 #include "VoiceAllocator.h"
 // Compat-shim coverage: the LutDSP path must keep aliasing the canonical type.
 #include "LutDSP/VoiceAllocator.h"
 #include "ModMatrix.h"
-#include "S950PatchFields.h"
-#include "S950Disk.h"
 #include "S950Calibration.h"
 #include "S950CalibrationHarness.h"
+#include "S950Disk.h"
 #include "S950EnvelopeBench.h"
+#include "S950PatchFields.h"
 
-namespace abd::synth::tests {
+namespace abd::synth::tests
+{
 
 static int testsPassed = 0;
 static int testsFailed = 0;
 
-static void check(bool condition, const char* testName) {
-    if (condition) {
+static void check(bool condition, const char* testName)
+{
+    if (condition)
+    {
         testsPassed++;
         printf("  [PASS] %s\n", testName);
-    } else {
+    }
+    else
+    {
         testsFailed++;
         printf("  [FAIL] %s\n", testName);
     }
@@ -54,15 +59,16 @@ static void check(bool condition, const char* testName) {
 // El catalogo del S950 tambien va en su propio .inc: es un bloque de datos con
 // sus propias reglas, y mezclarlo con el resto haria mas dificil ver que se
 // esta probando.
-#include "tests/S950PatchFieldsTests.inc"
-#include "tests/S950DiskTests.inc"
-#include "tests/S950CalibrationTests.inc"
-#include "tests/S950EnvelopeBenchTests.inc"
 #include "tests/S950CalibrationRenderTests.inc"
+#include "tests/S950CalibrationTests.inc"
+#include "tests/S950DiskTests.inc"
+#include "tests/S950EnvelopeBenchTests.inc"
+#include "tests/S950PatchFieldsTests.inc"
 
 // ─────────────────────────── DSPUtils ───────────────────────────
 
-static void testDSPUtils() {
+static void testDSPUtils()
+{
     printf("=== DSPUtils ===\n");
 
     check(DSPUtils::clamp(0.5f, 0.0f, 1.0f) == 0.5f, "clamp in range");
@@ -88,15 +94,16 @@ static void testDSPUtils() {
     check(std::abs(DSPUtils::linearToDecibels(10.0f) - 20.0f) < 0.001f, "x10 = 20 dB");
 
     uint32_t rng = 0x12345678;
-    float r1 = DSPUtils::randomBipolar(rng);
-    float r2 = DSPUtils::randomBipolar(rng);
+    float r1     = DSPUtils::randomBipolar(rng);
+    float r2     = DSPUtils::randomBipolar(rng);
     check(r1 >= -1.0f && r1 <= 1.0f, "randomBipolar in [-1,1]");
     check(r1 != r2, "randomBipolar advances state");
 }
 
 // ─────────────────────────── PolyBLEP ───────────────────────────
 
-static void testPolyBLEP() {
+static void testPolyBLEP()
+{
     printf("=== PolyBLEP ===\n");
 
     const float dt = 0.05f;
@@ -107,7 +114,8 @@ static void testPolyBLEP() {
 
     // Integrated residual stays within sane bounds
     bool bounded = true;
-    for (int i = 0; i <= 100; ++i) {
+    for (int i = 0; i <= 100; ++i)
+    {
         float t = static_cast<float>(i) / 100.0f;
         float r = PolyBLEP::getResidualIntegrated(t, 0.02f);
         if (std::abs(r) > 0.02f) bounded = false;
@@ -117,7 +125,8 @@ static void testPolyBLEP() {
 
 // ─────────────────────────── EnvelopeCurves + ADSREnvelope ───────────────────────────
 
-static void testEnvelope() {
+static void testEnvelope()
+{
     printf("=== EnvelopeCurves + ADSREnvelope ===\n");
 
     float at0 = EnvelopeCurves::getAttackTimeSeconds(0.0f);
@@ -126,7 +135,7 @@ static void testEnvelope() {
     check(std::abs(at1 - 5.0f) < 0.01f, "attack max 5 s");
     check(EnvelopeCurves::getAttackTimeSeconds(0.1f) < EnvelopeCurves::getAttackTimeSeconds(0.9f), "attack monotonic");
 
-    double multLong = EnvelopeCurves::getDecayMultiplier(10.0, 44100.0);
+    double multLong  = EnvelopeCurves::getDecayMultiplier(10.0, 44100.0);
     double multShort = EnvelopeCurves::getDecayMultiplier(0.002, 44100.0);
     // Per-sample multipliers: long decay ~0.99999, short decay ~0.949
     // (0.949^88.2 samples ~= e^-4.6 ~= 1% remaining at the 2 ms mark).
@@ -136,7 +145,7 @@ static void testEnvelope() {
 
     ADSREnvelope env;
     env.prepare(44100.0);
-    env.setAttack(0.0f);          // 0.5 ms
+    env.setAttack(0.0f); // 0.5 ms
     env.setDecay(0.0f);
     env.setSustain(0.5f);
     env.setRelease(0.0f);
@@ -167,7 +176,8 @@ static void testEnvelope() {
 
 // ─────────────────────────── PortamentoGlide ───────────────────────────
 
-static void testPortamento() {
+static void testPortamento()
+{
     printf("=== PortamentoGlide ===\n");
 
     PortamentoGlide glide;
@@ -200,7 +210,8 @@ static void testPortamento() {
 
 // ─────────────────────────── LFO ───────────────────────────
 
-static void testLFO() {
+static void testLFO()
+{
     printf("=== LFO ===\n");
 
     check(std::abs(LFO::syncNoteToMultiplier(4) - 1.0f) < 0.0001f, "sync idx4 = 1/4 x1");
@@ -216,7 +227,8 @@ static void testLFO() {
     lfo.setWaveformLFO1(LFOWaveform::Triangle);
     lfo.setFrequencyHz(1.0f);
     float peakPos = 0.0f, minPos = 0.0f;
-    for (int i = 0; i < 44100; ++i) {
+    for (int i = 0; i < 44100; ++i)
+    {
         float v = lfo.getNextSample();
         if (v > peakPos) peakPos = v;
         if (v < minPos) minPos = v;
@@ -230,7 +242,8 @@ static void testLFO() {
     lfo2.setWaveformLFO2(LFOWaveformLFO2::Sine);
     lfo2.setFrequencyHz(5.0f);
     bool sineBounded = true;
-    for (int i = 0; i < 44100; ++i) {
+    for (int i = 0; i < 44100; ++i)
+    {
         float v = lfo2.getNextSample();
         if (v < -1.001f || v > 1.001f) sineBounded = false;
     }
@@ -259,22 +272,24 @@ static void testLFO() {
 
 // ─────────────────────────── AudioThreadSnapshot ───────────────────────────
 
-static void testAudioThreadSnapshot() {
+static void testAudioThreadSnapshot()
+{
     printf("=== AudioThreadSnapshot ===\n");
 
     AudioThreadSnapshot snap;
     check(snap.voiceActive.size() == 32, "32 voice slots");
     check(snap.scopeBuffer.size() == 512, "512-sample scope buffer");
     check(snap.activeVoiceCount == 0 && !snap.isArpActive, "defaults zeroed");
-    snap.vuLeft = 0.5f;
+    snap.vuLeft         = 0.5f;
     snap.voiceActive[3] = true;
-    snap.voiceNote[3] = 64;
+    snap.voiceNote[3]   = 64;
     check(snap.voiceActive[3] && snap.voiceNote[3] == 64 && snap.vuLeft == 0.5f, "fields assignable");
 }
 
 // ─────────────────────────── VoiceAllocator ───────────────────────────
 
-static void testVoiceAllocator() {
+static void testVoiceAllocator()
+{
     printf("=== VoiceAllocator ===\n");
 
     // Poly1 round-robin
@@ -350,10 +365,10 @@ static void testVoiceAllocator() {
         // Engine state: v0 held(40), v1 latched(41, key up), v2 releasing(42),
         // v3 held(43) with the oldest trigger stamp.
         StealHint hints[4] = {
-            { 0, 40, true, true,  false, false, 0.9f, 10 },
-            { 1, 41, true, false, true,  false, 0.8f, 11 },
-            { 2, 42, true, false, false, true,  0.3f, 12 },
-            { 3, 43, true, true,  false, false, 0.9f, 8  },
+            {0, 40, true, true, false, false, 0.9f, 10},
+            {1, 41, true, false, true, false, 0.8f, 11},
+            {2, 42, true, false, false, true, 0.3f, 12},
+            {3, 43, true, true, false, false, 0.9f, 8},
         };
 
         // 1. Repeated Note Protection: re-trigger the slot already playing the note
@@ -365,24 +380,24 @@ static void testVoiceAllocator() {
         check(v == 1, "ladder: latched key-up voice stolen first");
 
         // 4. Release-phase stealing: releasing voice closest to silence
-        hints[1] = { 1, 41, true, true, false, false, 0.8f, 11 };
-        v = ladder.findVoiceToSteal(hints, 4, 50);
+        hints[1] = {1, 41, true, true, false, false, 0.8f, 11};
+        v        = ladder.findVoiceToSteal(hints, 4, 50);
         check(v == 2, "ladder: release-phase (lowest amp) stolen next");
 
         // 5. FIFO sustain stealing: oldest key-held note
-        hints[2] = { 2, 42, true, true, false, false, 0.9f, 12 };
-        v = ladder.findVoiceToSteal(hints, 4, 50);
+        hints[2] = {2, 42, true, true, false, false, 0.9f, 12};
+        v        = ladder.findVoiceToSteal(hints, 4, 50);
         check(v == 3, "ladder: FIFO steals oldest held note");
 
         // 6. Fallback: after all held, FIFO would always win; the RR fallback is
         //    the guaranteed-slot net. Exercise it via the real engine flow: pick,
         //    apply, commitAllocation, then rebuild hints from live engine state.
-        hints[3] = { 3, 43, true, true, false, false, 0.9f, 9 };
-        int v1 = ladder.findVoiceToSteal(hints, 4, 50);
+        hints[3] = {3, 43, true, true, false, false, 0.9f, 9};
+        int v1   = ladder.findVoiceToSteal(hints, 4, 50);
         check(v1 == 3, "fallback flow: FIFO picks oldest held (v3)");
         ladder.commitAllocation(v1, 50);
-        hints[3] = { 3, 50, true, true, false, false, 0.9f, 13 }; // engine state post-commit
-        int v2 = ladder.findVoiceToSteal(hints, 4, 51);           // 51: not already playing
+        hints[3] = {3, 50, true, true, false, false, 0.9f, 13}; // engine state post-commit
+        int v2   = ladder.findVoiceToSteal(hints, 4, 51);       // 51: not already playing
         check(v2 == 0, "fallback flow: next pick moves to v0 (oldest stamp rotated)");
         ladder.commitAllocation(v2, 51);
 
@@ -405,7 +420,8 @@ static void testVoiceAllocator() {
 
 } // namespace abd::synth::tests
 
-int main() {
+int main()
+{
     printf("=== SynthCore Test Suite ===\n");
     abd::synth::tests::testDSPUtils();
     abd::synth::tests::testPolyBLEP();

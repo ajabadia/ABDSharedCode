@@ -1,9 +1,11 @@
 #pragma once
 #include "EnvelopeCurves.h"
 
-namespace abd::synth {
+namespace abd::synth
+{
 
-enum class EnvelopeStage {
+enum class EnvelopeStage
+{
     Idle = 0,
     Attack,
     Decay,
@@ -15,7 +17,8 @@ enum class EnvelopeStage {
  * @brief High-performance Exponential ADSR Envelope Generator.
  * Matches the analogue capacitor charging/discharging response of Korg MS2000 EG1/EG2.
  */
-class ADSREnvelope {
+class ADSREnvelope
+{
 public:
     ADSREnvelope() = default;
 
@@ -36,21 +39,21 @@ public:
     EnvelopeStage getStage() const noexcept { return stage_; }
 
 private:
-    double sampleRate_{ 44100.0 };
-    EnvelopeStage stage_{ EnvelopeStage::Idle };
+    double sampleRate_{44100.0};
+    EnvelopeStage stage_{EnvelopeStage::Idle};
 
-    float attackParam_{ 0.1f };
-    float decayParam_{ 0.3f };
-    float sustainParam_{ 0.7f };
-    float releaseParam_{ 0.3f };
+    float attackParam_{0.1f};
+    float decayParam_{0.3f};
+    float sustainParam_{0.7f};
+    float releaseParam_{0.3f};
 
-    float currentLevel_{ 0.0f };
-    float targetLevel_{ 0.0f };
-    float velocityGain_{ 1.0f };
+    float currentLevel_{0.0f};
+    float targetLevel_{0.0f};
+    float velocityGain_{1.0f};
 
-    double attackRate_{ 0.01 };
-    double decayMult_{ 0.999 };
-    double releaseMult_{ 0.999 };
+    double attackRate_{0.01};
+    double decayMult_{0.999};
+    double releaseMult_{0.999};
 
     void updateRates() noexcept;
 };

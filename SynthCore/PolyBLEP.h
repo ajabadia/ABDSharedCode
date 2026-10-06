@@ -1,13 +1,15 @@
 #pragma once
 #include <cmath>
 
-namespace abd::synth {
+namespace abd::synth
+{
 
 /**
  * @brief PolyBLEP (Polynomial Band-Limited Step) helper functions.
  * Used for antialiased generation of Saw, Pulse, and Triangle waves.
  */
-class PolyBLEP {
+class PolyBLEP
+{
 public:
     /**
      * @brief Computes 2-point / 4-point PolyBLEP residual for a step transition.

@@ -1,6 +1,7 @@
 #include "PolyBLEP.h"
 
-namespace abd::synth {
+namespace abd::synth
+{
 
 float PolyBLEP::getResidual(float t, float dt) noexcept
 {

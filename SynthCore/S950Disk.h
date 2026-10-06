@@ -111,13 +111,13 @@ using PatchFieldCode = int;
 */
 struct DiskEntry
 {
-    int  slot = -1;              // posicion en el directorio, 0..63
-    char name[11] = { 0 };       // 10 caracteres y un terminador
-    char type = 0;               // 'P' programa, 'S' sample, 'D' kit, 'O' global
-    int  length = 0;             // bytes del fichero, cabecera de 60 incluida
-    int  startBlock = 0;         // primer bloque de la cadena
-    int  chainBlocks = 0;        // cuantos bloques recorre la cadena
-    bool chainOk = false;        // la cadena cubre los bytes que el fichero declara
+    int slot        = -1;    // posicion en el directorio, 0..63
+    char name[11]   = {0};   // 10 caracteres y un terminador
+    char type       = 0;     // 'P' programa, 'S' sample, 'D' kit, 'O' global
+    int length      = 0;     // bytes del fichero, cabecera de 60 incluida
+    int startBlock  = 0;     // primer bloque de la cadena
+    int chainBlocks = 0;     // cuantos bloques recorre la cadena
+    bool chainOk    = false; // la cadena cubre los bytes que el fichero declara
 };
 
 //==============================================================================
@@ -138,18 +138,18 @@ public:
     static constexpr int blockSize = 1024;
 
     /** El directorio: 64 entradas de 24 bytes, en el principio de la imagen. */
-    static constexpr int dirOffset = 0x000;
-    static constexpr int dirEntries = 64;
+    static constexpr int dirOffset    = 0x000;
+    static constexpr int dirEntries   = 64;
     static constexpr int dirEntrySize = 24;
 
     /** La tabla de asignacion: una palabra de 16 bits por bloque, desde 0x600. */
     static constexpr int fatOffset = 0x600;
-    static constexpr int fatEnd = 0x8000;   // fin de cadena
+    static constexpr int fatEnd    = 0x8000; // fin de cadena
 
     /** Los dos formatos que la maquina leia, y el disco decides cual por su
         tamano: 800 bloques es doble densidad, 1600 es alta. */
     static constexpr int doubleDensityBlocks = 800;
-    static constexpr int highDensityBlocks = 1600;
+    static constexpr int highDensityBlocks   = 1600;
 
     /** La cabecera de cada fichero, antes de su contenido.
 
@@ -167,11 +167,11 @@ public:
         asignacion vacios son exactamente ceros. No hay que escribir un "formato"
         aparte, y por eso no hay forma de que un disco nuevo esté medio formateado.
     */
-    static S950Disk blank (bool highDensity)
+    static S950Disk blank(bool highDensity)
     {
         const int blocks = highDensity ? highDensityBlocks : doubleDensityBlocks;
         S950Disk d;
-        d.image.assign (static_cast<std::size_t> (blocks) * blockSize, 0u);
+        d.image.assign(static_cast<std::size_t>(blocks) * blockSize, 0u);
         d.rescan();
         return d;
     }
@@ -179,11 +179,11 @@ public:
     /** Adopta una imagen ya leida de un fichero. Un tamano que no sea un numero
         entero de bloques se recorta al ultimo bloque entero, que es lo unico
         que se puede direccionar. */
-    void adopt (std::vector<std::uint8_t> bytes)
+    void adopt(std::vector<std::uint8_t> bytes)
     {
-        const auto whole = static_cast<std::size_t> (blockSize) * (bytes.size() / static_cast<std::size_t> (blockSize));
-        image.resize (whole);
-        std::copy (bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t> (whole), image.begin());
+        const auto whole = static_cast<std::size_t>(blockSize) * (bytes.size() / static_cast<std::size_t>(blockSize));
+        image.resize(whole);
+        std::copy(bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(whole), image.begin());
         rescan();
     }
 
@@ -191,7 +191,7 @@ public:
     /** Cuantos bloques tiene la imagen. */
     int totalBlocks() const noexcept
     {
-        return static_cast<int> (image.size() / static_cast<std::size_t> (blockSize));
+        return static_cast<int>(image.size() / static_cast<std::size_t>(blockSize));
     }
 
     /** La densidad, que se deduce del tamano y no al reves: un disco de 1600
@@ -210,9 +210,9 @@ public:
     //==========================================================================
 
     /** Cuantas entradas hay, ya leidas. */
-    int entryCount() const noexcept { return static_cast<int> (entries.size()); }
+    int entryCount() const noexcept { return static_cast<int>(entries.size()); }
 
-    const DiskEntry& entry (int index) const noexcept { return entries[static_cast<std::size_t> (index)]; }
+    const DiskEntry& entry(int index) const noexcept { return entries[static_cast<std::size_t>(index)]; }
 
     /** La entrada de un fichero por nombre y tipo, o `nullptr`.
 
@@ -220,13 +220,13 @@ public:
         programa y el sample que toca pueden llamarse igual, y buscar sin tipo
         devuelve el primero que encuentre en el directorio, que no es necesariamente
         el que se queria. */
-    const DiskEntry* find (const char* name, char type) const noexcept
+    const DiskEntry* find(const char* name, char type) const noexcept
     {
         if (name == nullptr)
             return nullptr;
 
         for (const auto& e : entries)
-            if (e.type == type && sameName (e.name, name))
+            if (e.type == type && sameName(e.name, name))
                 return &e;
 
         return nullptr;
@@ -250,23 +250,22 @@ public:
 
     /** El valor de la tabla para un bloque. 0 es libre, `fatEnd` es el final de
         una cadena, y cualquier otra cosa es el bloque siguiente. */
-    int fat (int block) const noexcept
+    int fat(int block) const noexcept
     {
         if (block < 0 || block >= totalBlocks())
             return fatEnd;
 
-        const auto at = static_cast<std::size_t> (fatOffset)
-                      + static_cast<std::size_t> (block) * 2u;
-        return readU16 (at);
+        const auto at = static_cast<std::size_t>(fatOffset) + static_cast<std::size_t>(block) * 2u;
+        return readU16(at);
     }
 
-    void setFat (int block, int value) noexcept
+    void setFat(int block, int value) noexcept
     {
         if (block < 0 || block >= totalBlocks())
             return;
 
-        writeU16 (static_cast<std::size_t> (fatOffset) + static_cast<std::size_t> (block) * 2u,
-                  static_cast<unsigned> (value));
+        writeU16(static_cast<std::size_t>(fatOffset) + static_cast<std::size_t>(block) * 2u,
+                 static_cast<unsigned>(value));
     }
 
     /** Cuantos bloques recorre la cadena que empieza en `start`.
@@ -275,25 +274,25 @@ public:
         tabla de asignacion DANADA puede apuntar un bloque a si mismo o hacia
         atras, y un recorrido sin limite no volveria nunca. Un disco roto tiene
         que poder decir "esto esta mal" y seguir, no colgar el proceso. */
-    int chainLength (int start, int maxBlocks) const noexcept
+    int chainLength(int start, int maxBlocks) const noexcept
     {
         if (maxBlocks <= 0)
             return 0;
 
-        const auto limit = std::min (maxBlocks, totalBlocks());
-        std::vector<bool> seen (static_cast<std::size_t> (totalBlocks()), false);
+        const auto limit = std::min(maxBlocks, totalBlocks());
+        std::vector<bool> seen(static_cast<std::size_t>(totalBlocks()), false);
 
         int block = start;
-        int n = 0;
+        int n     = 0;
 
         while (block != fatEnd && block >= 0 && block < totalBlocks() && n < limit)
         {
-            if (seen[static_cast<std::size_t> (block)])
+            if (seen[static_cast<std::size_t>(block)])
                 break;
 
-            seen[static_cast<std::size_t> (block)] = true;
+            seen[static_cast<std::size_t>(block)] = true;
             ++n;
-            block = fat (block);
+            block = fat(block);
         }
 
         return n;
@@ -310,12 +309,12 @@ public:
         entera y el modulo es su complemento: por eso el caso de un keygroup
         partido entre dos bloques no necesita un caso especial, solo necesita que
         se mire un byte cada vez. */
-    bool fileByteAt (const DiskEntry& e, std::size_t offset, std::size_t& imageAt) const noexcept
+    bool fileByteAt(const DiskEntry& e, std::size_t offset, std::size_t& imageAt) const noexcept
     {
-        if (offset >= static_cast<std::size_t> (e.length))
+        if (offset >= static_cast<std::size_t>(e.length))
             return false;
 
-        const auto index = static_cast<int> (offset / static_cast<std::size_t> (blockSize));
+        const auto index = static_cast<int>(offset / static_cast<std::size_t>(blockSize));
 
         if (index >= e.chainBlocks)
             return false;
@@ -330,14 +329,13 @@ public:
             if (block == fatEnd || block < 0 || block >= totalBlocks())
                 return false;
 
-            block = fat (block);
+            block = fat(block);
         }
 
         if (block == fatEnd || block < 0 || block >= totalBlocks())
             return false;
 
-        imageAt = static_cast<std::size_t> (block) * static_cast<std::size_t> (blockSize)
-                + (offset % static_cast<std::size_t> (blockSize));
+        imageAt = static_cast<std::size_t>(block) * static_cast<std::size_t>(blockSize) + (offset % static_cast<std::size_t>(blockSize));
 
         return imageAt < image.size();
     }
@@ -346,16 +344,16 @@ public:
 
         `offset` es un `byteOffset` del catalogo: esta dentro del keygroup, y el
         keygroup esta dentro del programa, que empieza tras su cabecera. */
-    bool keygroupByteAt (const DiskEntry& program, int keygroup,
-                         int offset, std::size_t& imageAt) const noexcept
+    bool keygroupByteAt(const DiskEntry& program, int keygroup,
+                        int offset, std::size_t& imageAt) const noexcept
     {
         if (program.type != 'P' || offset < 0 || offset >= keygroupRecordSize)
             return false;
 
-        if (keygroup < 0 || keygroup >= keygroupCount (program))
+        if (keygroup < 0 || keygroup >= keygroupCount(program))
             return false;
 
-        return fileByteAt (program, fileOffsetOf (program, keygroup, offset), imageAt);
+        return fileByteAt(program, fileOffsetOf(program, keygroup, offset), imageAt);
     }
 
     /** El offset, DENTRO DEL FICHERO, de un byte de un keygroup. Es lo que
@@ -363,11 +361,9 @@ public:
 
         Sin la cabecera de 60 bytes de los samples: un programa empieza con sus
         38. Ver el aviso de `keygroupCount`. */
-    static std::size_t fileOffsetOf (const DiskEntry& program, int keygroup, int offset) noexcept
+    static std::size_t fileOffsetOf(const DiskEntry& program, int keygroup, int offset) noexcept
     {
-        return static_cast<std::size_t> (programHeaderSize)
-             + static_cast<std::size_t> (keygroup) * static_cast<std::size_t> (keygroupRecordSize)
-             + static_cast<std::size_t> (offset);
+        return static_cast<std::size_t>(programHeaderSize) + static_cast<std::size_t>(keygroup) * static_cast<std::size_t>(keygroupRecordSize) + static_cast<std::size_t>(offset);
     }
 
     /** Cuantos keygroups tiene un programa.
@@ -383,7 +379,7 @@ public:
         asi que su longitud es `38 + n * 70` y no `60 + 38 + n * 70`. Restar los
         60 de mas hace que el cuerpo no sea multiplo de 70 y que el programa se
         lea como danado: cero keygroups, en vez de los 16 que tiene de verdad. */
-    int keygroupCount (const DiskEntry& program) const noexcept
+    int keygroupCount(const DiskEntry& program) const noexcept
     {
         if (program.type != 'P')
             return 0;
@@ -391,7 +387,7 @@ public:
         if (program.length < programHeaderSize + keygroupRecordSize)
             return 0;
 
-        const auto body = static_cast<int> (program.length) - programHeaderSize;
+        const auto body = static_cast<int>(program.length) - programHeaderSize;
         return (body % keygroupRecordSize == 0) ? body / keygroupRecordSize : 0;
     }
 
@@ -402,12 +398,12 @@ public:
     /** Si los cuatro bytes de la envolvente del filtro de un keygroup son
         ESPACIOS, que es lo que escribia un S900 y lo que significa "este programa
         no tiene envolvente de filtro". */
-    bool vcfEnvelopeIsBlank (const DiskEntry& program, int keygroup) const noexcept
+    bool vcfEnvelopeIsBlank(const DiskEntry& program, int keygroup) const noexcept
     {
         for (int o = 0; o < 4; ++o)
         {
             std::size_t at = 0;
-            if (! keygroupByteAt (program, keygroup, vcfFirstByte + o, at))
+            if (!keygroupByteAt(program, keygroup, vcfFirstByte + o, at))
                 return false;
 
             if (image[at] != blankByte)
@@ -445,13 +441,13 @@ public:
         hay un espacio ahi.
 
         @returns  `false` si el byte no se puede resolver. Nunca lanza. */
-    bool readKeygroupField (const DiskEntry& program, int keygroup,
-                            const PatchField& field, int& out) const noexcept
+    bool readKeygroupField(const DiskEntry& program, int keygroup,
+                           const PatchField& field, int& out) const noexcept
     {
         out = 0;
 
         std::size_t at = 0;
-        if (! keygroupByteAt (program, keygroup, field.byteOffset, at))
+        if (!keygroupByteAt(program, keygroup, field.byteOffset, at))
             return false;
 
         const auto raw = image[at];
@@ -462,11 +458,11 @@ public:
                 // A un byte con signo de verdad, que es lo que la maquina
                 // escribe. El rango del campo dice -50..+50, pero el byte puede
                 // traer cualquier cosa: eso se recorta, no se inventa.
-                out = static_cast<int> (static_cast<std::int8_t> (raw));
+                out = static_cast<int>(static_cast<std::int8_t>(raw));
                 break;
 
             case PatchField::Encoding::Port:
-                out = (raw == 0xFFu) ? 0 : static_cast<int> (raw) + 1;
+                out = (raw == 0xFFu) ? 0 : static_cast<int>(raw) + 1;
                 break;
 
             case PatchField::Encoding::Bit:
@@ -475,29 +471,29 @@ public:
 
             case PatchField::Encoding::Unsigned:
             default:
-                out = static_cast<int> (raw);
+                out = static_cast<int>(raw);
                 break;
         }
 
         // El blanco de la envolvente del filtro, antes de recortar.
-        if (isVcfField (field) && vcfEnvelopeIsBlank (program, keygroup))
+        if (isVcfField(field) && vcfEnvelopeIsBlank(program, keygroup))
         {
             out = (field.byteOffset == vcfFirstByte + 2) ? 99 : 0;
             return true;
         }
 
-        out = clampToField (field, out);
+        out = clampToField(field, out);
         return true;
     }
 
     /** Lee por CODIGO, que es como lo llama un preset. */
-    bool readField (const DiskEntry& program, int keygroup, const char* code, int& out) const noexcept
+    bool readField(const DiskEntry& program, int keygroup, const char* code, int& out) const noexcept
     {
-        const auto* f = findField (code);
+        const auto* f = findField(code);
         if (f == nullptr)
             return false;
 
-        return readKeygroupField (program, keygroup, *f, out);
+        return readKeygroupField(program, keygroup, *f, out);
     }
 
     /** Lee los 38 campos de golpe, en el orden de la tabla.
@@ -505,13 +501,13 @@ public:
         Para un panel, que los quiere todos de una vez. Llena `out` y devuelve
         cuantos ha llenado; si `out` es mas corto que la tabla, se para, en vez
         de escribir mas alla del final. */
-    int readAllFields (const DiskEntry& program, int keygroup, PatchFieldCode* out, int capacity) const noexcept
+    int readAllFields(const DiskEntry& program, int keygroup, PatchFieldCode* out, int capacity) const noexcept
     {
         int n = 0;
 
         for (int i = 0; i < patchFieldCount && n < capacity; ++i)
         {
-            if (! readKeygroupField (program, keygroup, fieldAt (i), out[n]))
+            if (!readKeygroupField(program, keygroup, fieldAt(i), out[n]))
                 break;
 
             ++n;
@@ -543,41 +539,40 @@ public:
         Lo que NO hace, y por lo tanto devuelve `false`: mover ficheros, cambiar
         el numero de keygroups, o escribir fuera del registro de uno. Escribir a
         ojo en la imagen cambiaria cosas que esta funcion no sabe medir. */
-    bool writeKeygroupField (const DiskEntry& program, int keygroup,
-                             const PatchField& field, int value)
+    bool writeKeygroupField(const DiskEntry& program, int keygroup,
+                            const PatchField& field, int value)
     {
         std::size_t at = 0;
-        if (! keygroupByteAt (program, keygroup, field.byteOffset, at))
+        if (!keygroupByteAt(program, keygroup, field.byteOffset, at))
             return false;
 
         // La envolvente en blanco se pone plana ANTES de escribir el byte, como
         // la maquina: si no, escribir un solo campo dejas los otros tres
         // espacios y un keygroup medio convertido.
-        if (isVcfField (field) && vcfEnvelopeIsBlank (program, keygroup))
-            flattenVcfEnvelope (program, keygroup);
+        if (isVcfField(field) && vcfEnvelopeIsBlank(program, keygroup))
+            flattenVcfEnvelope(program, keygroup);
 
-        const auto clipped = clampToField (field, value);
-        auto raw = static_cast<std::uint8_t> (clipped);
+        const auto clipped = clampToField(field, value);
+        auto raw           = static_cast<std::uint8_t>(clipped);
 
         switch (field.encoding)
         {
             case PatchField::Encoding::Signed:
-                raw = static_cast<std::uint8_t> (static_cast<std::int8_t> (clipped));
+                raw = static_cast<std::uint8_t>(static_cast<std::int8_t>(clipped));
                 break;
 
             case PatchField::Encoding::Port:
                 // Al reves de la lectura: el 0 del panel es el 0xFF del disco, y
                 // el resto va uno menos.
-                raw = (clipped == 0) ? 0xFFu : static_cast<std::uint8_t> (clipped - 1);
+                raw = (clipped == 0) ? 0xFFu : static_cast<std::uint8_t>(clipped - 1);
                 break;
 
-            case PatchField::Encoding::Bit:
-            {
+            case PatchField::Encoding::Bit: {
                 // Lectura-modificacion-escritura. Escribir el byte entero seria
                 // tirar los otros tres flags y el bit reservado sin que nadie se
                 // entere, y ese es exactamente el fallo que no se ve.
-                const auto others = static_cast<std::uint8_t> (image[at] & static_cast<std::uint8_t> (~field.bitMask));
-                raw = static_cast<std::uint8_t> (others | (clipped != 0 ? field.bitMask : 0u));
+                const auto others = static_cast<std::uint8_t>(image[at] & static_cast<std::uint8_t>(~field.bitMask));
+                raw               = static_cast<std::uint8_t>(others | (clipped != 0 ? field.bitMask : 0u));
                 break;
             }
 
@@ -591,23 +586,23 @@ public:
     }
 
     /** Escribe por CODIGO, que es como lo llama un preset. */
-    bool writeField (const DiskEntry& program, int keygroup, const char* code, int value)
+    bool writeField(const DiskEntry& program, int keygroup, const char* code, int value)
     {
-        const auto* f = findField (code);
+        const auto* f = findField(code);
         if (f == nullptr)
             return false;
 
-        return writeKeygroupField (program, keygroup, *f, value);
+        return writeKeygroupField(program, keygroup, *f, value);
     }
 
     /** Escribe un valor, YA en unidades de panel, en el byte que la maquina
         guarda. Para quien necesita el byte y no el campo, y por eso el nombre
         lo dice: no recorta, no traduce y no arregla nada. */
-    bool writeRawKeygroupByte (const DiskEntry& program, int keygroup, int offset,
-                               std::uint8_t value) noexcept
+    bool writeRawKeygroupByte(const DiskEntry& program, int keygroup, int offset,
+                              std::uint8_t value) noexcept
     {
         std::size_t at = 0;
-        if (! keygroupByteAt (program, keygroup, offset, at))
+        if (!keygroupByteAt(program, keygroup, offset, at))
             return false;
 
         image[at] = value;
@@ -616,11 +611,11 @@ public:
 
     /** Lee un byte del registro, sin interpretar. Para los bytes que NO son
         campos: los nombres de zona, la cadena de punteros. */
-    bool readRawKeygroupByte (const DiskEntry& program, int keygroup, int offset,
-                              std::uint8_t& out) const noexcept
+    bool readRawKeygroupByte(const DiskEntry& program, int keygroup, int offset,
+                             std::uint8_t& out) const noexcept
     {
         std::size_t at = 0;
-        if (! keygroupByteAt (program, keygroup, offset, at))
+        if (!keygroupByteAt(program, keygroup, offset, at))
             return false;
 
         out = image[at];
@@ -648,32 +643,31 @@ public:
         El nombre se normaliza antes: 10 caracteres, mayusculas, imprimibles. Un
         nombre con acento o mas largo no es un error, es un nombre que la maquina
         no puede enseyar, y recortarlo aqui es mejor que rechazarlo. */
-    const DiskEntry* addProgram (const char* name, int keygroups)
+    const DiskEntry* addProgram(const char* name, int keygroups)
     {
         if (keygroups < 1 || keygroups > keygroupMaxCount)
             return nullptr;
 
-        char clean[11] = { 0 };
-        normaliseName (name, clean);
+        char clean[11] = {0};
+        normaliseName(name, clean);
 
         // Los nombres son unicos DENTRO de un tipo, y hay que comprobarlo antes
         // de reservar bloques: descubrirlo despues dejaria el disco a medias.
-        if (find (clean, 'P') != nullptr)
+        if (find(clean, 'P') != nullptr)
             return nullptr;
 
-        const auto payload = static_cast<std::size_t> (programHeaderSize)
-                           + static_cast<std::size_t> (keygroups) * static_cast<std::size_t> (keygroupRecordSize);
+        const auto payload = static_cast<std::size_t>(programHeaderSize) + static_cast<std::size_t>(keygroups) * static_cast<std::size_t>(keygroupRecordSize);
 
-        std::vector<std::uint8_t> body (payload, 0u);
-        writeProgramHeader (body.data(), clean, keygroups);
-        writeFreshKeygroups (body.data() + programHeaderSize, keygroups);
+        std::vector<std::uint8_t> body(payload, 0u);
+        writeProgramHeader(body.data(), clean, keygroups);
+        writeFreshKeygroups(body.data() + programHeaderSize, keygroups);
 
-        const auto written = addFile (clean, 'P', body, payload);
+        const auto written = addFile(clean, 'P', body, payload);
         if (written < 0)
             return nullptr;
 
         rescan();
-        return find (clean, 'P');
+        return find(clean, 'P');
     }
 
     //==========================================================================
@@ -685,28 +679,28 @@ public:
     /** Un bloque entero de la imagen, para escribirlo entero. `block` fuera de
         rango devuelve `false` en vez de recortar: un bloque que no existe no es
         un bloque vacio. */
-    bool blockAt (int block, std::uint8_t* out) const noexcept
+    bool blockAt(int block, std::uint8_t* out) const noexcept
     {
         if (block < 0 || block >= totalBlocks() || out == nullptr)
             return false;
 
-        const auto from = static_cast<std::size_t> (block) * static_cast<std::size_t> (blockSize);
-        std::copy (image.begin() + static_cast<std::ptrdiff_t> (from),
-                   image.begin() + static_cast<std::ptrdiff_t> (from + static_cast<std::size_t> (blockSize)),
-                   out);
+        const auto from = static_cast<std::size_t>(block) * static_cast<std::size_t>(blockSize);
+        std::copy(image.begin() + static_cast<std::ptrdiff_t>(from),
+                  image.begin() + static_cast<std::ptrdiff_t>(from + static_cast<std::size_t>(blockSize)),
+                  out);
         return true;
     }
 
     /** Escribe un bloque entero de la imagen, sin comprobar la cadena ni el
         directorio. Para montar una imagen; escribir DATOS de fichero por aqui si
         es saltarse la comprobacion de que el byte existe. */
-    bool setBlock (int block, const std::uint8_t* in) noexcept
+    bool setBlock(int block, const std::uint8_t* in) noexcept
     {
         if (block < 0 || block >= totalBlocks() || in == nullptr)
             return false;
 
-        const auto at = static_cast<std::size_t> (block) * static_cast<std::size_t> (blockSize);
-        std::copy (in, in + blockSize, image.begin() + static_cast<std::ptrdiff_t> (at));
+        const auto at = static_cast<std::size_t>(block) * static_cast<std::size_t>(blockSize);
+        std::copy(in, in + blockSize, image.begin() + static_cast<std::ptrdiff_t>(at));
         return true;
     }
 
@@ -718,32 +712,32 @@ public:
 
         for (int i = 0; i < dirEntries; ++i)
         {
-            const auto o = static_cast<std::size_t> (dirOffset + i * dirEntrySize);
-            if (o + static_cast<std::size_t> (dirEntrySize) > image.size())
+            const auto o = static_cast<std::size_t>(dirOffset + i * dirEntrySize);
+            if (o + static_cast<std::size_t>(dirEntrySize) > image.size())
                 break;
 
-            if (image[o] == 0x00u)                 // ranura libre
+            if (image[o] == 0x00u) // ranura libre
                 continue;
 
-            const auto type = static_cast<char> (image[o + 16]);
+            const auto type = static_cast<char>(image[o + 16]);
             if (type != 'P' && type != 'S' && type != 'D' && type != 'O')
-                continue;                           // no es una entrada
+                continue; // no es una entrada
 
             DiskEntry e;
-            e.slot       = i;
-            readFixedName (o, e.name);
+            e.slot = i;
+            readFixedName(o, e.name);
             e.type       = type;
-            e.length     = readU24 (o + 17);
-            e.startBlock = static_cast<int> (readU16 (o + 20));
+            e.length     = readU24(o + 17);
+            e.startBlock = static_cast<int>(readU16(o + 20));
 
             if (e.startBlock < 0 || e.startBlock >= totalBlocks())
                 continue;
 
-            e.chainBlocks = chainLength (e.startBlock, totalBlocks());
+            e.chainBlocks     = chainLength(e.startBlock, totalBlocks());
             const auto needed = (e.length + blockSize - 1) / blockSize;
-            e.chainOk    = e.chainBlocks >= needed;
+            e.chainOk         = e.chainBlocks >= needed;
 
-            entries.push_back (e);
+            entries.push_back(e);
         }
     }
 
@@ -753,74 +747,71 @@ private:
         Un offset fuera de la imagen devuelve 0, que para una tabla de asignacion
         es "bloque libre": un disco truncado se lee como un disco con hueco, no
         como uno que se inventa los datos. */
-    unsigned readU16 (std::size_t at) const noexcept
+    unsigned readU16(std::size_t at) const noexcept
     {
         if (at + 1 >= image.size())
             return 0u;
 
-        return static_cast<unsigned> (image[at])
-             | (static_cast<unsigned> (image[at + 1]) << 8);
+        return static_cast<unsigned>(image[at]) | (static_cast<unsigned>(image[at + 1]) << 8);
     }
 
-    void writeU16 (std::size_t at, unsigned value) noexcept
+    void writeU16(std::size_t at, unsigned value) noexcept
     {
         if (at + 1 >= image.size())
             return;
 
-        image[at]     = static_cast<std::uint8_t> (value & 0xFFu);
-        image[at + 1] = static_cast<std::uint8_t> ((value >> 8) & 0xFFu);
+        image[at]     = static_cast<std::uint8_t>(value & 0xFFu);
+        image[at + 1] = static_cast<std::uint8_t>((value >> 8) & 0xFFu);
     }
 
     /** 24 bits, que es como la maquina guarda el tamaño de un fichero: cabe en
         dos bytes y sobra con el tercero. */
-    unsigned readU24 (std::size_t at) const noexcept
+    unsigned readU24(std::size_t at) const noexcept
     {
         if (at + 2 >= image.size())
             return 0u;
 
-        return static_cast<unsigned> (image[at])
-             | (static_cast<unsigned> (image[at + 1]) << 8)
-             | (static_cast<unsigned> (image[at + 2]) << 16);
+        return static_cast<unsigned>(image[at]) | (static_cast<unsigned>(image[at + 1]) << 8) | (static_cast<unsigned>(image[at + 2]) << 16);
     }
 
     /** Un nombre del directorio: diez bytes, y lo que no sea imprimible se lee
         como un espacio. Un nombre con bytes raros se muestra con huecos en vez
         de ensuciar el resto de la linea. */
-    void readFixedName (std::size_t at, char* out) const noexcept
+    void readFixedName(std::size_t at, char* out) const noexcept
     {
         for (int i = 0; i < fileNameSize; ++i)
         {
-            const auto c = image[at + static_cast<std::size_t> (i)];
-            out[i] = (c >= 0x20u && c < 0x7Fu) ? static_cast<char> (c) : ' ';
+            const auto c = image[at + static_cast<std::size_t>(i)];
+            out[i]       = (c >= 0x20u && c < 0x7Fu) ? static_cast<char>(c) : ' ';
         }
 
         out[fileNameSize] = '\0';
 
-        while (out[0] != '\0' && out[static_cast<std::size_t> (strlen (out)) - 1] == ' ')
-            out[static_cast<std::size_t> (strlen (out)) - 1] = '\0';
+        while (out[0] != '\0' && out[static_cast<std::size_t>(strlen(out)) - 1] == ' ')
+            out[static_cast<std::size_t>(strlen(out)) - 1] = '\0';
     }
 
     /** El nombre tal y como la maquina lo escribiria: diez caracteres, en
         mayusculas, y lo que no se pueda imprimir se cambia por un espacio. */
-    static void normaliseName (const char* name, char* out) noexcept
+    static void normaliseName(const char* name, char* out) noexcept
     {
         for (int i = 0; i < fileNameSize; ++i)
         {
-            const auto c = (name != nullptr) ? static_cast<unsigned char> (name[std::min<std::size_t> (static_cast<std::size_t> (i), std::strlen (name))]) : 0x20u;
-            const auto up = (c >= 'a' && c <= 'z') ? static_cast<unsigned char> (c - ('a' - 'A')) : c;
-            out[i] = (up >= 0x20u && up < 0x7Fu) ? static_cast<char> (up) : ' ';
+            const auto c  = (name != nullptr) ? static_cast<unsigned char>(name[std::min<std::size_t>(static_cast<std::size_t>(i), std::strlen(name))]) : 0x20u;
+            const auto up = (c >= 'a' && c <= 'z') ? static_cast<unsigned char>(c - ('a' - 'A')) : c;
+            out[i]        = (up >= 0x20u && up < 0x7Fu) ? static_cast<char>(up) : ' ';
         }
 
         out[fileNameSize] = '\0';
 
-        while (out[0] != '\0' && out[static_cast<std::size_t> (strlen (out)) - 1] == ' ')
-            out[static_cast<std::size_t> (strlen (out)) - 1] = '\0';
+        while (out[0] != '\0' && out[static_cast<std::size_t>(strlen(out)) - 1] == ' ')
+            out[static_cast<std::size_t>(strlen(out)) - 1] = '\0';
 
         if (out[0] == '\0')
         {
             // Un nombre vacio no es un nombre: la maquina enseña algo, y lo que
             // enseña cuando no hay nada es UNTITLED.
-            std::memcpy (out, "UNTITLED", 8);
+            std::memcpy(out, "UNTITLED", 8);
             out[8] = '\0';
         }
     }
@@ -834,7 +825,7 @@ private:
         acaba"— daria "TESTPROG" y "OTROPROG" por iguales cuando su ultimo
         caracter coincide, que es justo el fallo que hace que un find() con un
         nombre que no existe encuentre algo. */
-    static bool sameName (const char* a, const char* b) noexcept
+    static bool sameName(const char* a, const char* b) noexcept
     {
         if (a == nullptr || b == nullptr)
             return false;
@@ -845,17 +836,23 @@ private:
         {
             // Los espacios al principio no cuentan: un nombre empieza donde
             // empieza, y los de padding no son parte de el.
-            while (a[i] == ' ') { ++i; }
-            while (b[j] == ' ') { ++j; }
+            while (a[i] == ' ')
+            {
+                ++i;
+            }
+            while (b[j] == ' ')
+            {
+                ++j;
+            }
 
-            const auto ca = upperNameChar (a[i]);
-            const auto cb = upperNameChar (b[j]);
+            const auto ca = upperNameChar(a[i]);
+            const auto cb = upperNameChar(b[j]);
 
             if (ca != cb)
                 return false;
 
             if (ca == '\0')
-                return true;    // los dos se han acabado a la vez
+                return true; // los dos se han acabado a la vez
 
             ++i;
             ++j;
@@ -864,40 +861,38 @@ private:
 
     /** Un caracter de nombre, en mayusculas. La maquina no distingue, asi que
         comparar en mayusculas es comparar como compara ella. */
-    static char upperNameChar (char c) noexcept
+    static char upperNameChar(char c) noexcept
     {
-        return (c >= 'a' && c <= 'z') ? static_cast<char> (c - ('a' - 'A')) : c;
+        return (c >= 'a' && c <= 'z') ? static_cast<char>(c - ('a' - 'A')) : c;
     }
 
     /** Los cuatro bytes de un campo que es una etapa de la envolvente del
         filtro. */
-    static bool isVcfField (const PatchField& field) noexcept
+    static bool isVcfField(const PatchField& field) noexcept
     {
-        return field.byteOffset >= vcfFirstByte && field.byteOffset < vcfFirstByte + 4
-            && field.encoding == PatchField::Encoding::Unsigned
-            && field.hi == 99 && field.lo == 0;
+        return field.byteOffset >= vcfFirstByte && field.byteOffset < vcfFirstByte + 4 && field.encoding == PatchField::Encoding::Unsigned && field.hi == 99 && field.lo == 0;
     }
 
     /** Pone la envolvente del filtro plana: 0, 0, 99, 0. Es lo que hay que
         escribir antes de tocar un campo de un programa viejo, o el keygroup se
         queda con tres espacios y un numero. */
-    void flattenVcfEnvelope (const DiskEntry& program, int keygroup) noexcept
+    void flattenVcfEnvelope(const DiskEntry& program, int keygroup) noexcept
     {
-        static const std::uint8_t flat[4] = { 0u, 0u, 99u, 0u };
+        static const std::uint8_t flat[4] = {0u, 0u, 99u, 0u};
 
         for (int o = 0; o < 4; ++o)
         {
             std::size_t at = 0;
-            if (keygroupByteAt (program, keygroup, vcfFirstByte + o, at))
+            if (keygroupByteAt(program, keygroup, vcfFirstByte + o, at))
                 image[at] = flat[o];
         }
     }
 
     /** La cabecera de 38 bytes de un programa nuevo. */
-    void writeProgramHeader (std::uint8_t* at, const char* clean, int keygroups) const noexcept
+    void writeProgramHeader(std::uint8_t* at, const char* clean, int keygroups) const noexcept
     {
-        std::copy (clean, clean + fileNameSize, at);
-        at[keygroupCountOffset] = static_cast<std::uint8_t> (keygroups);
+        std::copy(clean, clean + fileNameSize, at);
+        at[keygroupCountOffset] = static_cast<std::uint8_t>(keygroups);
         at[programNumberOffset] = nextProgramNumber();
     }
 
@@ -905,7 +900,7 @@ private:
         maquina enseña en su pantalla, y no un dato del motor. */
     std::uint8_t nextProgramNumber() const noexcept
     {
-        bool taken[128] = { false };
+        bool taken[128] = {false};
 
         for (const auto& e : entries)
         {
@@ -913,8 +908,7 @@ private:
                 continue;
 
             std::size_t at = 0;
-            if (fileByteAt (e, static_cast<std::size_t> (programNumberOffset), at)
-                && at < image.size())
+            if (fileByteAt(e, static_cast<std::size_t>(programNumberOffset), at) && at < image.size())
                 taken[image[at] & 0x7Fu] = true;
         }
 
@@ -922,7 +916,7 @@ private:
         while (n < 127 && taken[n])
             ++n;
 
-        return static_cast<std::uint8_t> (n);
+        return static_cast<std::uint8_t>(n);
     }
 
     /** Un keygroup nuevo, escrito CAMPO A CAMPO a traves del catalogo.
@@ -937,16 +931,16 @@ private:
         pone. La envolvente del filtro nace EN BLANCO —los cuatro espacios—, que
         es lo que significa "esta maquina no tenia envolvente de filtro" y no
         "una envolvente con 32 en todas las etapas". */
-    void writeFreshKeygroups (std::uint8_t* base, int keygroups) const noexcept
+    void writeFreshKeygroups(std::uint8_t* base, int keygroups) const noexcept
     {
         for (int k = 0; k < keygroups; ++k)
         {
-            auto* kg = base + static_cast<std::size_t> (k) * static_cast<std::size_t> (keygroupRecordSize);
+            auto* kg = base + static_cast<std::size_t>(k) * static_cast<std::size_t>(keygroupRecordSize);
 
-            std::fill (kg, kg + keygroupRecordSize, std::uint8_t { 0 });
+            std::fill(kg, kg + keygroupRecordSize, std::uint8_t{0});
 
             for (int i = 0; i < patchFieldCount; ++i)
-                putFieldValue (kg, fieldAt (i), defaultValueFor (fieldAt (i)));
+                putFieldValue(kg, fieldAt(i), defaultValueFor(fieldAt(i)));
 
             // Los dos nombres de zona a "2 SAMPLE", que es como la biblioteca
             // marca una zona sin usar. No es un campo del panel, asi que no sale
@@ -954,10 +948,9 @@ private:
             static const char unusedZone[] = "2 SAMPLE";
             for (int z = 0; z < keygroupMaxZones; ++z)
             {
-                auto* zone = kg + keygroupNameOffset
-                           + static_cast<std::size_t> (z) * static_cast<std::size_t> (keygroupZoneStride);
-                std::copy (unusedZone, unusedZone + 8, zone);
-                std::fill (zone + 8, zone + keygroupNameSize, std::uint8_t { ' ' });
+                auto* zone = kg + keygroupNameOffset + static_cast<std::size_t>(z) * static_cast<std::size_t>(keygroupZoneStride);
+                std::copy(unusedZone, unusedZone + 8, zone);
+                std::fill(zone + 8, zone + keygroupNameSize, std::uint8_t{' '});
             }
 
             // La cadena de punteros a las zonas se deja a cero a proposito: este
@@ -969,24 +962,24 @@ private:
     /** El valor de fabrica de un campo, y el motivo cuando no es el de su
         `lo`. Un campo cuyo valor por defecto no se puede decir en una palabra
         lleva su porque aqui. */
-    static int defaultValueFor (const PatchField& field) noexcept
+    static int defaultValueFor(const PatchField& field) noexcept
     {
         const char* c = field.code;
 
         // El teclado entero y sin segunda zona de velocidad: un keygroup nuevo
         // suena en todo lo que se pueda tocar.
-        if (std::strcmp (c, "lowKey") == 0)        return 0;
-        if (std::strcmp (c, "highKey") == 0)       return keygroupVelocityCount - 1;
+        if (std::strcmp(c, "lowKey") == 0) return 0;
+        if (std::strcmp(c, "highKey") == 0) return keygroupVelocityCount - 1;
         // El 128 del switch es el "no hay segunda zona", y es el valor de
         // fabrica: un keygroup nuevo tiene UNA zona.
-        if (std::strcmp (c, "velocitySwitch") == 0) return 128;
+        if (std::strcmp(c, "velocitySwitch") == 0) return 128;
 
         // Los flags: constante apagada, one-shot apagada, desync ENCENDIDO (lo
         // escribe la maquina asi) y el release por velocidad apagado.
-        if (std::strcmp (c, "constantPitch") == 0)     return 0;
-        if (std::strcmp (c, "oneShot") == 0)           return 0;
-        if (std::strcmp (c, "lfoDesync") == 0)         return 1;
-        if (std::strcmp (c, "velocityReleaseOn") == 0) return 0;
+        if (std::strcmp(c, "constantPitch") == 0) return 0;
+        if (std::strcmp(c, "oneShot") == 0) return 0;
+        if (std::strcmp(c, "lfoDesync") == 0) return 1;
+        if (std::strcmp(c, "velocityReleaseOn") == 0) return 0;
 
         // Todo lo demas nace en su minimo, que es donde un mando empieza.
         return field.lo;
@@ -996,26 +989,26 @@ private:
         dentro de un buffer: la version sin imagen de `writeKeygroupField`, para
         construir un keygroup nuevo. Sin recorte y sin blancos, porque los
         valores vienen de `defaultValueFor` y son de la tabla. */
-    static void putFieldValue (std::uint8_t* keygroup, const PatchField& field, int value) noexcept
+    static void putFieldValue(std::uint8_t* keygroup, const PatchField& field, int value) noexcept
     {
-        auto* at = keygroup + field.byteOffset;
-        const auto v = clampToField (field, value);
+        auto* at     = keygroup + field.byteOffset;
+        const auto v = clampToField(field, value);
 
         switch (field.encoding)
         {
             case PatchField::Encoding::Signed:
-                *at = static_cast<std::uint8_t> (static_cast<std::int8_t> (v));
+                *at = static_cast<std::uint8_t>(static_cast<std::int8_t>(v));
                 break;
             case PatchField::Encoding::Port:
-                *at = (v == 0) ? 0xFFu : static_cast<std::uint8_t> (v - 1);
+                *at = (v == 0) ? 0xFFu : static_cast<std::uint8_t>(v - 1);
                 break;
             case PatchField::Encoding::Bit:
                 if (v != 0)
-                    *at = static_cast<std::uint8_t> (*at | field.bitMask);
+                    *at = static_cast<std::uint8_t>(*at | field.bitMask);
                 break;
             case PatchField::Encoding::Unsigned:
             default:
-                *at = static_cast<std::uint8_t> (v);
+                *at = static_cast<std::uint8_t>(v);
                 break;
         }
     }
@@ -1027,76 +1020,80 @@ private:
         estetica: es lo que hace que un test pueda comparar una imagen entera.
 
         @returns  el bloque inicial, o -1 si no cabe. */
-    int addFile (const char* clean, char type,
-                 const std::vector<std::uint8_t>& contents, std::size_t declaredLength)
+    int addFile(const char* clean, char type,
+                const std::vector<std::uint8_t>& contents, std::size_t declaredLength)
     {
-        const auto need = std::max (1, static_cast<int> ((declaredLength + blockSize - 1) / static_cast<std::size_t> (blockSize)));
+        const auto need = std::max(1, static_cast<int>((declaredLength + blockSize - 1) / static_cast<std::size_t>(blockSize)));
 
         std::vector<int> free;
-        for (int b = headerBlocks(); b < totalBlocks() && static_cast<int> (free.size()) < need; ++b)
-            if (fat (b) == 0)
-                free.push_back (b);
+        for (int b = headerBlocks(); b < totalBlocks() && static_cast<int>(free.size()) < need; ++b)
+            if (fat(b) == 0)
+                free.push_back(b);
 
-        if (static_cast<int> (free.size()) < need)
+        if (static_cast<int>(free.size()) < need)
             return -1;
 
         int slot = -1;
         for (int i = 0; i < dirEntries; ++i)
-            if (image[static_cast<std::size_t> (dirOffset + i * dirEntrySize)] == 0x00u) { slot = i; break; }
+            if (image[static_cast<std::size_t>(dirOffset + i * dirEntrySize)] == 0x00u)
+            {
+                slot = i;
+                break;
+            }
 
         if (slot < 0)
             return -1;
 
         for (int i = 0; i < need; ++i)
         {
-            const auto blockFrom = static_cast<std::size_t> (i) * static_cast<std::size_t> (blockSize);
-            const auto blockAt_ = static_cast<std::size_t> (free[static_cast<std::size_t> (i)]) * static_cast<std::size_t> (blockSize);
-            const auto take = std::min (static_cast<std::size_t> (blockSize),
-                                        contents.size() > blockFrom ? contents.size() - blockFrom : 0u);
+            const auto blockFrom = static_cast<std::size_t>(i) * static_cast<std::size_t>(blockSize);
+            const auto blockAt_  = static_cast<std::size_t>(free[static_cast<std::size_t>(i)]) * static_cast<std::size_t>(blockSize);
+            const auto take      = std::min(static_cast<std::size_t>(blockSize),
+                                       contents.size() > blockFrom ? contents.size() - blockFrom : 0u);
 
-            std::fill (image.begin() + static_cast<std::ptrdiff_t> (blockAt_),
-                       image.begin() + static_cast<std::ptrdiff_t> (blockAt_ + static_cast<std::size_t> (blockSize)),
-                       std::uint8_t { 0 });
+            std::fill(image.begin() + static_cast<std::ptrdiff_t>(blockAt_),
+                      image.begin() + static_cast<std::ptrdiff_t>(blockAt_ + static_cast<std::size_t>(blockSize)),
+                      std::uint8_t{0});
 
             if (take > 0)
-                std::copy (contents.begin() + static_cast<std::ptrdiff_t> (blockFrom),
-                           contents.begin() + static_cast<std::ptrdiff_t> (blockFrom + take),
-                           image.begin() + static_cast<std::ptrdiff_t> (blockAt_));
+                std::copy(contents.begin() + static_cast<std::ptrdiff_t>(blockFrom),
+                          contents.begin() + static_cast<std::ptrdiff_t>(blockFrom + take),
+                          image.begin() + static_cast<std::ptrdiff_t>(blockAt_));
 
             // La cadena salta de un bloque libre al siguiente libre, que pueden
             // no ser contiguos. Por eso el keygroup partido entre bloques tiene
             // que resolverse byte a byte, y por eso este bucle no dice nada de
             // contigüidad.
-            setFat (free[static_cast<std::size_t> (i)],
-                    i == need - 1 ? fatEnd : free[static_cast<std::size_t> (i) + 1]);
+            setFat(free[static_cast<std::size_t>(i)],
+                   i == need - 1 ? fatEnd : free[static_cast<std::size_t>(i) + 1]);
         }
 
-        const auto d = static_cast<std::size_t> (dirOffset + slot * dirEntrySize);
-        std::fill (image.begin() + static_cast<std::ptrdiff_t> (d),
-                   image.begin() + static_cast<std::ptrdiff_t> (d + static_cast<std::size_t> (dirEntrySize)),
-                   std::uint8_t { 0 });
+        const auto d = static_cast<std::size_t>(dirOffset + slot * dirEntrySize);
+        std::fill(image.begin() + static_cast<std::ptrdiff_t>(d),
+                  image.begin() + static_cast<std::ptrdiff_t>(d + static_cast<std::size_t>(dirEntrySize)),
+                  std::uint8_t{0});
 
-        std::copy (clean, clean + fileNameSize, image.begin() + static_cast<std::ptrdiff_t> (d));
-        image[d + 16] = static_cast<std::uint8_t> (type);
+        std::copy(clean, clean + fileNameSize, image.begin() + static_cast<std::ptrdiff_t>(d));
+        image[d + 16] = static_cast<std::uint8_t>(type);
 
-        const auto len = static_cast<unsigned> (declaredLength);
-        image[d + 17] = static_cast<std::uint8_t> (len & 0xFFu);
-        image[d + 18] = static_cast<std::uint8_t> ((len >> 8) & 0xFFu);
-        image[d + 19] = static_cast<std::uint8_t> ((len >> 16) & 0xFFu);
-        image[d + 20] = static_cast<std::uint8_t> (free[0] & 0xFF);
-        image[d + 21] = static_cast<std::uint8_t> ((free[0] >> 8) & 0xFF);
+        const auto len = static_cast<unsigned>(declaredLength);
+        image[d + 17]  = static_cast<std::uint8_t>(len & 0xFFu);
+        image[d + 18]  = static_cast<std::uint8_t>((len >> 8) & 0xFFu);
+        image[d + 19]  = static_cast<std::uint8_t>((len >> 16) & 0xFFu);
+        image[d + 20]  = static_cast<std::uint8_t>(free[0] & 0xFF);
+        image[d + 21]  = static_cast<std::uint8_t>((free[0] >> 8) & 0xFF);
 
         return free[0];
     }
 
     std::vector<std::uint8_t> image;
-    std::vector<DiskEntry>     entries;
+    std::vector<DiskEntry> entries;
 };
 
 //==============================================================================
 /** El indice de un campo por su codigo, o -1. Lo que un panel recorre, y lo que
     hace el emparejamiento con la tabla del catalogo. */
-constexpr int patchFieldIndex (const char* code) noexcept
+constexpr int patchFieldIndex(const char* code) noexcept
 {
     for (int i = 0; i < patchFieldCount; ++i)
     {
@@ -1106,7 +1103,11 @@ constexpr int patchFieldIndex (const char* code) noexcept
         if (b == nullptr)
             return -1;
 
-        while (*a != '\0' && *a == *b) { ++a; ++b; }
+        while (*a != '\0' && *a == *b)
+        {
+            ++a;
+            ++b;
+        }
 
         if (*a == *b)
             return i;

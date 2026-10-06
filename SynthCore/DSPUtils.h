@@ -1,14 +1,16 @@
 #pragma once
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
-namespace abd::synth {
+namespace abd::synth
+{
 
-namespace DSPUtils {
+namespace DSPUtils
+{
 
-constexpr float PI = 3.14159265358979323846f;
-constexpr float TWO_PI = 6.28318530717958647692f;
+constexpr float PI      = 3.14159265358979323846f;
+constexpr float TWO_PI  = 6.28318530717958647692f;
 constexpr float HALF_PI = 1.57079632679489661923f;
 
 inline float clamp(float value, float minVal, float maxVal) noexcept
@@ -56,8 +58,8 @@ inline float softClip(float x) noexcept
 // then applies makeup gain. The MS2000 distortion is deliberately gritty.
 inline float ampDistortion(float x, float drive) noexcept
 {
-    float preGain = 1.0f + drive * 8.0f;  // Up to 7.8x pre-gain
-    float in = x * preGain;
+    float preGain = 1.0f + drive * 8.0f; // Up to 7.8x pre-gain
+    float in      = x * preGain;
     float shaped;
     // Asymmetric clipping curve (even harmonics from asymmetry)
     if (in > 0.0f)
@@ -77,39 +79,48 @@ inline float randomBipolar(uint32_t& state) noexcept
 }
 
 template <typename T = float>
-class LinearSmoother {
+class LinearSmoother
+{
 public:
-    void reset(double sampleRate, double rampLengthSeconds) noexcept {
+    void reset(double sampleRate, double rampLengthSeconds) noexcept
+    {
         steps_ = static_cast<int>(std::max(1.0, sampleRate * rampLengthSeconds));
-        step_ = steps_;
+        step_  = steps_;
     }
-    void setCurrentAndTargetValue(T val) noexcept {
+    void setCurrentAndTargetValue(T val) noexcept
+    {
         current_ = target_ = val;
-        step_ = steps_;
-        stepSize_ = 0;
+        step_              = steps_;
+        stepSize_          = 0;
     }
-    void setTargetValue(T target) noexcept {
-        target_ = target;
-        step_ = 0;
+    void setTargetValue(T target) noexcept
+    {
+        target_   = target;
+        step_     = 0;
         stepSize_ = (steps_ > 0) ? ((target_ - current_) / static_cast<T>(steps_)) : 0;
     }
-    T getNextValue() noexcept {
-        if (step_ < steps_) {
+    T getNextValue() noexcept
+    {
+        if (step_ < steps_)
+        {
             current_ += stepSize_;
             ++step_;
-        } else {
+        }
+        else
+        {
             current_ = target_;
         }
         return current_;
     }
     T getCurrentValue() const noexcept { return current_; }
     bool isSmoothing() const noexcept { return step_ < steps_; }
+
 private:
-    T current_{ 0 };
-    T target_{ 0 };
-    T stepSize_{ 0 };
-    int steps_{ 1 };
-    int step_{ 1 };
+    T current_{0};
+    T target_{0};
+    T stepSize_{0};
+    int steps_{1};
+    int step_{1};
 };
 
 } // namespace DSPUtils

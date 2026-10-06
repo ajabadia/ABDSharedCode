@@ -1,8 +1,9 @@
 #include "PortamentoGlide.h"
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
-namespace abd::synth {
+namespace abd::synth
+{
 
 void PortamentoGlide::prepare(double sampleRate) noexcept
 {
@@ -13,7 +14,7 @@ void PortamentoGlide::prepare(double sampleRate) noexcept
 void PortamentoGlide::reset(float initialMidiNote) noexcept
 {
     currentPitch_ = initialMidiNote;
-    targetPitch_ = initialMidiNote;
+    targetPitch_  = initialMidiNote;
 }
 
 void PortamentoGlide::setTargetNote(float targetMidiNote, bool glideEnabled) noexcept
@@ -40,10 +41,9 @@ void PortamentoGlide::updateMultiplier() noexcept
     }
 
     // Korg MS2000 calibrated curve: 0 to 4.5 seconds with 2.5 power exponent
-    float glideSec = std::pow(timeParam_, 2.5f) * 4.5f;
+    float glideSec  = std::pow(timeParam_, 2.5f) * 4.5f;
     slewMultiplier_ = std::exp(-1.0 / (glideSec * sampleRate_));
 }
-
 
 float PortamentoGlide::getNextPitchSemitones() noexcept
 {

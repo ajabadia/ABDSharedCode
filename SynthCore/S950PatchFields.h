@@ -115,11 +115,17 @@ struct PatchField
 {
     const char* code;
     const char* name;
-    int         byteOffset;
-    int         lo;
-    int         hi;
-    enum class Encoding { Unsigned, Signed, Port, Bit };
-    Encoding    encoding;
+    int byteOffset;
+    int lo;
+    int hi;
+    enum class Encoding
+    {
+        Unsigned,
+        Signed,
+        Port,
+        Bit
+    };
+    Encoding encoding;
     std::uint8_t bitMask;
     const char* group;
     const char* trimId;
@@ -166,9 +172,9 @@ struct PerformTrim
     const char* code;
     const char* name;
     const char* fieldCode;
-    int         lo;
-    int         hi;
-    bool        bipolar;
+    int lo;
+    int hi;
+    bool bipolar;
     const char* unit;
 };
 
@@ -181,88 +187,88 @@ struct PerformTrim
     justo lo que pasa con un target INTERFACE.
 */
 inline constexpr PatchField patchFields[] =
-{
-    //--- Byte 0..2: que teclas y que velocidades responden
-    { "lowKey",            "Low key",            0,   0, 127, PatchField::Encoding::Unsigned, 0x00, "KEYS",   "",         "nota MIDI" },
-    { "highKey",           "High key",           1,   0, 127, PatchField::Encoding::Unsigned, 0x00, "KEYS",   "",         "nota MIDI" },
-    // El 128 es el valor que dice "no hay segunda zona", y no hay velocidad que
-    // llegue a el. Por eso el rango es 1..128 y no 0..127: el 0 no es un valor
-    // valido, es el hueco que deja el switch cuando no hay nada que repartir.
-    { "velocitySwitch",    "Velocity switch",    2,   1, 128, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "",       "nota MIDI" },
+    {
+        //--- Byte 0..2: que teclas y que velocidades responden
+        {"lowKey", "Low key", 0, 0, 127, PatchField::Encoding::Unsigned, 0x00, "KEYS", "", "nota MIDI"},
+        {"highKey", "High key", 1, 0, 127, PatchField::Encoding::Unsigned, 0x00, "KEYS", "", "nota MIDI"},
+        // El 128 es el valor que dice "no hay segunda zona", y no hay velocidad que
+        // llegue a el. Por eso el rango es 1..128 y no 0..127: el 0 no es un valor
+        // valido, es el hueco que deja el switch cuando no hay nada que repartir.
+        {"velocitySwitch", "Velocity switch", 2, 1, 128, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "", "nota MIDI"},
 
-    //--- Byte 3..6: envolvente de amplitud
-    { "vcaAttack",         "VCA attack",         3,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaAttack",  "0..99" },
-    { "vcaDecay",          "VCA decay",          4,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaDecay",   "0..99" },
-    { "vcaSustain",        "VCA sustain",        5,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaSustain", "0..99" },
-    { "vcaRelease",        "VCA release",        6,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaRelease", "0..99" },
+        //--- Byte 3..6: envolvente de amplitud
+        {"vcaAttack", "VCA attack", 3, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaAttack", "0..99"},
+        {"vcaDecay", "VCA decay", 4, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaDecay", "0..99"},
+        {"vcaSustain", "VCA sustain", 5, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaSustain", "0..99"},
+        {"vcaRelease", "VCA release", 6, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcaRelease", "0..99"},
 
-    //--- Byte 7..11: la velocidad y el teclado moviendo cosas
-    { "velToFilter",       "Velocity to filter",  7,   0,  99, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "velToFilter",   "0..99" },
-    { "keyToFilter",       "Key to filter",       8,   0,  99, PatchField::Encoding::Unsigned, 0x00, "FILTER",   "",         "0..99" },
-    { "velToAttack",       "Velocity to attack",  9,   0,  99, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "",         "0..99" },
-    // Los dos siguientes NO tienen trim, y es una decision, no un olvido: en
-    // el estudio ninguno de los dos se puede mover con un offset. Una version
-    // anterior de esta tabla les puso un trimId con su propio nombre, y la
-    // referencia colgaba: el campo apuntaba a un trim que no existia. No hacia
-    // falta ningun motor para verlo —lo vio un test que mira al reves— y
-    // hacia justo el daño que este catalogo existe para evitar.
-    { "velToRelease",      "Velocity to release",10, -50,  50, PatchField::Encoding::Signed,   0x00, "VELOCITY", "",         "-50..+50" },
-    { "velToLoudness",     "Velocity to loudness",11,  0,  99, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "velToLoudness", "0..99" },
+        //--- Byte 7..11: la velocidad y el teclado moviendo cosas
+        {"velToFilter", "Velocity to filter", 7, 0, 99, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "velToFilter", "0..99"},
+        {"keyToFilter", "Key to filter", 8, 0, 99, PatchField::Encoding::Unsigned, 0x00, "FILTER", "", "0..99"},
+        {"velToAttack", "Velocity to attack", 9, 0, 99, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "", "0..99"},
+        // Los dos siguientes NO tienen trim, y es una decision, no un olvido: en
+        // el estudio ninguno de los dos se puede mover con un offset. Una version
+        // anterior de esta tabla les puso un trimId con su propio nombre, y la
+        // referencia colgaba: el campo apuntaba a un trim que no existia. No hacia
+        // falta ningun motor para verlo —lo vio un test que mira al reves— y
+        // hacia justo el daño que este catalogo existe para evitar.
+        {"velToRelease", "Velocity to release", 10, -50, 50, PatchField::Encoding::Signed, 0x00, "VELOCITY", "", "-50..+50"},
+        {"velToLoudness", "Velocity to loudness", 11, 0, 99, PatchField::Encoding::Unsigned, 0x00, "VELOCITY", "velToLoudness", "0..99"},
 
-    //--- Byte 12..14: WARP, un bend en el ataque
-    { "warpVelocity",      "Warp velocity",     12,   0,  99, PatchField::Encoding::Unsigned, 0x00, "TUNING",  "",         "0..99" },
-    { "warpDepth",         "Warp depth",        13, -50,  50, PatchField::Encoding::Signed,   0x00, "TUNING",  "",         "semitonos" },
-    { "warpTime",          "Warp time",         14,   0,  99, PatchField::Encoding::Unsigned, 0x00, "TUNING",  "",         "0..99" },
+        //--- Byte 12..14: WARP, un bend en el ataque
+        {"warpVelocity", "Warp velocity", 12, 0, 99, PatchField::Encoding::Unsigned, 0x00, "TUNING", "", "0..99"},
+        {"warpDepth", "Warp depth", 13, -50, 50, PatchField::Encoding::Signed, 0x00, "TUNING", "", "semitonos"},
+        {"warpTime", "Warp time", 14, 0, 99, PatchField::Encoding::Unsigned, 0x00, "TUNING", "", "0..99"},
 
-    //--- Byte 15..17 y 21..22: el LFO
-    { "lfoDelay",          "LFO delay",         15,   0,  99, PatchField::Encoding::Unsigned, 0x00, "LFO",     "lfoDelay",     "0..99" },
-    { "lfoRate",           "LFO rate",          16,   0,  99, PatchField::Encoding::Unsigned, 0x00, "LFO",     "lfoRate",      "0..99" },
-    { "lfoDepth",          "LFO depth",         17,   0,  99, PatchField::Encoding::Unsigned, 0x00, "LFO",     "lfoDepth",     "0..99" },
-    // Los dos siguientes son 0..50 y no 0..99 porque el S950 los imprime asi. Un
-    // mando que llega a 99 donde la maquina llega a 50 es un mando que hay que
-    // explicar, y el criterio de la maquina es que el panel manda.
-    { "lfoAftertouch",     "LFO from aftertouch",21,  0,  50, PatchField::Encoding::Unsigned, 0x00, "LFO",     "",         "0..50" },
-    { "lfoModwheel",       "LFO from modwheel", 22,   0,  50, PatchField::Encoding::Unsigned, 0x00, "LFO",     "",         "0..50" },
+        //--- Byte 15..17 y 21..22: el LFO
+        {"lfoDelay", "LFO delay", 15, 0, 99, PatchField::Encoding::Unsigned, 0x00, "LFO", "lfoDelay", "0..99"},
+        {"lfoRate", "LFO rate", 16, 0, 99, PatchField::Encoding::Unsigned, 0x00, "LFO", "lfoRate", "0..99"},
+        {"lfoDepth", "LFO depth", 17, 0, 99, PatchField::Encoding::Unsigned, 0x00, "LFO", "lfoDepth", "0..99"},
+        // Los dos siguientes son 0..50 y no 0..99 porque el S950 los imprime asi. Un
+        // mando que llega a 99 donde la maquina llega a 50 es un mando que hay que
+        // explicar, y el criterio de la maquina es que el panel manda.
+        {"lfoAftertouch", "LFO from aftertouch", 21, 0, 50, PatchField::Encoding::Unsigned, 0x00, "LFO", "", "0..50"},
+        {"lfoModwheel", "LFO from modwheel", 22, 0, 50, PatchField::Encoding::Unsigned, 0x00, "LFO", "", "0..50"},
 
-    //--- Byte 19: la salida
-    { "outputPort",        "Output",            19,   0,  10, PatchField::Encoding::Port,     0x00, "KEYS",   "",         "puerto" },
+        //--- Byte 19: la salida
+        {"outputPort", "Output", 19, 0, 10, PatchField::Encoding::Port, 0x00, "KEYS", "", "puerto"},
 
-    //--- Byte 23 y 34..37: el filtro y su envolvente
-    { "vcfAmount",         "VCF amount",        23, -50,  50, PatchField::Encoding::Signed,   0x00, "FILTER", "vcfAmount",  "-50..+50" },
-    { "vcfAttack",         "VCF attack",        34,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfAttack", "0..99" },
-    { "vcfDecay",          "VCF decay",         35,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfDecay",  "0..99" },
-    { "vcfSustain",        "VCF sustain",       36,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfSustain", "0..99" },
-    { "vcfRelease",        "VCF release",       37,   0,  99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfRelease", "0..99" },
+        //--- Byte 23 y 34..37: el filtro y su envolvente
+        {"vcfAmount", "VCF amount", 23, -50, 50, PatchField::Encoding::Signed, 0x00, "FILTER", "vcfAmount", "-50..+50"},
+        {"vcfAttack", "VCF attack", 34, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfAttack", "0..99"},
+        {"vcfDecay", "VCF decay", 35, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfDecay", "0..99"},
+        {"vcfSustain", "VCF sustain", 36, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfSustain", "0..99"},
+        {"vcfRelease", "VCF release", 37, 0, 99, PatchField::Encoding::Unsigned, 0x00, "ENVELOPES", "vcfRelease", "0..99"},
 
-    //--- Byte 42..45: la zona SUAVE, la de la velocidad baja
-    // El fine es 0..255 porque NO es una altura: es el byte BAJO de un offset de
-    // altura de 16 bits con signo, y lo alto es el transpose. Los dos juntos son
-    // un offset en dieciseiseavos de semitono. Leer el fine como 0..99 y
-    // recortarlo es el error de un cuarto de tono sin que nada se queje.
-    { "softFine",          "Soft fine",         42,   0, 255, PatchField::Encoding::Unsigned, 0x00, "TUNING",  "",         "1/16 semitono" },
-    { "softTranspose",     "Soft transpose",    43, -50,  50, PatchField::Encoding::Signed,   0x00, "TUNING",  "",         "semitonos" },
-    { "softFilter",        "Soft filter",       44,   0,  99, PatchField::Encoding::Unsigned, 0x00, "FILTER",  "vcfCutoff", "0..99" },
-    { "softLoudness",      "Soft loudness",     45, -50,  50, PatchField::Encoding::Signed,   0x00, "VELOCITY", "",        "-50..+50" },
+        //--- Byte 42..45: la zona SUAVE, la de la velocidad baja
+        // El fine es 0..255 porque NO es una altura: es el byte BAJO de un offset de
+        // altura de 16 bits con signo, y lo alto es el transpose. Los dos juntos son
+        // un offset en dieciseiseavos de semitono. Leer el fine como 0..99 y
+        // recortarlo es el error de un cuarto de tono sin que nada se queje.
+        {"softFine", "Soft fine", 42, 0, 255, PatchField::Encoding::Unsigned, 0x00, "TUNING", "", "1/16 semitono"},
+        {"softTranspose", "Soft transpose", 43, -50, 50, PatchField::Encoding::Signed, 0x00, "TUNING", "", "semitonos"},
+        {"softFilter", "Soft filter", 44, 0, 99, PatchField::Encoding::Unsigned, 0x00, "FILTER", "vcfCutoff", "0..99"},
+        {"softLoudness", "Soft loudness", 45, -50, 50, PatchField::Encoding::Signed, 0x00, "VELOCITY", "", "-50..+50"},
 
-    //--- Byte 64..67: la zona DURA, la de la velocidad alta
-    // Mismo grupo que el anterior, 22 bytes mas adelante. Un keygroup puede
-    // tener las dos zonas con cortes distintos —el 54% de los keygroups de dos
-    // zonas de la biblioteca lo hace— y por eso son ocho campos y no cuatro.
-    { "loudFine",          "Loud fine",         64,   0, 255, PatchField::Encoding::Unsigned, 0x00, "TUNING",  "",         "1/16 semitono" },
-    { "loudTranspose",     "Loud transpose",    65, -50,  50, PatchField::Encoding::Signed,   0x00, "TUNING",  "",         "semitonos" },
-    { "loudFilter",        "Loud filter",       66,   0,  99, PatchField::Encoding::Unsigned, 0x00, "FILTER",  "vcfCutoff", "0..99" },
-    { "loudLoudness",      "Loud loudness",     67, -50,  50, PatchField::Encoding::Signed,   0x00, "VELOCITY", "",        "-50..+50" },
+        //--- Byte 64..67: la zona DURA, la de la velocidad alta
+        // Mismo grupo que el anterior, 22 bytes mas adelante. Un keygroup puede
+        // tener las dos zonas con cortes distintos —el 54% de los keygroups de dos
+        // zonas de la biblioteca lo hace— y por eso son ocho campos y no cuatro.
+        {"loudFine", "Loud fine", 64, 0, 255, PatchField::Encoding::Unsigned, 0x00, "TUNING", "", "1/16 semitono"},
+        {"loudTranspose", "Loud transpose", 65, -50, 50, PatchField::Encoding::Signed, 0x00, "TUNING", "", "semitonos"},
+        {"loudFilter", "Loud filter", 66, 0, 99, PatchField::Encoding::Unsigned, 0x00, "FILTER", "vcfCutoff", "0..99"},
+        {"loudLoudness", "Loud loudness", 67, -50, 50, PatchField::Encoding::Signed, 0x00, "VELOCITY", "", "-50..+50"},
 
-    //--- Byte 18, cuatro bits sueltos que comparten byte
-    { "constantPitch",     "Constant pitch",    18,   0,   1, PatchField::Encoding::Bit,      0x01, "TUNING",  "",         "si/no" },
-    { "lfoDesync",         "LFO desync",        18,   0,   1, PatchField::Encoding::Bit,      0x04, "LFO",     "",         "si/no" },
-    { "oneShot",           "One shot",          18,   0,   1, PatchField::Encoding::Bit,      0x08, "KEYS",    "",         "si/no" },
-    { "velocityReleaseOn", "Velocity release on",18,  0,   1, PatchField::Encoding::Bit,      0x10, "VELOCITY", "",        "si/no" },
+        //--- Byte 18, cuatro bits sueltos que comparten byte
+        {"constantPitch", "Constant pitch", 18, 0, 1, PatchField::Encoding::Bit, 0x01, "TUNING", "", "si/no"},
+        {"lfoDesync", "LFO desync", 18, 0, 1, PatchField::Encoding::Bit, 0x04, "LFO", "", "si/no"},
+        {"oneShot", "One shot", 18, 0, 1, PatchField::Encoding::Bit, 0x08, "KEYS", "", "si/no"},
+        {"velocityReleaseOn", "Velocity release on", 18, 0, 1, PatchField::Encoding::Bit, 0x10, "VELOCITY", "", "si/no"},
 };
 
 /** Cuantos campos hay. La tabla es la verdad; esto se comprueba contra ella. */
 inline constexpr int patchFieldCount =
-    static_cast<int> (sizeof (patchFields) / sizeof (patchFields[0]));
+    static_cast<int>(sizeof(patchFields) / sizeof(patchFields[0]));
 
 //==============================================================================
 /** El byte 18, con sus bits que nadie ha descodificado y que hay que conservar.
@@ -272,9 +278,9 @@ inline constexpr int patchFieldCount =
     dejarlo como un misterio: un byte del que nadie sabe que un bit esta vivo es
     un byte que se pierde en la primera escritura. Ver `setKeygroupField`.
 */
-inline constexpr std::uint8_t keygroupFlagsByte    = 18;
-inline constexpr std::uint8_t knownFlagsMask       = 0x1D;
-inline constexpr std::uint8_t reservedBitMask      = 0xE2;   // lo que NO es de esta tabla
+inline constexpr std::uint8_t keygroupFlagsByte = 18;
+inline constexpr std::uint8_t knownFlagsMask    = 0x1D;
+inline constexpr std::uint8_t reservedBitMask   = 0xE2; // lo que NO es de esta tabla
 
 //==============================================================================
 /** Los cuatro nombres del byte de salida, en el orden del panel.
@@ -286,25 +292,29 @@ inline constexpr std::uint8_t reservedBitMask      = 0xE2;   // lo que NO es de 
 */
 struct OutputPort
 {
-    int         panelValue;   // 0..10, lo que dice el panel
+    int panelValue; // 0..10, lo que dice el panel
     const char* name;
-    float       left;
-    float       right;
+    float left;
+    float right;
 };
 
 inline constexpr OutputPort outputPorts[] =
-{
-    {  0, "ALL",   1.0f, 1.0f },
-    {  1, "MONO1", 1.0f, 1.0f }, { 2, "MONO2", 1.0f, 1.0f },
-    {  3, "MONO3", 1.0f, 1.0f }, { 4, "MONO4", 1.0f, 1.0f },
-    {  5, "MONO5", 1.0f, 1.0f }, { 6, "MONO6", 1.0f, 1.0f },
-    {  7, "MONO7", 1.0f, 1.0f }, { 8, "MONO8", 1.0f, 1.0f },
-    {  9, "LEFT",  1.0f, 0.0f },
-    { 10, "RIGHT", 0.0f, 1.0f },
+    {
+        {0, "ALL", 1.0f, 1.0f},
+        {1, "MONO1", 1.0f, 1.0f},
+        {2, "MONO2", 1.0f, 1.0f},
+        {3, "MONO3", 1.0f, 1.0f},
+        {4, "MONO4", 1.0f, 1.0f},
+        {5, "MONO5", 1.0f, 1.0f},
+        {6, "MONO6", 1.0f, 1.0f},
+        {7, "MONO7", 1.0f, 1.0f},
+        {8, "MONO8", 1.0f, 1.0f},
+        {9, "LEFT", 1.0f, 0.0f},
+        {10, "RIGHT", 0.0f, 1.0f},
 };
 
 inline constexpr int outputPortCount =
-    static_cast<int> (sizeof (outputPorts) / sizeof (outputPorts[0]));
+    static_cast<int>(sizeof(outputPorts) / sizeof(outputPorts[0]));
 
 //==============================================================================
 /** Los trims de Perform: los offsets que el ejecutor mueve encima del keygroup.
@@ -321,32 +331,32 @@ inline constexpr int outputPortCount =
     falta.
 */
 inline constexpr PerformTrim performTrims[] =
-{
-    { "vcfCutoff",     "VCF Filter",       "softFilter",  -99,  99, true,  "0..99 del panel" },
-    { "vcfAmount",     "VCF Amnt",         "vcfAmount",   -50,  50, true,  "-50..+50" },
-    { "vcaAttack",     "VCA Attack",       "vcaAttack",   -99,  99, true,  "0..99 del panel" },
-    { "vcaDecay",      "VCA Decay",        "vcaDecay",    -99,  99, true,  "0..99 del panel" },
-    { "vcaSustain",    "VCA Sustain",      "vcaSustain",  -99,  99, true,  "0..99 del panel" },
-    { "vcaRelease",    "VCA Release",      "vcaRelease",  -99,  99, true,  "0..99 del panel" },
-    { "vcfAttack",     "VCF Attack",       "vcfAttack",   -99,  99, true,  "0..99 del panel" },
-    { "vcfDecay",      "VCF Decay",        "vcfDecay",    -99,  99, true,  "0..99 del panel" },
-    { "vcfSustain",    "VCF Sustain",      "vcfSustain",  -99,  99, true,  "0..99 del panel" },
-    { "vcfRelease",    "VCF Release",      "vcfRelease",  -99,  99, true,  "0..99 del panel" },
-    { "lfoRate",       "LFO Rate",         "lfoRate",     -99,  99, true,  "0..99 del panel" },
-    { "lfoDelay",      "LFO Delay",        "lfoDelay",    -99,  99, true,  "0..99 del panel" },
-    // La profundidad SOLO SUMA. Casi todos los patches de la biblioteca la dejan
-    // en 0, así que un mando simetrico gastaria media vuelta pidiendo menos que
-    // nada. Se evaluó hacerlo bipolar y se descartó: no hay nada que quitar.
-    { "lfoDepth",      "LFO Pitch Depth",  "lfoDepth",      0,  99, false, "0..99 del panel" },
-    { "velToFilter",   "Vel Freq",         "velToFilter",   0,  99, false, "0..99 del panel" },
-    { "velToLoudness", "Vel Loudness",     "velToLoudness", 0,  99, false, "0..99 del panel" },
-    { "lfoToFilter",   "LFO Filter Depth", "",               0,  99, false, "0..99 del panel" },
-    { "resonance",     "Resonance",        "",               0,  99, false, "0..99" },
-    { "lfoShape",      "LFO Shape",        "",               0,   3, false, "indice" },
+    {
+        {"vcfCutoff", "VCF Filter", "softFilter", -99, 99, true, "0..99 del panel"},
+        {"vcfAmount", "VCF Amnt", "vcfAmount", -50, 50, true, "-50..+50"},
+        {"vcaAttack", "VCA Attack", "vcaAttack", -99, 99, true, "0..99 del panel"},
+        {"vcaDecay", "VCA Decay", "vcaDecay", -99, 99, true, "0..99 del panel"},
+        {"vcaSustain", "VCA Sustain", "vcaSustain", -99, 99, true, "0..99 del panel"},
+        {"vcaRelease", "VCA Release", "vcaRelease", -99, 99, true, "0..99 del panel"},
+        {"vcfAttack", "VCF Attack", "vcfAttack", -99, 99, true, "0..99 del panel"},
+        {"vcfDecay", "VCF Decay", "vcfDecay", -99, 99, true, "0..99 del panel"},
+        {"vcfSustain", "VCF Sustain", "vcfSustain", -99, 99, true, "0..99 del panel"},
+        {"vcfRelease", "VCF Release", "vcfRelease", -99, 99, true, "0..99 del panel"},
+        {"lfoRate", "LFO Rate", "lfoRate", -99, 99, true, "0..99 del panel"},
+        {"lfoDelay", "LFO Delay", "lfoDelay", -99, 99, true, "0..99 del panel"},
+        // La profundidad SOLO SUMA. Casi todos los patches de la biblioteca la dejan
+        // en 0, así que un mando simetrico gastaria media vuelta pidiendo menos que
+        // nada. Se evaluó hacerlo bipolar y se descartó: no hay nada que quitar.
+        {"lfoDepth", "LFO Pitch Depth", "lfoDepth", 0, 99, false, "0..99 del panel"},
+        {"velToFilter", "Vel Freq", "velToFilter", 0, 99, false, "0..99 del panel"},
+        {"velToLoudness", "Vel Loudness", "velToLoudness", 0, 99, false, "0..99 del panel"},
+        {"lfoToFilter", "LFO Filter Depth", "", 0, 99, false, "0..99 del panel"},
+        {"resonance", "Resonance", "", 0, 99, false, "0..99"},
+        {"lfoShape", "LFO Shape", "", 0, 3, false, "indice"},
 };
 
 inline constexpr int performTrimCount =
-    static_cast<int> (sizeof (performTrims) / sizeof (performTrims[0]));
+    static_cast<int>(sizeof(performTrims) / sizeof(performTrims[0]));
 
 //==============================================================================
 /** La geometria del registro, que el catalogo no puede deducir de si mismo.
@@ -356,30 +366,30 @@ inline constexpr int performTrimCount =
     zona, la cadena de punteros— no es ningun campo del panel, y por eso no está en
     la tabla de arriba sino aquí.
 */
-inline constexpr int keygroupRecordSize    = 70;    // bytes por keygroup
-inline constexpr int programHeaderSize     = 38;    // bytes antes del primer keygroup
-inline constexpr int keygroupZoneStride    = 22;    // la zona 2 esta 22 bytes mas alla
-inline constexpr int keygroupNameOffset    = 24;    // el nombre del sample de la zona 1
-inline constexpr int keygroupNameSize      = 10;    // caracteres del nombre
-inline constexpr int keygroupChainOffset   = 68;    // puntero a la zona, 12 bytes al final
-inline constexpr int keygroupVelocityCount = 128;   // velocidades que responde un keygroup
-inline constexpr int keygroupMaxZones      = 2;     // zonas de velocidad, NO capas
-inline constexpr int keygroupMaxCount      = 64;    // keygroups por programa
-inline constexpr int keygroupCountOffset   = 23;    // byte de la cabecera que lleva el numero
-inline constexpr int programNumberOffset  = 26;    // numero de programa que ve el panel
-inline constexpr int fileNameSize          = 10;    // nombre de fichero, en el directorio
+inline constexpr int keygroupRecordSize    = 70;  // bytes por keygroup
+inline constexpr int programHeaderSize     = 38;  // bytes antes del primer keygroup
+inline constexpr int keygroupZoneStride    = 22;  // la zona 2 esta 22 bytes mas alla
+inline constexpr int keygroupNameOffset    = 24;  // el nombre del sample de la zona 1
+inline constexpr int keygroupNameSize      = 10;  // caracteres del nombre
+inline constexpr int keygroupChainOffset   = 68;  // puntero a la zona, 12 bytes al final
+inline constexpr int keygroupVelocityCount = 128; // velocidades que responde un keygroup
+inline constexpr int keygroupMaxZones      = 2;   // zonas de velocidad, NO capas
+inline constexpr int keygroupMaxCount      = 64;  // keygroups por programa
+inline constexpr int keygroupCountOffset   = 23;  // byte de la cabecera que lleva el numero
+inline constexpr int programNumberOffset   = 26;  // numero de programa que ve el panel
+inline constexpr int fileNameSize          = 10;  // nombre de fichero, en el directorio
 
 //==============================================================================
 /** El campo de la tabla, por indice. `index` en 0..`patchFieldCount`; fuera de
     rango es un bug de compilacion, no una condicion de ejecucion. */
-constexpr const PatchField& fieldAt (int index) noexcept
+constexpr const PatchField& fieldAt(int index) noexcept
 {
     return patchFields[index];
 }
 
 /** El campo por su codigo, o `nullptr` si no existe. Para lo que puede fallar
     en runtime: un preset traido de fuera puede pedir un campo que no esta. */
-const PatchField* findField (const char* code) noexcept
+const PatchField* findField(const char* code) noexcept
 {
     if (code == nullptr)
         return nullptr;
@@ -392,7 +402,11 @@ const PatchField* findField (const char* code) noexcept
         const char* a = patchFields[i].code;
         const char* b = code;
 
-        while (*a != '\0' && *a == *b) { ++a; ++b; }
+        while (*a != '\0' && *a == *b)
+        {
+            ++a;
+            ++b;
+        }
 
         if (*a == *b)
             return &patchFields[i];
@@ -402,7 +416,7 @@ const PatchField* findField (const char* code) noexcept
 }
 
 /** El trim por su codigo, o `nullptr` si no existe. */
-const PerformTrim* findTrim (const char* code) noexcept
+const PerformTrim* findTrim(const char* code) noexcept
 {
     if (code == nullptr)
         return nullptr;
@@ -412,7 +426,11 @@ const PerformTrim* findTrim (const char* code) noexcept
         const char* a = performTrims[i].code;
         const char* b = code;
 
-        while (*a != '\0' && *a == *b) { ++a; ++b; }
+        while (*a != '\0' && *a == *b)
+        {
+            ++a;
+            ++b;
+        }
 
         if (*a == *b)
             return &performTrims[i];
@@ -431,8 +449,8 @@ const PerformTrim* findTrim (const char* code) noexcept
 
     @returns  el offset en dieciseiseavos de semitono, signed.
 */
-constexpr int zonePitchOffset (const PatchField& fine, int fineValue,
-                               const PatchField& transpose, int transposeValue) noexcept
+constexpr int zonePitchOffset(const PatchField& fine, int fineValue,
+                              const PatchField& transpose, int transposeValue) noexcept
 {
     return (transposeValue << 8) | (fineValue & 0xFF);
 }
@@ -444,7 +462,7 @@ constexpr int zonePitchOffset (const PatchField& fine, int fineValue,
     si cada uno hace la suya acaba siendo distinta. `dspAssert` en vez de nada:
     un rango con lomin > hi es un error de tabla, no de datos.
 */
-constexpr int clampToField (const PatchField& field, int value) noexcept
+constexpr int clampToField(const PatchField& field, int value) noexcept
 {
     return value < field.lo ? field.lo : (value > field.hi ? field.hi : value);
 }

@@ -91,8 +91,8 @@ namespace abd::synth::harness
 */
 struct Observation
 {
-    int    stored = 0;
-    double observed = 0.0;
+    int stored       = 0;
+    double observed  = 0.0;
     double sweepRate = 0.0;
 };
 
@@ -110,9 +110,9 @@ struct Observation
 */
 struct ReferenceObservation
 {
-    int    stored = 0;
+    int stored      = 0;
     double observed = 0.0;
-    double truth = 0.0;
+    double truth    = 0.0;
 };
 
 //==============================================================================
@@ -126,7 +126,8 @@ class Session
 public:
     //==========================================================================
     /** Una sesion para medir `id`, con la forma de su curva ya declarada. */
-    explicit Session (CalCurveId id) : curve (id) {}
+    explicit Session(CalCurveId id)
+        : curve(id) {}
 
     //==========================================================================
     /** Una calibracion con la forma de la curva y NINGUN punto. Es de donde se
@@ -139,16 +140,16 @@ public:
         Sin esto `build()` no corrige nada, y sin correccion los puntos son
         numeros con un error del que nadie sabe el origen —que es peor que no
         tener tabla, porque la tabla existe y parece buena—. */
-    void addReference (const std::vector<ReferenceObservation>& run)
+    void addReference(const std::vector<ReferenceObservation>& run)
     {
         for (const auto& o : run)
-            reference.push_back (o);
+            reference.push_back(o);
     }
 
     /** Una observacion de la maquina, en bruto. */
-    void addObservation (int stored, double observed, double sweepRate = 0.0)
+    void addObservation(int stored, double observed, double sweepRate = 0.0)
     {
-        measured.push_back (Observation { stored, observed, sweepRate });
+        measured.push_back(Observation{stored, observed, sweepRate});
     }
 
     //==========================================================================
@@ -159,7 +160,7 @@ public:
         sesion sin modelo conocido produce una tabla SIN CORREGIR que no lo dice
         en ninguna parte, y por eso `build()` avisa y `hasBiasData()` deja que se
         pregunte antes de confiar. */
-    double referenceBias (int stored) const
+    double referenceBias(int stored) const
     {
         for (const auto& r : reference)
             if (r.stored == stored)
@@ -181,9 +182,13 @@ public:
             bool found = false;
 
             for (const auto& r : reference)
-                if (r.stored == m.stored) { found = true; break; }
+                if (r.stored == m.stored)
+                {
+                    found = true;
+                    break;
+                }
 
-            if (! found)
+            if (!found)
                 return false;
         }
 
@@ -194,17 +199,17 @@ public:
     /** Cuanto se ha movido un punto al corregirlo, en fraccion. */
     struct Shift
     {
-        int    stored = 0;
-        double fraction = 0.0;   // (corregido - observado) / observado
+        int stored      = 0;
+        double fraction = 0.0; // (corregido - observado) / observado
     };
 
-    std::size_t referenceCount()   const noexcept { return reference.size(); }
+    std::size_t referenceCount() const noexcept { return reference.size(); }
     std::size_t observationCount() const noexcept { return measured.size(); }
-    std::size_t shiftCount()       const noexcept { return shifts.size(); }
+    std::size_t shiftCount() const noexcept { return shifts.size(); }
 
-    const ReferenceObservation& referenceAt (std::size_t i)   const { return reference[i]; }
-    const Observation&          observationAt (std::size_t i) const { return measured[i]; }
-    const Shift&                shiftAt (std::size_t i)       const { return shifts[i]; }
+    const ReferenceObservation& referenceAt(std::size_t i) const { return reference[i]; }
+    const Observation& observationAt(std::size_t i) const { return measured[i]; }
+    const Shift& shiftAt(std::size_t i) const { return shifts[i]; }
 
     /** El mayor desplazamiento en valor absoluto. Por encima de un 10% la
         medicion no es una medicion todavia. */
@@ -213,7 +218,7 @@ public:
         double worst = 0.0;
 
         for (const auto& s : shifts)
-            worst = jmaxAbs (worst, s.fraction);
+            worst = jmaxAbs(worst, s.fraction);
 
         return worst;
     }
@@ -222,7 +227,7 @@ public:
         @param tolerance  en fraccion. El 10% es un punto de partida, no una
                         verdad: cada curva tiene su ruido, y quien mide es quien
                         sabe cuanto es en SU banco. */
-    bool isConverged (double tolerance = 0.10) const
+    bool isConverged(double tolerance = 0.10) const
     {
         return worstShift() <= tolerance;
     }
@@ -237,9 +242,9 @@ public:
                     de dos no hay curva, y `read()` daria `nullopt` para todo,
                     que es lo correcto pero conviene que el arnes lo diga.
     */
-    bool build (S950Calibration& out)
+    bool build(S950Calibration& out)
     {
-        out.clear (curve);
+        out.clear(curve);
         shifts.clear();
         lastErrorText = nullptr;
 
@@ -247,23 +252,23 @@ public:
 
         for (const auto& m : measured)
         {
-            const double bias = referenceBias (m.stored);
+            const double bias      = referenceBias(m.stored);
             const double corrected = m.observed - bias;
 
-            if (std::abs (m.observed) > 0.0)
-                shifts.push_back (Shift { m.stored, (corrected - m.observed) / m.observed });
+            if (std::abs(m.observed) > 0.0)
+                shifts.push_back(Shift{m.stored, (corrected - m.observed) / m.observed});
 
             const char* why = nullptr;
 
-            if (! out.addPoint (curve, m.stored, corrected, &why))
+            if (!out.addPoint(curve, m.stored, corrected, &why))
             {
-                lastErrorText = why != nullptr ? why : "punto rechazado";
+                lastErrorText           = why != nullptr ? why : "punto rechazado";
                 lastRejectedObservation = m;
-                allAccepted = false;
+                allAccepted             = false;
             }
         }
 
-        return allAccepted && out.isMeasured (curve);
+        return allAccepted && out.isMeasured(curve);
     }
 
     /** Por que se rechazo el ultimo punto, o `nullptr` si no hubo ninguno. */
@@ -275,19 +280,19 @@ public:
 private:
     //==========================================================================
     /** El mayor de dos valores en valor absoluto. */
-    static double jmaxAbs (double a, double b) noexcept
+    static double jmaxAbs(double a, double b) noexcept
     {
         const double x = a < 0.0 ? -a : a;
         const double y = b < 0.0 ? -b : b;
         return x > y ? x : y;
     }
 
-    CalCurveId                       curve = CalCurveId::EnvelopeTime;
+    CalCurveId curve = CalCurveId::EnvelopeTime;
     std::vector<ReferenceObservation> reference;
-    std::vector<Observation>         measured;
-    std::vector<Shift>               shifts;
-    const char*                      lastErrorText = nullptr;
-    Observation                      lastRejectedObservation;
+    std::vector<Observation> measured;
+    std::vector<Shift> shifts;
+    const char* lastErrorText = nullptr;
+    Observation lastRejectedObservation;
 };
 
 } // namespace abd::synth::harness

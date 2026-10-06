@@ -1,10 +1,12 @@
 #pragma once
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
-namespace abd::synth {
+namespace abd::synth
+{
 
-namespace EnvelopeCurves {
+namespace EnvelopeCurves
+{
 
 /**
  * @brief Maps normalized [0.0, 1.0] knob value to real-world seconds based on MS2000 measured curves.
@@ -12,10 +14,10 @@ namespace EnvelopeCurves {
  */
 inline float getAttackTimeSeconds(float norm0to1) noexcept
 {
-    float norm = std::max(0.0f, std::min(1.0f, norm0to1));
-    const float minTime = 0.0005f;  // 0.5 ms (snap attack)
-    const float maxTime = 5.0f;     // 5 seconds
-    float curved = std::pow(norm, 3.0f);
+    float norm          = std::max(0.0f, std::min(1.0f, norm0to1));
+    const float minTime = 0.0005f; // 0.5 ms (snap attack)
+    const float maxTime = 5.0f;    // 5 seconds
+    float curved        = std::pow(norm, 3.0f);
     return minTime + (maxTime - minTime) * curved;
 }
 
@@ -24,10 +26,10 @@ inline float getAttackTimeSeconds(float norm0to1) noexcept
  */
 inline float getDecayReleaseTimeSeconds(float norm0to1) noexcept
 {
-    float norm = std::max(0.0f, std::min(1.0f, norm0to1));
-    const float minTime = 0.005f;  // 5 ms
-    const float maxTime = 10.0f;   // 10 seconds
-    float curved = std::pow(norm, 3.0f);
+    float norm          = std::max(0.0f, std::min(1.0f, norm0to1));
+    const float minTime = 0.005f; // 5 ms
+    const float maxTime = 10.0f;  // 10 seconds
+    float curved        = std::pow(norm, 3.0f);
     return minTime + (maxTime - minTime) * curved;
 }
 

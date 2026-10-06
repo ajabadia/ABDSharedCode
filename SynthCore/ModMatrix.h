@@ -2,7 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace abd::synth {
+namespace abd::synth
+{
 
 /**
  * @brief Matriz de modulación genérica — el motor, sin política.
@@ -46,11 +47,11 @@ namespace abd::synth {
 // ── Identificadores opacos ─────────────────────────────────────────────────
 // Índices en tablas que DA EL PROYECTO. El motor nunca los interpreta.
 
-using ModSourceId = std::uint16_t;
+using ModSourceId      = std::uint16_t;
 using ModDestinationId = std::uint16_t;
 
 /** Valor reservado: una fuente o destino que no hace nada ("None" / "Off"). */
-inline constexpr ModSourceId kNoModSource = 0;
+inline constexpr ModSourceId kNoModSource           = 0;
 inline constexpr ModDestinationId kNoModDestination = 0;
 
 /** Bipolar, como el hardware y como los tres synths: -1..+1. */
@@ -64,10 +65,11 @@ inline constexpr float kMaxModAmount = 1.0f;
  * en unidades del destino (semitonos, Hz, %), que es lo que consume el motor de
  * voz. Quien venga de una tabla lo normaliza antes de escribir aquí.
  */
-struct ModRoute {
-    ModSourceId      source{ kNoModSource };
-    ModDestinationId destination{ kNoModDestination };
-    float            amount{ 0.0f };
+struct ModRoute
+{
+    ModSourceId source{kNoModSource};
+    ModDestinationId destination{kNoModDestination};
+    float amount{0.0f};
 };
 
 /**
@@ -89,16 +91,17 @@ struct ModRoute {
  * `label` no lo usa el motor: vive aquí para que la tabla sea la fuente única
  * y la UI no tenga que reescribir la lista de destinos a mano.
  */
-struct ModDestinationDescriptor {
-    ModDestinationId id{ kNoModDestination };
-    const char*      label{ "" };
-    const char*      parameterId{ nullptr };  ///< nullptr = "Off", no conduce nada
-    float            min{ 0.0f };
-    float            max{ 1.0f };
-    float            scale{ 1.0f };           ///< unidades del amount por 1.0
-    bool             perNote{ false };       ///< se resuelve por voz
-    bool             replaces{ false };      ///< ENV: reemplaza, no suma
-    std::uint32_t    engineMask{ 0xFFFFFFFFu };
+struct ModDestinationDescriptor
+{
+    ModDestinationId id{kNoModDestination};
+    const char* label{""};
+    const char* parameterId{nullptr}; ///< nullptr = "Off", no conduce nada
+    float min{0.0f};
+    float max{1.0f};
+    float scale{1.0f};    ///< unidades del amount por 1.0
+    bool perNote{false};  ///< se resuelve por voz
+    bool replaces{false}; ///< ENV: reemplaza, no suma
+    std::uint32_t engineMask{0xFFFFFFFFu};
 };
 
 /**
@@ -122,7 +125,8 @@ struct ModDestinationDescriptor {
  *                          silenciosamente y sus patches no modularían.
  */
 template <std::size_t kNumSlots, bool kZeroIdInert = true>
-class ModMatrixT {
+class ModMatrixT
+{
 public:
     static constexpr std::size_t kSlots = kNumSlots;
 
@@ -163,8 +167,8 @@ public:
         routes_[slotIndex].source      = source;
         routes_[slotIndex].destination = destination;
         routes_[slotIndex].amount      = amount < kMinModAmount ? kMinModAmount
-                                     : (amount > kMaxModAmount ? kMaxModAmount
-                                                                : amount);
+                                                                : (amount > kMaxModAmount ? kMaxModAmount
+                                                                                          : amount);
     }
 
     const ModRoute& getRoute(std::size_t slotIndex) const noexcept
@@ -175,11 +179,11 @@ public:
     /** ¿Hay alguna ruta viva (fuente distinta de "None")? */
     bool hasAnyRoute() const noexcept
     {
-        for (const auto& route : routes_) {
+        for (const auto& route : routes_)
+        {
             if (route.amount == 0.0f)
                 continue;
-            if (!isInert(static_cast<std::size_t>(route.source))
-                && !isInert(static_cast<std::size_t>(route.destination)))
+            if (!isInert(static_cast<std::size_t>(route.source)) && !isInert(static_cast<std::size_t>(route.destination)))
                 return true;
         }
         return false;
@@ -203,7 +207,7 @@ public:
      */
     void accumulate(const float* sourceValues,
                     std::size_t sourceCount,
-                    float*       destAccum,
+                    float* destAccum,
                     std::size_t destCount) const noexcept
     {
         if (destAccum == nullptr || destCount == 0)
@@ -214,7 +218,7 @@ public:
             const auto& route = routes_[slot];
 
             const auto sourceIndex = static_cast<std::size_t>(route.source);
-            const auto destIndex = static_cast<std::size_t>(route.destination);
+            const auto destIndex   = static_cast<std::size_t>(route.destination);
 
             if (isInert(sourceIndex) || isInert(destIndex))
                 continue;
@@ -239,7 +243,7 @@ public:
      */
     [[nodiscard]] float get(ModDestinationId destination,
                             const float* sourceValues,
-                            std::size_t   sourceCount) const noexcept
+                            std::size_t sourceCount) const noexcept
     {
         if (isInert(static_cast<std::size_t>(destination)) || sourceValues == nullptr)
             return 0.0f;
@@ -266,7 +270,7 @@ public:
     }
 
 private:
-    ModRoute routes_[kNumSlots] {};
+    ModRoute routes_[kNumSlots]{};
 };
 
 } // namespace abd::synth
