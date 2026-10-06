@@ -26,9 +26,6 @@
   --scope-font-lcd: 'Courier New', 'Roboto Mono', monospace;
 }
 
-{
-
-
 /* ─── Global Theme-Aware Scrollbars ─── */
 ::-webkit-scrollbar {
   width: 6px;
