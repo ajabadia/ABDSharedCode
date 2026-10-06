@@ -1,18 +1,19 @@
 #pragma once
 
 #if defined(JUCE_VERSION) || __has_include(<juce_gui_extra/juce_gui_extra.h>)
-#include <juce_gui_extra/juce_gui_extra.h>
-#include <WebView2Bridge/JuceWebView2Component.h>
 #include "../Core/ScopeDataCollector.h"
 #include "../Core/ScopeFrameSerializer.h"
 #include "ScopeResourceProvider.h"
+#include <WebView2Bridge/JuceWebView2Component.h>
 #include <atomic>
 #include <cstddef>
+#include <juce_gui_extra/juce_gui_extra.h>
 #include <limits>
 #include <string>
 #include <vector>
 
-namespace abd::scope {
+namespace abd::scope
+{
 
 /**
  * @brief High-performance JUCE GUI Component encapsulating ABDScope WebUI inside WebView2.
@@ -34,17 +35,16 @@ class JuceWebScopeComponent : public abd::webview2::JuceWebView2Component,
 {
 public:
     explicit JuceWebScopeComponent(ScopeDataCollector& collector,
-                                   double initialSampleRate = 44100.0,
-                                   int refreshRateHz = 30,
+                                   double initialSampleRate         = 44100.0,
+                                   int refreshRateHz                = 30,
                                    const juce::String& initialTheme = "audiolab")
         : abd::webview2::JuceWebView2Component(
               abd::scope::scopeResourceProvider,
-              {{ "SET_ACTIVE_TAP", [this](const juce::var& message) {
-                  handleTapSubscription(message);
-              } }},
+              {{"SET_ACTIVE_TAP", [this](const juce::var& message) {
+                    handleTapSubscription(message);
+                }}},
               initialTheme),
-          scopeCollector(collector),
-          sampleRate(initialSampleRate)
+          scopeCollector(collector), sampleRate(initialSampleRate)
     {
         // All-active fallback until the WebUI subscribes lanes (see class docs).
         activateAllTaps();
@@ -94,7 +94,7 @@ private:
     void handleTapSubscription(const juce::var& message)
     {
         const juce::String tapId = message["tapId"].toString();
-        const int laneIdx = static_cast<int>(message["laneIdx"]);
+        const int laneIdx        = static_cast<int>(message["laneIdx"]);
 
         if (tapId.isEmpty() || laneIdx < 0 || laneIdx > 64) return;
 
@@ -144,7 +144,7 @@ private:
 
         // Bundle every currently active tap so each subscribed lane receives its probe.
         std::string bundle = R"({"taps":{)";
-        bool first = true;
+        bool first         = true;
         for (size_t i = 0; i < count; ++i)
         {
             auto* tap = const_cast<ScopeTap*>(scopeCollector.getTap(i));
@@ -162,15 +162,14 @@ private:
 
         if (!first)
         {
-            juce::String js = "if (window.__pushScopeFrame) { window.__pushScopeFrame("
-                            + juce::String(bundle) + "); }";
+            juce::String js = "if (window.__pushScopeFrame) { window.__pushScopeFrame(" + juce::String(bundle) + "); }";
             webBrowser.evaluateJavascript(js);
         }
     }
 
     ScopeDataCollector& scopeCollector;
-    ScopeFrameSerializer frameSerializer { 512 };
-    std::atomic<double> sampleRate { 44100.0 };
+    ScopeFrameSerializer frameSerializer{512};
+    std::atomic<double> sampleRate{44100.0};
 
     std::vector<size_t> m_laneTaps; ///< laneIdx -> registered tap index (NO_TAP if unsubscribed)
 

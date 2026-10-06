@@ -1,19 +1,20 @@
 ﻿#include "ScopeResourceProvider.h"
-#include <juce_core/juce_core.h>
 #include "ABDScopeWebAssets.h"
+#include <juce_core/juce_core.h>
 
-namespace abd::scope {
+namespace abd::scope
+{
 
 static juce::String getMimeTypeForFilename(const juce::String& filename)
 {
     if (filename.endsWithIgnoreCase(".html")) return "text/html";
-    if (filename.endsWithIgnoreCase(".css"))  return "text/css";
+    if (filename.endsWithIgnoreCase(".css")) return "text/css";
     if (filename.endsWithIgnoreCase(".js") || filename.endsWithIgnoreCase(".mjs")) return "application/javascript";
-    if (filename.endsWithIgnoreCase(".png"))  return "image/png";
+    if (filename.endsWithIgnoreCase(".png")) return "image/png";
     if (filename.endsWithIgnoreCase(".jpg") || filename.endsWithIgnoreCase(".jpeg")) return "image/jpeg";
     if (filename.endsWithIgnoreCase(".webp")) return "image/webp";
-    if (filename.endsWithIgnoreCase(".svg"))  return "image/svg+xml";
-    if (filename.endsWithIgnoreCase(".ttf"))  return "font/ttf";
+    if (filename.endsWithIgnoreCase(".svg")) return "image/svg+xml";
+    if (filename.endsWithIgnoreCase(".ttf")) return "font/ttf";
     if (filename.endsWithIgnoreCase(".woff")) return "font/woff";
     if (filename.endsWithIgnoreCase(".woff2")) return "font/woff2";
     if (filename.endsWithIgnoreCase(".json")) return "application/json";
@@ -42,9 +43,12 @@ std::optional<juce::WebBrowserComponent::Resource> scopeResourceProvider(const j
         else
             path = "/";
     }
-    else if (path.startsWith("https://juce.backend")) path = path.substring(20);
-    else if (path.startsWith("http://localhost"))     path = path.substring(16);
-    else if (path.startsWith("https://localhost"))    path = path.substring(17);
+    else if (path.startsWith("https://juce.backend"))
+        path = path.substring(20);
+    else if (path.startsWith("http://localhost"))
+        path = path.substring(16);
+    else if (path.startsWith("https://localhost"))
+        path = path.substring(17);
 
     if (path == "/" || path.isEmpty()) path = "/index.html";
     if (path.startsWith("/")) path = path.substring(1);
@@ -57,7 +61,7 @@ std::optional<juce::WebBrowserComponent::Resource> scopeResourceProvider(const j
         return std::nullopt; // Let JUCE WebBrowserComponent serve its built-in frontend script
     }
 
-    int binSize = 0;
+    int binSize         = 0;
     const char* binData = nullptr;
 
     // Extract bare filename (e.g. "src/renderers/OscilloscopeRenderer.js" -> "OscilloscopeRenderer.js")
@@ -90,7 +94,7 @@ std::optional<juce::WebBrowserComponent::Resource> scopeResourceProvider(const j
     {
         std::vector<std::byte> bytes(static_cast<size_t>(binSize));
         std::memcpy(bytes.data(), binData, static_cast<size_t>(binSize));
-        return juce::WebBrowserComponent::Resource { std::move(bytes), getMimeTypeForFilename(filename).toStdString() };
+        return juce::WebBrowserComponent::Resource{std::move(bytes), getMimeTypeForFilename(filename).toStdString()};
     }
 
     return std::nullopt;

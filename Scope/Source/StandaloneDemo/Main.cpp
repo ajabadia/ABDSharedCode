@@ -1,13 +1,14 @@
-#include <juce_gui_basics/juce_gui_basics.h>
-#include <juce_gui_extra/juce_gui_extra.h>
+#include "../Core/ScopeDataCollector.h"
+#include "../JUCE/JuceScopeComponent.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
-#include "../Core/ScopeDataCollector.h"
-#include "../JUCE/JuceScopeComponent.h"
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_gui_extra/juce_gui_extra.h>
 
-namespace abd::scope {
+namespace abd::scope
+{
 
 /**
  * Main GUI Component hosting JuceScopeComponent and test signal controls.
@@ -104,19 +105,21 @@ public:
     void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override
     {
         const int numSamples = bufferToFill.numSamples;
-        auto* leftOut = bufferToFill.buffer->getWritePointer(0, bufferToFill.startSample);
-        auto* rightOut = bufferToFill.buffer->getNumChannels() > 1
-                       ? bufferToFill.buffer->getWritePointer(1, bufferToFill.startSample)
-                       : leftOut;
+        auto* leftOut        = bufferToFill.buffer->getWritePointer(0, bufferToFill.startSample);
+        auto* rightOut       = bufferToFill.buffer->getNumChannels() > 1
+                                   ? bufferToFill.buffer->getWritePointer(1, bufferToFill.startSample)
+                                   : leftOut;
 
-        const float phaseDelta = (m_freq * 2.0f * 3.1415926535f) / m_currentSampleRate;
+        const float phaseDelta    = (m_freq * 2.0f * 3.1415926535f) / m_currentSampleRate;
         const float spreadRadians = m_stereoPhaseDeg * (3.1415926535f / 180.0f);
 
-        for (int i = 0; i < numSamples; ++i) {
+        for (int i = 0; i < numSamples; ++i)
+        {
             float sampleL = 0.0f;
             float sampleR = 0.0f;
 
-            switch (m_waveType) {
+            switch (m_waveType)
+            {
                 case 1: // Sine
                     sampleL = std::sin(m_phase);
                     sampleR = std::sin(m_phase + spreadRadians);
@@ -142,17 +145,19 @@ public:
             sampleL *= 0.35f;
             sampleR *= 0.35f;
 
-            leftOut[i] = sampleL;
+            leftOut[i]  = sampleL;
             rightOut[i] = sampleR;
 
             m_phase += phaseDelta;
-            if (m_phase >= 2.0f * 3.1415926535f) {
+            if (m_phase >= 2.0f * 3.1415926535f)
+            {
                 m_phase -= 2.0f * 3.1415926535f;
             }
         }
 
         // Tap Audio Stream for Native Scope
-        if (m_tapMaster) {
+        if (m_tapMaster)
+        {
             m_tapMaster->writeStereo(leftOut, rightOut, static_cast<size_t>(numSamples));
         }
     }
@@ -171,13 +176,13 @@ public:
 
     void resized() override
     {
-        const int margin = 12;
-        const int topBarH = 40;
+        const int margin        = 12;
+        const int topBarH       = 40;
         const int controlPanelH = 100;
-        auto bounds = getLocalBounds().reduced(margin);
+        auto bounds             = getLocalBounds().reduced(margin);
 
         // Top Visual Mode Buttons
-        auto topArea = bounds.removeFromTop(topBarH);
+        auto topArea   = bounds.removeFromTop(topBarH);
         const int btnW = 110;
         m_btnOsc.setBounds(topArea.removeFromLeft(btnW).reduced(2));
         m_btnSpec.setBounds(topArea.removeFromLeft(btnW).reduced(2));
@@ -207,25 +212,28 @@ public:
 
     void buttonClicked(juce::Button* btn) override
     {
-        if (btn == &m_btnOsc)   m_scopeComponent->setMode(NativeScopeMode::Oscilloscope);
-        if (btn == &m_btnSpec)  m_scopeComponent->setMode(NativeScopeMode::Spectrum);
-        if (btn == &m_btnLiss)  m_scopeComponent->setMode(NativeScopeMode::Lissajous);
+        if (btn == &m_btnOsc) m_scopeComponent->setMode(NativeScopeMode::Oscilloscope);
+        if (btn == &m_btnSpec) m_scopeComponent->setMode(NativeScopeMode::Spectrum);
+        if (btn == &m_btnLiss) m_scopeComponent->setMode(NativeScopeMode::Lissajous);
         if (btn == &m_btnPhase) m_scopeComponent->setMode(NativeScopeMode::PhaseMeter);
     }
 
     void sliderValueChanged(juce::Slider* slider) override
     {
-        if (slider == &m_sliderFreq)  m_freq = static_cast<float>(slider->getValue());
+        if (slider == &m_sliderFreq) m_freq = static_cast<float>(slider->getValue());
         if (slider == &m_sliderPhase) m_stereoPhaseDeg = static_cast<float>(slider->getValue());
     }
 
     void comboBoxChanged(juce::ComboBox* box) override
     {
-        if (box == &m_waveSelector) {
+        if (box == &m_waveSelector)
+        {
             m_waveType = box->getSelectedId();
         }
-        else if (box == &m_themeSelector) {
-            switch (box->getSelectedId()) {
+        else if (box == &m_themeSelector)
+        {
+            switch (box->getSelectedId())
+            {
                 case 1: // MS2000 Cyan
                     m_currentAccent = juce::Colour(0xff00c3ff);
                     m_scopeComponent->setTraceColour(m_currentAccent, juce::Colour(0xffff007f));
@@ -253,8 +261,8 @@ public:
 
 private:
     ScopeDataCollector m_collector;
-    ScopeTap* m_tapMaster { nullptr };
-    ScopeTap* m_tapOsc1 { nullptr };
+    ScopeTap* m_tapMaster{nullptr};
+    ScopeTap* m_tapOsc1{nullptr};
 
     std::unique_ptr<JuceScopeComponent> m_scopeComponent;
 
@@ -264,13 +272,13 @@ private:
     juce::Slider m_sliderFreq, m_sliderPhase;
     juce::Label m_labelFreq, m_labelPhase;
 
-    float m_freq { 440.0f };
-    float m_stereoPhaseDeg { 0.0f };
-    float m_phase { 0.0f };
-    float m_currentSampleRate { 44100.0f };
-    int m_waveType { 1 };
+    float m_freq{440.0f};
+    float m_stereoPhaseDeg{0.0f};
+    float m_phase{0.0f};
+    float m_currentSampleRate{44100.0f};
+    int m_waveType{1};
     juce::Random m_random;
-    juce::Colour m_currentAccent { 0xff00c3ff };
+    juce::Colour m_currentAccent{0xff00c3ff};
 
     std::vector<float> m_leftBuffer;
     std::vector<float> m_rightBuffer;
@@ -280,9 +288,9 @@ private:
 class StandaloneScopeApp : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override       { return "ABDScope Native C++ Demo"; }
-    const juce::String getApplicationVersion() override    { return "0.3.1"; }
-    bool moreThanOneInstanceAllowed() override             { return true; }
+    const juce::String getApplicationName() override { return "ABDScope Native C++ Demo"; }
+    const juce::String getApplicationVersion() override { return "0.3.1"; }
+    bool moreThanOneInstanceAllowed() override { return true; }
 
     void initialise(const juce::String&) override
     {

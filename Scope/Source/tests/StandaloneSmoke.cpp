@@ -1,14 +1,15 @@
-#include <iostream>
-#include <vector>
-#include <string>
-#include <cmath>
-#include "../Core/SpscRingBuffer.h"
-#include "../Core/ScopeTap.h"
 #include "../Core/ScopeDataCollector.h"
-#include "../Core/TriggerDetector.h"
 #include "../Core/ScopeFrameSerializer.h"
+#include "../Core/ScopeTap.h"
+#include "../Core/SpscRingBuffer.h"
+#include "../Core/TriggerDetector.h"
+#include <cmath>
+#include <iostream>
+#include <string>
+#include <vector>
 
-namespace {
+namespace
+{
 
 int g_failures = 0;
 
@@ -37,7 +38,7 @@ int main()
     {
         std::cout << "[TEST] Testing SpscRingBuffer..." << std::endl;
         abd::scope::SpscRingBuffer<float> ring(128);
-        std::vector<float> input = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };
+        std::vector<float> input = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
         CHECK(ring.write(input.data(), input.size()) == 5);
         CHECK(ring.getAvailableRead() == 5);
 
@@ -78,8 +79,8 @@ int main()
     // 3. Test TriggerDetector Sub-sample Precision & Pitch (octave-qualified note names)
     {
         std::cout << "[TEST] Testing TriggerDetector Sub-sample Lock & Pitch..." << std::endl;
-        const float sampleRate = 44100.0f;
-        const float targetFreq = 440.0f;
+        const float sampleRate  = 44100.0f;
+        const float targetFreq  = 440.0f;
         const size_t numSamples = 4096;
         std::vector<float> sine(numSamples, 0.0f);
 

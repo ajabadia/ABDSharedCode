@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cctype>
 #include <string>
 #include <string_view>
-#include <cctype>
 
-namespace abd::scope {
+namespace abd::scope
+{
 
 /**
  * ASCII-only lowercase helper (locale-independent, no UTF-8 surprises).
