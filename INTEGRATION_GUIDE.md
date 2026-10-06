@@ -659,6 +659,150 @@ no caza:
    tapando el punto 1**: con el corte mal, el fallo aparecía en la muestra 85;
    arreglado el corte, el error de fase aparece en la 18937 si lo reintroduces.
 
+### El arnés que mide `DspMath` en WASM y en nativo, para que ninguna trascendental nueva entre sin medir
+
+`DspCoreTests.cpp` responde a "¿las trascendentales hacen lo que dicen?". No a
+las dos preguntas que solo se ven mirando el binario, y que son las que
+importan cuando el mismo código corre en un DAW y en un navegador:
+
+- **¿Siguen siendo las MISMAS?** Un `sin` correcto en x86 y un `sin` distinto
+  en WASM no son dos implementaciones: son dos instrumentos que suenan distinto,
+  y el producto que compila a WASM se lleva el peor.
+- **¿Cuánto cuestan?** Una trascendental correcta pero lentísima se cuela igual
+  de fácil que una incorrecta, y el síntoma —una voz que va bien en el DAW y se
+  arrastra en el navegador— no señala al culpable.
+
+Y hay una tercera, que es la que este arnés existe sobre todo:
+
+- **¿Ha entrado alguna nueva sin medir?** Alguien añade un `tan` a `DspMath.h`,
+  lo usa en una voz, y entra sin ruido, sin warning y sin crash. Nadie sabe que
+  hay una función más, ni cuánto cuesta, ni si es la misma en los dos
+  compiladores.
+
+#### Las cuatro puertas
+
+Se ejecuta con `python tools/run_dsp_math_harness.py`. Los códigos de salida no
+son intercambiables: **0** todo pasa y la pata WASM se ha ejecutado de verdad,
+**1** alguna puerta falla, y **3** la pata WASM no se ha podido ejecutar porque
+falta `clang` o `wasm-ld`. El 3 existe para que un CI no confunda "nadie ha
+comprobado la paridad" con "la paridad está bien". Un 0 sin haber corrido WASM
+sería mentira.
+
+| | Puerta | Qué atrapa |
+|---|---|---|
+| **A** | Cobertura | Lee `DspMath.h`, saca las declaraciones de nivel de namespace y las compara con el manifiesto del arnés. Una función nueva sin medir sale aquí. No necesita compilador. |
+| **B** | Símbolos | Compila a objeto y mira los símbolos **indefinidos** con `nm`. El módulo tiene que salir con cero. |
+| **C** | Informe | Corre el arnés nativo y enseña el coste. Avisa, no falla. |
+| **D** | Paridad | Compila a `--target=wasm32 -nostdlib`, lo corre en `node` y compara los **bits** con los del nativo, función a función y caso a caso. |
+
+La puerta B es la que evita el dolor de verdad, y merece la pena entender por
+qué. **En nativo, llamar a `expf` de libm compila y funciona.** Da un resultado
+razonable, el test de sonido pasa, y nadie se entera hasta que alguien compila a
+WASM y descubre que allí no hay biblioteca. La puerta B avisa en nativo, donde
+todavía se puede arreglar. Y la puerta D lo remata por el otro lado: en
+freestanding una fuga o aparece como un *import* de más o no enlaza, y el
+arnés comprueba que el módulo WASM **solo** pide el reloj.
+
+#### El mismo código, dos veces
+
+`DspCore/DspMathHarness.cpp` se compila de dos maneras —con `main` para nativo,
+y con `-DDspMathHarnessWasm` sin `main` ni `stdio` ni `vector`— y por eso el
+informe se escribe a mano en un buffer estático. Que sea **un** archivo y no dos
+es lo que hace que la paridad signifique algo: si las dos listas de casos
+estuvieran escritas a mano, bastaría con añadir un caso a una y olvidar el otro
+para que la paridad dijera "OK" sin haber comparado nada.
+
+El reloj es la única cosa que cambia entre las dos patas, y a propósito. En
+freestanding no hay `time.h` ni `clock()`, así que el módulo **importa** el
+reloj del host y `node` le pasa `performance.now()`. Un `time.h` inventado sería
+medir un reloj contra sí mismo; importando el del host, el número que sale es el
+tiempo de pared real de la ejecución en WASM, que es lo que a un navegador le
+importa. Los dos shims que hacen falta —`<cstdint>` y `<limits>`, y solo esos
+dos— están en `tools/wasm_freestanding/` y solo se usan en la ruta de include
+del build WASM. El de `<limits>` va **sin `constexpr`** a propósito, porque
+`__builtin_bit_cast` es de C++20 y el módulo es C++17.
+
+#### Los casos, y por qué no son aleatorios
+
+16 entradas, escritas a mano, elegidas por lo que se aprende midiendo: los
+redondos (0, 1, −1, 0,5) donde una serie truncada se nota porque el error
+relativo es máximo; los grandes (1000) donde un polinomio se va; y los bordes
+del rango de `log2`/`exp2`/`atan`/`atanh`, donde una guarda mal puesta devuelve
+algo silenciosamente equivocado en vez de NaN. Un generador con semilla fija
+daría más cobertura y **menos** casos útiles: los que el azar no elige son
+justamente los de arriba.
+
+#### Las cifras, en esta máquina
+
+Native con 1.000.000 de repeticiones, y el coste **neto** de restar el blanco del
+bucle. Esta tabla es **una** corrida, y las demás salen parecidas:
+
+| función | ns netas | × mediana | presupuesto | | función | ns netas | × mediana | presupuesto |
+|---|---|---|---|---|---|---|---|---|
+| `pow2i` | 3,50 | 0,31 | 0,60 | | `sin` | 12,44 | 1,09 | 1,60 |
+| `floorToInt` | 5,69 | 0,50 | 0,80 | | `cos` | 12,94 | 1,14 | 1,60 |
+| `wrapPhase` | 6,69 | 0,59 | 1,40 | | `tanh` | 14,38 | 1,26 | 1,80 |
+| `atanh` | 5,63 | 0,49 | 1,60 | | `atan` | 16,06 | 1,41 | 2,00 |
+| `log2` | 10,88 | 0,96 | 1,60 | | `pow` | 33,50 | 2,95 | 6,00 |
+| `exp2` | 11,38 | 1,00 | 1,60 | | | | | |
+
+Blanco del bucle: **1,81 ns**. Mediana: **11,38 ns**. Hay un grupo apretado
+alrededor de 1 y dos que se salen: `pow`, que hace `exp` y `log` de verdad, y
+`pow2i`, que es una construcción de bits.
+
+**En WASM la mediana sale entre 35 y 36 ns, contra 10,2 – 11,9 ns en nativo:
+entre 3,0 y 3,5 veces, medido en cuatro corridas.** Doy el rango porque la
+máquina carga y el número suelto no significa nada; la mediana de WASM es la que
+se mueve poco y la nativa la que baila. Ese 3 a 3,5 es el número que le diría a
+alguien por qué el navegador va justo.
+
+Y los 11 × 16 = 176 resultados salen **idénticos bit a bit** en las dos patas,
+que es lo que dice que ese precio se paga solo en velocidad y no en sonido.
+
+#### Dos cosas que la medición obligó a arreglar en el arnés mismo
+
+**El presupuesto va en múltiplos de la mediana, no en nanos.** Con 20.000
+repeticiones el bucle entero dura ~4 ms, el reloj nativo mide en milisegundos, y
+nueve de las once funciones salían a 9,38 ns — el suelo del reloj, no su coste.
+Con 1.000.000 el orden se repite entre corridas. Y si el bucle dura menos de 20
+ms, el veredicto sale `sin-medir` en vez de un "ok" que sería un "no he medido
+nada" con otra palabra.
+
+**El formateador imprimía `nan` para el cero.** La guarda "esto no es un número"
+—`v > 0` y `v < 0`— es falsa también para `0.0`, así que el número más probable
+de todos, un coste redondeado, salía marcado como inválido. Y los céntimas
+redondeados sin la llevada sacaban `13.006` como `13.001` y `1.999` como `1.00`.
+Ninguno de los dos fallos se ve leyendo el código: se ven mirando el informe.
+
+#### Las cuatro puertas muerden
+
+Comprobado reintroduciendo uno a uno cada fallo, no leyendo que haya un test:
+
+| Mutación | Puerta | Resultado |
+|---|---|---|
+| Un `tan` nuevo en `DspMath.h`, fuera del manifiesto | A | `funciones de DspMath.h que NO estan en el manifiesto: tan` |
+| `log2` llamando a `expf` de libm, con su `<cmath>` debajo | B | `el modulo TIRA DE LIBM` |
+| El módulo WASM pidiendo un símbolo de más al host | D imports | `el modulo WASM pide al host env.dspMathHarnessFuga` |
+| La pata WASM escribiendo un bit distinto en cada valor | D paridad | `sin: 16 de 16 casos difieren` |
+
+Dos de esas cuatro reuniones son la mitad del valor de este arnés, y las dos
+salieron de que **la primera versión de la mutación no era la correcta**:
+
+- La fuga a libm no llegaba a la puerta B porque `::expf` **no compila** sin
+  `<cmath>`. Una fuga real necesita el include para existir, porque sin él no hay
+  ni declaración: el mutador tenía que meter las dos cosas.
+- Romper el escritor de bits **no mordía nada**: el escritor es el mismo código
+  en las dos patas, así que las dos mienten igual y siguen coincidiendo. Una
+  comparación diferencial solo puede cazar una diferencia, y la diferencia tiene
+  que existir entre los dos lados. Hubo que meter la corrupción dentro de
+  `#if defined (DspMathHarnessWasm)`, que es como se simula un compilador que
+  redondea distinto.
+
+Y un tercero, del mismo tipo, que no es del arnés: **`DspMath.h` está en CRLF**
+y las sustituciones de las mutaciones buscaban con `\n` a pelo, así que no
+mutaban nada y la puerta salía verde. Una mutación que no cambia el fichero no
+es una prueba que pasa: es una que no se ha ejecutado.
+
 ### El sistema de slots: para poner "el efecto que elija el usuario" en un hueco
 
 `DspEffects` no es solo una coleccion de motores: tiene tambien el **sistema de
@@ -666,7 +810,7 @@ slots** que los mete en huecos, con los cuatro huecos y los nueve modos de ruteo
 de ABDEep, pero **JUCE-free**, sobre `AudioBuffer<float>` de `DspCore`.
 
 ```cpp
-#include "DspEffects/FxDefaultCatalogue.h"     // el catalogo de las seis filas
+#include "DspEffects/FxDefaultCatalogue.h"     // el catalogo de las siete filas
 
 abd::dsp::FxEngine motor;
 int num = 0;
@@ -692,8 +836,8 @@ Los ficheros, en este orden de lectura:
 | `FxRegistry.h` | El CONTRATO: `FxParamSpec`, `FxEffectInfo` y las tablas `fxNormalise` / `fxDenormalise`. Sin motores, sin JUCE |
 | `FxSlot.h` | UN hueco: el tipo que hay, 12 mandos normalizados, `gain`, `mix` y la frontera wet/dry |
 | `FxEngine.h` | Los cuatro huecos, los nueve ruteos, el modo insert/send/bypass y la realimentación global |
-| `adapters/BasicAdapters.h` | Los seis motores de este modulo, traducidos de unidades físicas a 0..1 |
-| `FxDefaultCatalogue.h` | Las seis filas, y las funciones que las consultan |
+| `adapters/BasicAdapters.h` | Los siete motores de este modulo, traducidos de unidades físicas a 0..1 |
+| `FxDefaultCatalogue.h` | Las siete filas, y las funciones que las consultan |
 
 **POR QUE ESTA EN EL MODULO Y NO EN UN PRODUCTO.** Porque hay dos productos que
 lo necesitan, y el de ABDEep es codigo JUCE: su `FXEngine::updateParameters`
@@ -716,7 +860,7 @@ niveles internos como parametros suyos (`levels`) en vez de romperle la paridad 
 **Y LO QUE ES DE PRODUCTO, que no esta aqui:** qué efectos hay, cómo se llaman en
 el panel, y la tabla de unidades de cada mando. Eso entra por `setCatalogue`. Un
 producto con efectos propios (ABDEep tiene 48 más) monta su tabla y le añade
-estas seis filas.
+estas siete filas.
 
 **Un catálogo, no un `switch`.** La version de ABDEep tiene un `switch` de 50
 casos en `FXSlot_Factory.cpp`, y `FXSlot.h` incluye CINCUENTA cabeceras: tocar un
@@ -727,7 +871,7 @@ efecto es añadir una fila, y el número de filas sale de `sizeof`: un catálogo
 con una entrada de más que el recuento es la forma bonita de que el último efecto
 del panel no exista.
 
-#### Los seis, y por qué no setenta
+#### Los siete, y por qué no setenta
 
 El único criterio para entrar en el catálogo por defecto es que el motor esté
 **en este módulo**. Los 48 efectos privados de ABDEep no entran todavía: son
@@ -742,6 +886,7 @@ JUCE-free, que es justo lo que sostiene la paridad nativa <-> WASM de ABDNeural.
 | 4 | `saturation` | `DspSaturation` | drive (1–8) |
 | 5 | `schroeder` | `DspSchroederReverb` | decay, damping, diffusion, predelay |
 | 6 | `bbd` | `JunoBBD` + `BbdNoise` | mode (**4 pasos**), rate, depth, wear |
+| 7 | `shelf` | `ShelfFilter` | mode (**2 pasos**), freq (20 Hz–20 kHz), gain (±12 dB) |
 
 **El 0 es siempre bypass**, esté o no en la tabla, para que un panel permita
 elegir "nada" sin que ningún producto tenga que acordarlo.
@@ -749,11 +894,12 @@ elegir "nada" sin que ningún producto tenga que acordarlo.
 #### Cuatro cosas que costaron, y que un test de "suena igual" no caza
 
 1. **El último efecto era inalcanzable.** El límite superior de `fxEffectAt` era
-   `index >= count` en vez de `index > count`, así que con seis filas el índice 6
-   —el BBD, el único con selector discreto y el que más se nota que falta— no se
-   podía elegir jamás. No lo cazaba ningún test porque los que había elegían
-   efectos del principio de la lista. **Medido**: con el defecto, `fxEffectAt(cat,
-   6, 6)` devuelve `nullptr`.
+   `index >= count` en vez de `index > count`, así que con siete filas el índice 7
+   —la repisa— no se podía elegir jamás. El defecto es el mismo desde que hay
+   catálogo, pero el que lo sufría cambió: con seis filas era el BBD, con siete
+   es la repisa. No lo cazaba ningún test porque los que había elegían efectos
+   del principio de la lista. **Medido**: con el defecto, `fxEffectAt(cat, 7, 7)`
+   devuelve `nullptr`.
 2. **El modo envío se comía el `mix` del usuario.** La primera versión hacía
    `setMix (sendLevel_)` en cada hueco antes de procesar. Suena casi igual, y
    está mal: `setMix` es un mando del usuario, así que un bloque de envío se
@@ -1065,14 +1211,73 @@ los mandos en rango, 0 ulps.
 
 Los cinco casos están en el banco (`DspEffectsTests.cpp`, 709 comprobaciones =
 681 + 28 de esta auditoría) y **todos muerden**: reintroduciendo uno a uno cada
-arreglo, el banco se pone rojo —7 de 7 mutaciones, en dos tandas porque el
-banco tarda unos 70 s por ejecución y no caben todas en un solo script—. Dos de
-esas mutaciones merecen nota:
+arreglo, el banco se pone rojo. Y desde el 2026-09-29 eso no es una frase sino
+un script: `tools/ds_effects_mutation_bank.py`.
+
+Ahora el script tiene **un catálogo de arreglos, no una lista de mutaciones**,
+que es la diferencia entre una afirmación y una condición. Cada mutación dice
+qué arreglo deshace, y el banco **se niega a arrancar** si hay un arreglo del
+catálogo sin mutación: el "7 de 7" de antes podía quedarse en 7 de 7 mientras
+un octavo arreglo, ya arreglado, se deshacía sin que nadie se enterase. Hoy son
+12 arreglos y 13 mutaciones —dos de ellas sobre el mismo arreglo del `decay`—,
+y con la migración del ecualizador han entrado seis: el techo de 0,45·fs, la
+banda muerta de 0,05 dB, el recorte de índices de la cascada, la independencia
+de los dos mandos, la puerta de hercios continuos que se puede volver a
+cerrar con la tabla, y que esa puerta sea **una por repisa**.
+
+La sexta merece su propia nota, porque es un fallo que se escondía solo. La
+puerta de hercios continuos se implementaba con **una bandera para las dos
+repisas**, así que escribir un hercio a mano en la baja apagaba la bandera
+común, y al siguiente `setHighIndex` la máquina reescribía **las dos**
+frecuencias: el hercio que el producto acababa de poner en la baja se perdía
+sin avisar y sin error de ningún tipo. Y solo pasaba cuando el índice de la alta
+casualmente no era el que ya estaba, porque la guarda de "no ha cambiado" cortaba
+antes — un fallo que depende de **en qué posición tapaba el mando** del usuario
+es de los que más tardan en verse. Ahora hay una bandera por repisa,
+`aplicaFrecuencias` solo escribe la que la pide, `prepare` reabre las dos
+puertas, y la guarda de "no ha cambiado" mira también si manda la tabla (si no,
+un hercio continuo con el mismo índice se quedaba puesto para siempre y el
+selector del panel parecía muerto).
+
+Y hay un segundo agujero, más tonto, que también está cerrado: **contaba como
+detección cualquier rojo**. Un banco que se ponía rojo porque la mutación había
+roto *otra* comprobación se contaba como "mordida", y el arreglo parecía
+vigilado sin estarlo. Ahora cada mutación declara `muerde`, el texto de la
+comprobación que **tiene** que ponerse falsa, y si el banco se pone rojo de
+verdad pero por otro sitio sale `ROJA PERO NO POR AQUI` y cuenta como fallo. Es
+lo que separa un test que muerde de un test que tropieza.
+
+```
+python tools/ds_effects_mutation_bank.py --rapido           # el cruce, en un segundo
+python tools/ds_effects_mutation_bank.py --autocomprobacion
+python tools/ds_effects_mutation_bank.py --list
+python tools/ds_effects_mutation_bank.py --only 8,9,10
+```
+
+Los tres niveles, y cada uno comprueba al anterior. `--rapido` no compila ni
+toca el árbol: cruza cada anclaje con su fichero y cada `muerde` con
+`DspEffectsTests.cpp`, así que si alguien renombra una comprobación sin tocar
+la tabla, la herramienta lo dice en un segundo en vez de veinte minutos de
+compilación más tarde. `--autocomprobacion` le pasa al revisor una tabla rota a
+propósito —un arreglo sin mutación, un `muerde` inexistente, un anclaje
+duplicado— y **exige que señale cada caso**; un revisor al que nunca se le ha
+visto fallar no es un revisor, y si se calla esto sale en rojo. La corrida de
+verdad son unos 30 minutos.
+
+Lo que mide es la SENSIBILIDAD del banco —que cada arreglo tenga **alguna**
+comprobación que se rompa al deshacerlo, y que se rompa **la suya**—, no que el
+arreglo sea correcto: un banco que se pone rojo porque no compila se cuenta
+como fallo del banco, y por eso la mutación que no compila no es una mutación
+detectada.
+
+Dos de esas mutaciones merecen nota:
 
 - La del vtable: el fichero está en **CRLF** y la mutación buscaba con `\n` a
   pelo, así que no mutaba nada y salía "[OK]". Una mutación que no cambia el
-  fichero no es una prueba que pasa, es una que no se ha ejecutado: el script
-  compara el `cksum` antes y después y avisa si el fichero no ha cambiado.
+  fichero no es una prueba que pasa, es una que no se ha ejecutado. El script
+  compara el checksum antes y después y **avisa si el fichero no ha cambiado**;
+  verde sale de "el banco se puso rojo" y rojo de "no mutamos nada", que son
+  cosas distintas.
 - La del `decay`: volver al `jlimit(0, 1)` de los tres mandos pone el banco
   rojo en 2 comprobaciones. Es la que más ha merecido la pena escribir, porque
   es el arreglo que parecía correcto.
@@ -1144,21 +1349,28 @@ audio al bloque, porque diez transcendentales por muestra son un precio que
 ningún hueco de este sistema va a pagar. Eso es una reescritura, no una
 migración, y va en su propio paso con su propia paridad.
 
-#### 3. `Equalizer` — el único que está limpio
+#### 3. `Equalizer` — el único que está limpio (MIGRADO, ver más abajo)
 
 Dos repisas de Butterworth en cascada, forma II transpuesta, y dos detalles que
 están **bien hechos**: el coeficiente `A = 10^(dB/40)` da identidad exacta a
 0 dB (`b = a` cuando `A = 1`, comprobado con la fórmula), y la banda muerta de
-0,05 dB en los dos mandos de ganancia evita el tictac deHost sin coste.
+0,05 dB en los dos mandos de ganancia evita el tictac de host sin coste.
 
-**Decisión: migra**, y es la migración más barata de las tres. Solo le falta una
+**Decisión: migra**, y es la migración más barata de las tres. Solo le faltaba una
 cosa al módulo: **`DspMath` no tiene `sqrt`**, y el cálculo de la repisa usa
-`std::sqrt(A)` dos veces por banda. Para `A ≥ 0,66` el sustituto es
-`exp2 (0.5 * log2 (A))`, con las dos funciones ya disponibles y con toda la
-precisión que necesita un coeficiente de filtro. Las **tablas de 4 pasos del
-MS2000 (160/250/400/600 y 4000/6000/8000/12000 Hz) NO migran**: son política de
+`std::sqrt(A)` dos veces por banda. Las **tablas de 4 pasos del MS2000
+(160/250/400/600 y 4000/6000/8000/12000 Hz) NO migran**: son política de
 producto, y la fila común toma frecuencias continuas en hercios. Es la misma
 regla que el rango de 0,10 a 8 Hz del coro.
+
+> **CORRECCIÓN de este párrafo, que estaba mal medido.** Decía que el sustituto
+> `exp2 (0.5 * log2 (A))` valía "para `A ≥ 0,66`", y no vale solo a partir de
+> ahí: vale en **todo** el rango. Con ±12 dB, `A` recorre [0,501, 1,995] y el
+> peor error son **2 ulps**, alcanzado a **+11,40 dB** y no en el extremo de
+> −12 dB, que es donde uno esperaría el peor caso. El 0,66 venía de acotar por
+> debajo de donde un `log2` de dominio general empieza a perder precisión, y
+> aquí no aplica: `A` vive en un rango estrecho y muy cerca de 1.
+> **Migrado**: la sección siguiente tiene las cifras del cambio de sonido.
 
 **Y una advertencia que es de todos, no de este caso.** Migrar a este módulo
 cambia la aritmética: `std::sin` → `abd::dsp::sin`, `std::cos` → `abd::dsp::cos`,
@@ -1171,6 +1383,171 @@ congelada en unos ulps, y esa referencia se actualiza en el mismo commit que
 documenta el cambio. Es el precio de que el filtro valga lo mismo a 32, 44,1 y
 48 kHz, y es un precio que se paga una vez y se cobra en todos los productos
 siguientes.
+
+### La repisa: el ecualizador del MS2000, ya en el módulo
+
+`ABDMS2000/Source/DSP/Effects/Equalizer.{h,cpp}` era el único de sus tres efectos
+que estaba limpio: dos repisas de Butterworth en cascada, forma II transpuesta,
+`A = 10^(dB/40)` con identidad exacta a 0 dB y banda muerta de 0,05 dB en la
+ganancia. Ahora son **dos `ShelfFilter` del módulo en cascada**, y lo que queda
+en el producto es un shim de 60 líneas: las tablas de 4 pasos y la API de índices.
+
+Y la cascada, que era lo último que vivía en el shim, ya está también en el
+módulo: `CascadeShelfEq<Perfil>` y `profiles/MS2000EqProfile.h`. Ver abajo.
+
+#### Dos decisiones, y las dos están medidas
+
+**Una repisa, no un ecualizador.** El motor se llama `ShelfFilter` y no
+`Equalizer` porque un ecualizador que solo sabe hacer dos bandas con un Q fijo y
+cuatro frecuencias por banda no es un ecualizador, es un preset. La fila del
+catálogo expone **una** repisa con un selector de modo; un producto que quiera
+tres bandas mete tres filas iguales. Las tablas de 4 pasos del MS2000 (160/250/400/600
+y 4000/6000/8000/12000 Hz) **migran como perfil**, no como motor: son los números
+de un sintetizador, y eso en el módulo es exactamente lo que es un perfil
+(`JunoBbdProfile.h`, `Re201Profile.h`, `ReverbProfile.h`). Lo que no migra es el
+rango de 0,10 a 8 Hz del coro, porque ese sí es política del producto y no de
+ningun sintetizador en concreto.
+
+**El límite de frecuencia es 0,45·fs, y no 0,2.** La primera versión puso 0,2
+"por prudencia" y al medir resultó que **movía las frecuencias del propio MS2000
+a 32 kHz**: las repisas de 8 y de 12 kHz se recortaban a 6,4 kHz y sonaban en otro
+sitio. El MS2000 usa 12 kHz, y 12000/32000 = 0,375, así que cualquier límite por
+debajo de 0,375 cambia el sonido de un producto ya publicado.
+
+#### La cascada, que era lo último que vivía en el shim
+
+`CascadeShelfEq<Perfil>` son las dos `ShelfFilter` en serie, con los estados
+separados por canal, y del perfil toma **solo datos**: `numPositions`,
+`lowFreqs`, `highFreqs`, los dos índices de fábrica, el tope de ganancia y el
+paso del mando. El recorte de índices, los modos fijos, la puerta de hercios
+continuos y la regla "cambiar la ganancia no reescribe la frecuencia" son de la
+máquina, no del MS2000: son reglas, y una regla no es de nadie en concreto. Un
+producto con dos bandas fijas por hardware instancia esto con su perfil; uno sin
+selector usa la puerta de hercios continuos y se salta las tablas.
+
+Esa puerta tiene una política y la política es **manda la última puerta usada**:
+`setLowIndex` vuelve a encender la tabla después de que alguien haya escrito un
+hercio a mano. Se puso al revés al principio —la puerta era de ida— y el banco
+lo cazó en la primera corrida, porque contradecía el propio comentario del
+código. Un test que encuentra un defecto en la máquina que está uno escribiendo
+vale más que tres párrafos diciendo que no puede pasar.
+
+Las tres están medidas, y las tres miran el sonido y no los libros:
+
+- **La máquina es bit a bit las dos repisas en serie.** Se mide contra dos
+  `ShelfFilter` conducidos a mano, no contra una fórmula reescrita en el test:
+  comparar contra una reimplementación en vez de contra la que corre de verdad
+  es el error clásico de este tipo de test.
+- **El orden de las dos etapas da la misma respuesta, y no da igual bit a bit.**
+  Las dos son LTI, así que la cascada es `H1(z)·H2(z)` y da igual el orden —
+  eso es álgebra, no conmutatividad, que es la confusión que se cuela aquí—. Lo
+  medido son de 1,9e-6 con g++ optimizado a 3,5e-6 con MSVC en Debug, 16 a 30
+  ULPs, porque dos órdenes distintos del mismo sistema de orden 4 agrupan el
+  redondeo de otra manera. El aserto va a 1e-4 con la cifra imprimida al lado: un
+  umbral sin el valor medido al lado es un número que nadie revisa.
+- **0 dB devuelve la señal bit a bit.** Es la misma identidad exacta que la del
+  motor, pero vista a través de dos etapas, y es la razón por la que un preset
+  nuevo con los dos mandos a cero no se oye.
+
+Suman 933 comprobaciones, 28 por encima de las 905 de antes. Lo que **no** está
+hecho: el shim de `ABDMS2000` sigue con sus propias tablas y no instancia
+`CascadeShelfEq`, así que los números están ahora en dos sitios. El cambio de un
+lado al otro es de un rato, pero el producto tenía trabajo sin commitear encima y
+no se ha tocado.
+
+#### El cambio de sonido, que no es cero
+
+El original usaba `std::sqrt`, `std::pow`, `std::cos` y `std::sin` de libm. El
+módulo no puede: solo tiene `DspMath.h`, y `sqrt` no está. Las cuatro
+transcendentales se sustituyen, y la cuenta **corrige** a la que estaba escrita
+antes, que era mala por partida doble —medía solo lo de `sqrt`, y en un punto:
+
+| sustitución | error |
+|---|---|
+| `std::pow` → `dsp::pow` | 2 ulps |
+| `std::sqrt` → `exp2 (0.5·log2 (A))` | 2 ulps |
+| `std::cos` → `dsp::cos` | 5 ulps |
+| `std::sin` → `dsp::sin` | 5 ulps |
+| los cuatro juntos, en un coeficiente | **hasta 509 ulps** |
+| y en la **respuesta** del filtro | **0,010 dB** |
+| y en la **señal**, dos bandas | **−70,2 dBFS** de pico |
+
+Los 509 ulps no son un error del filtro: son cuatro aproximaciones entrando en
+las cinco fórmulas a la vez. Y los ulps de un coeficiente son un proxy débil —lo
+que se oye es la respuesta—, así que las dos filas de abajo son las que valen.
+La de la señal está medida **desde el producto**: las 16 combinaciones de las dos
+bandas × 9 ganancias × los tres sample rates, contra una copia de las fórmulas
+originales con libm. Y a **0 dB la salida es bit a bit la del original**, que es lo
+que tiene que pasar: sin ganancia no hay raíz que sustituir.
+
+#### El suavizado de los mandos, y por qué la tasa de control es 16
+
+La fila no empuja los mandos al motor en cada bloque ni en cada muestra.
+Recalcular los coeficientes son **cinco transcendentales**: MEDIDO, por muestra
+son 194 ns, o sea el **20,7% de un núcleo a 48 kHz** para un biquad. Cada 16
+muestras mide 17,9 ns (0,18%), y **entre 16 y 32 no hay diferencia real**: la
+máquina estaba midiendo por debajo del ruido.
+
+El umbral del clic, en cambio, sí depende, y hay que medirlo bien. **Un clic no es
+"un salto grande": es un salto que no es de la señal**, y las tres primeras
+mediciones lo midieron mal por tres motivos distintos, los tres escritos en
+`DspEffectsTests.cpp` para que no se repitan:
+
+- comparando el paso de la **salida** con el de la **entrada** se mide la ganancia;
+- comparándolo con el de una referencia de ganancia **fija** se mide el
+  crecimiento de amplitud del barrido (con +12 dB la salida pasa de 0 a 12 dB de
+  punta a punta);
+- pasar alta la diferencia a 5 kHz mide el **resonador** de la repisa, que en una
+  repisa alta está justo ahí.
+
+El criterio que sí funciona es darle a los dos lados **la misma trayectoria** y
+cambiar solo cada cuánto se empujan los coeficientes. La desviación resultante,
+barrido de 200 Hz a 16 kHz en 500 ms, es de unos 6 dB por octava:
+
+| cada N muestras | repisa alta | repisa baja |
+|---|---|---|
+| 16 | −45,3 dBFS | −42,6 dBFS |
+| 32 | −38,6 | −36,2 |
+| 64 | −30,4 | −28,2 |
+| 128 | −22,7 | −18,7 |
+| 256 | −16,7 | −12,7 |
+
+La puerta exige −40 dBFS en las dos repisas: 16 pasa con 2,6 dB de margen sobre la
+peor, y 32 **ya se pondría roja**. Ese es su trabajo, no solo avisar de que hoy
+está bien: impedir que alguien suba la tasa a "optimizar" y se lleve el clic sin
+enterarse.
+
+#### Y el `reset` asienta las rampas, que no es lo mismo que vaciar el estado
+
+Un `reset` de host no debe **congelar** el mando —si lo hiciera, el usuario oíría
+el mando parado hasta que moviera otra cosa—, así que la rampa de 20 ms sigue
+corriendo después. Lo que sí tiene que hacer es vaciar el estado, y asentar la
+rampa en su destino para que no siga bajando desde donde se quedó. MEDIDO, sin
+el `jumpToTarget` el primer bloque tras un reset sale con un golpe de ganancia de
+**más de 7 dB**; con él, −4,0 dB, que es la inercia del propio filtro.
+
+#### Lo que este trabajo se llevó por delante
+
+La puerta del clic y la del `reset` tardaron **cuatro y tres** reescrituras
+respectivamente, y en los dos casos la primera versión no era floja: era
+incorrecta. Dos cosas de esa lista valen para cualquier migración:
+
+- **una comprobación que no puede fallar hace guardia**, y es peor que no
+  tenerla. La de la independencia de bloque comparaba el mismo audio con
+  distintos tamaños de bloque **con los mandos quietos**, así que pasaba incluso
+  con el contador de control reiniciado por bloque, que es justo el fallo que
+  decía cazar;
+- **un script de mutación que se traga el error de compilación no mide nada**.
+  `2>/dev/null` dejaba el ejecutable viejo de la vuelta anterior, y cinco
+  mutaciones "no mordían" cuando en realidad las ocho estaban midiendo la misma
+  tasa. La tabla que salió era plausible y completamente falsa. Y otro script
+  reponía la constante buscando su valor exacto, así que a partir de la segunda
+  vuelta ya no la encontraba: el mismo número ocho veces. Las dos instrumentaciones
+  dan un resultado que parece un resultado.
+
+**Verificado**: 754 comprobaciones de DspEffects con `-Wall -Wextra -Werror`, 5 de
+5 puertas de la fila mordiendo, y el ecualizador de ABDMS2000 compilando contra
+el módulo con su API intacta (`SynthEngine` y `WasmBridge` no se han tocado).
 
 ### La mitad JS: el contrato de efectos
 
@@ -1279,6 +1656,7 @@ sano por sí mismo. Cuatro trabajos, **los cuatro puertas** (ninguno en `warning
 |---|---|---|
 | `tools` | `node --test tools/guard_atributos.test.mjs` (46) | Sin dependencias: `node:test` y `assert` vienen en el runtime, y estas herramientas no están dentro del workspace pnpm. Meter un runner para 46 pruebas sería meter una cadena de dependencias en un guard que vigila los binarios. |
 | `midikeyboard` | la acción `pnpm-workspace-bootstrap` + `pnpm test` (340) | Usa la acción de **este** repo, `ajabadia/ABDSharedCode/.github/actions/pnpm-workspace-bootstrap@master`, que a su vez llama a `tools/bootstrap-workspace.mjs`. |
+| `foto` | `python tools/verificar_foto.py --check` | Comprueba que la línea base se midió contra los SHA que el workflow clona. No clona nada: son dos datos escritos los comparan. |
 | `audit` | 5 hermanos por SHA inmutable + el audit con trinquete | El auditor compara contra la suite; los SHA son lo que hace el veredicto reproducible. |
 
 **Por qué el job nombra el fichero y no el directorio.** `node --test tools/` es
@@ -1302,6 +1680,56 @@ El paso de audit **mide** y anota su código de salida con `set +e`; el paso
 siguiente es el que **decide** y el que puede fallar. Así el código no se pierde
 y no hace falta un `continue-on-error`, que era justo lo que dejaba el job verde
 sin mirar.
+
+#### El trabajo `foto`: la línea base tiene que decir contra qué SHA se midió
+
+Es el cuarto trabajo y cierra el agujero por el que el trinquete **empieza a
+mentir sin que se note**. La línea base decía 55 nombres, pero no decía contra
+qué foto se midieron, y el trinquete solo compara **nombres**. Medido en un clon
+con los cinco hermanos en su SHA: un commit nuevo en ABDNeural que no toca
+ningún consumidor deja el audit en **0**, porque el conjunto de huérfanas no
+cambia —siguen siendo las mismas 55, los consumidores siguen sin commitear— y
+nadie puede saber que se ha movido el suelo. El veredicto es verde y ya no
+habla de lo que CI va a medir.
+
+La solución es que la foto sea un **dato**: `--write-baseline` escribe en el
+JSON la clave `foto`, con el `git rev-parse HEAD` de cada repo hermano en el
+disco donde se midió. Y `tools/verificar_foto.py` compara esa foto con los SHA
+que este mismo workflow clona, leyendo el YAML en vez de llevar su propia lista
+—una lista sería una segunda copia de los SHA, y las copias se separan en
+silencio—. Por eso no hay nada que avisar cuando cambia un SHA: cambia lo que
+el guard lee.
+
+| Situación | Código |
+|---|---|
+| La foto de la línea base es la del workflow | **0** |
+| Un SHA del workflow no es el que dice la foto (se subió sin regenerar) | **1** |
+| La línea base no tiene clave `foto`: no se puede saber contra qué se midió | **1** |
+| Un repo de la foto sin SHA, que es una foto con huecos que parece completa | **1** |
+| Un repo que el workflow clona y no está en la foto | **1** |
+| El workflow no se puede leer | **2** (no es un hallazgo: no se midió nada) |
+
+Va como trabajo aparte y no como paso del job `audit` por una razón medida: si
+fuera un paso, su fallo y el del audit caerían en el mismo log y no se podrían
+distinguir. Así se sabe que lo que se movió es el suelo.
+
+El cuarto paso de ese trabajo es un aviso, y es el **único paso del repo con
+`continue-on-error`**: si un force-push borra el SHA que el workflow clona,
+`actions/checkout` falla con un mensaje de refs que no nombra la línea base.
+Este paso lo dice antes y en el job que se llama `foto`, que es donde la foto es
+el asunto. Es `warning` y no puerta a propósito: un SHA borrado no es un
+problema de este repo, y si el remoto no responde lo único que falta es la
+*existencia* del SHA, de lo que el checkout informa mucho mejor. El listado sale
+de `verificar_foto.py --listar`, no de un parser escrito en el `run:`: dos vistas
+de "los SHA del workflow" escritas en dos sitios se separan en silencio, y la
+que se separa es la que nadie ejecuta.
+
+El caso al revés, que es el peor y el que el guard hace visible: si la línea
+base se regenera **en local** —donde los hermanos tienen el trabajo sin
+commitear en el disco— lo que se commitea no son las huérfanas de CI. El audit
+daría 1 con 55 huérfanas nuevas y el motivo no nombraría la causa. El orden que
+funciona es: dejar cada hermano en el SHA del workflow, `--write-baseline`, y
+commitear la línea base **con el workflow ya subido**.
 
 Teclado virtual completo (keybed responsivo, ruedas pitch/mod con filmstrip, pedals,
 QWERTY, touch, chord memory, scale filter) + **API de feedback host-driven** (v0.2.0) para
@@ -1407,7 +1835,7 @@ target_link_libraries(TuPlugin PRIVATE ABDShared::HardwareMidiDetect)
 
 ### Paso 2: Contratos desde ABDSharedAssets
 
-Cargá los contratos (single-source en `ABDSharedAssets/contracts/hardware`) con el registry compartido:
+Cargá los contratos (single-source en `ABDSharedAssets/contracts`) con el registry compartido:
 
 ```cpp
 #include <HardwareMidiDetect/HardwareContractRegistry.h>
@@ -1415,7 +1843,7 @@ Cargá los contratos (single-source en `ABDSharedAssets/contracts/hardware`) con
 abd::hwid::HardwareContractRegistry registry;
 // Ruta relativa al monorepo; ajustá searchRoots según tu layout.
 juce::File contractsDir = juce::File::getCurrentWorkingDirectory()
-    .getChildFile("../../../ABDSharedAssets/contracts/hardware");
+    .getChildFile("../../../ABDSharedAssets/contracts");
 bool ok = registry.loadContractsFromDirectory(contractsDir);
 if (ok) {
     auto contracts = registry.getContracts();   // std::vector<abd::hwid::HardwareContract>
@@ -1656,8 +2084,6 @@ class MiControladorCustom : public abd::hw::IHardwareController
 {
 public:
     bool isAutomatic() const noexcept override { return false; } // false para operador humano
-| `foto` | `python tools/verificar_foto.py --check` | Comprueba que la línea base se midió contra los SHA que el workflow clona. No clona nada: son dos datos escritos los comparan. |
-| `foto` | `python tools/verificar_foto.py --check` | Comprueba que la línea base se midió contra los SHA que el workflow clona. No clona nada: son dos datos escritos los comparan. |
     bool connect() override { /* ... */ return true; }
     void disconnect() override { /* ... */ }
     bool setParameter(int paramIndex, float normalizedValue) override { /* ... */ return true; }
@@ -1679,90 +2105,30 @@ public:
   Máquina de estados reactiva para parsear secuencias entrantes de CC 99, 98, 6 y 38 ensamblando el valor de 14 bits `[0..16383]` en tiempo real.
 - **`abd::hw::FskAudioModem`**:
   Módem de audio FSK de fase continua (CP-FSK) a 1200 baudios con frecuencias portadoras a 12 kHz (Mark/0) y 14 kHz (Space/1) y discriminación espectral Goertzel para inyección de parches por audio in (*Remote In*).
+- **`abd::hw::JunoTapeModem`**:
+  Módem de audio FSK de fase continua para la interfaz de cinta analógica de Roland, con portadoras de 1,3 kHz (Space/0) y 2,6 kHz (Mark/1), detección de tono piloto y demodulación para Juno-60, Juno-6 y HS-60.
+- **`abd::hw::CasioCzVirtualController`**:
+  Controlador autónomo para interrogar sintetizadores Casio CZ con Phase Distortion emulados (VES / núcleo MAME) o por hardware físico vía loopMIDI. Implementa `IHardwareController` con empaquetado estándar de 4 bits (Manufacturer ID 0x44) y una tabla de opcodes NZ-1 de 1984 con override por mapeo JSON.
+  Su **`.cpp` NO está en el target `ABDShared::HardwareDrivers`**, a propósito:
+  compilarlo allí convertiría `nlohmann/json` en una dependencia dura de
+  *compilación* para todo el que enlace el módulo, que es casi toda la suite y no
+  lo necesita para nada. Su **cabecera sí** es superficie pública del target, y el
+  target enlaza `nlohmann_json` en `PUBLIC` justo por eso: incluirla no da
+  `C1083`. Lo único que queda fuera es la implementación, y quien la use la
+  compila desde fuente —es lo que hace `ABDAudioLab`—:
+  ```cmake
+  target_sources(MiProyecto PRIVATE
+      ${ABDSHARED_CODE_DIR}/HardwareDrivers/CasioCzVirtualController.cpp)
+  target_link_libraries(MiProyecto PRIVATE nlohmann_json::nlohmann_json)
+  ```
+- **`abd::hw::CasioNibbleCodec`**:
+  Empaquetador/desempaquetador universal de 4 bits (nibbles `0x00..0x0F`) con verificación de checksum de 7 bits Casio.
 
----
-#### El trabajo `foto`: la línea base tiene que decir contra qué SHA se midió
-
-Es el cuarto trabajo y cierra el agujero por el que el trinquete **empieza a
-mentir sin que se note**. La línea base decía 55 nombres, pero no decía contra
-qué foto se midieron, y el trinquete solo compara **nombres**. Medido en un clon
-con los cinco hermanos en su SHA: un commit nuevo en ABDNeural que no toca
-ningún consumidor deja el audit en **0**, porque el conjunto de huérfanas no
-cambia —siguen siendo las mismas 55, los consumidores siguen sin commitear— y
-nadie puede saber que se ha movido el suelo. El veredicto es verde y ya no
-habla de lo que CI va a medir.
-
-La solución es que la foto sea un **dato**: `--write-baseline` escribe en el
-JSON la clave `foto`, con el `git rev-parse HEAD` de cada repo hermano en el
-disco donde se midió. Y `tools/verificar_foto.py` compara esa foto con los SHA
-que este mismo workflow clona, leyendo el YAML en vez de llevar su propia lista
-—una lista sería una segunda copia de los SHA, y las copias se separan en
-silencio—. Por eso no hay nada que avisar cuando cambia un SHA: cambia lo que
-el guard lee.
-
-| Situación | Código |
-|---|---|
-| La foto de la línea base es la del workflow | **0** |
-| Un SHA del workflow no es el que dice la foto (se subió sin regenerar) | **1** |
-| La línea base no tiene clave `foto`: no se puede saber contra qué se midió | **1** |
-| Un repo de la foto sin SHA, que es una foto con huecos que parece completa | **1** |
-| Un repo que el workflow clona y no está en la foto | **1** |
-| El workflow no se puede leer | **2** (no es un hallazgo: no se midió nada) |
-
-Va como trabajo aparte y no como paso del job `audit` por una razón medida: si
-fuera un paso, su fallo y el del audit caerían en el mismo log y no se podrían
-distinguir. Así se sabe que lo que se movió es el suelo.
-
-El cuarto paso de ese trabajo es un aviso, y es el **único paso del repo con
-`continue-on-error`**: si un force-push borra el SHA que el workflow clona,
-`actions/checkout` falla con un mensaje de refs que no nombra la línea base.
-Este paso lo dice antes y en el job que se llama `foto`, que es donde la foto es
-el asunto. Es `warning` y no puerta a propósito: un SHA borrado no es un
-problema de este repo, y si el remoto no responde lo único que falta es la
-*existencia* del SHA, de lo que el checkout informa mucho mejor. El listado sale
-de `verificar_foto.py --listar`, no de un parser escrito en el `run:`: dos vistas
-de "los SHA del workflow" escritas en dos sitios se separan en silencio, y la
-que se separa es la que nadie ejecuta.
-
-El caso al revés, que es el peor y el que el guard hace visible: si la línea
-base se regenera **en local** —donde los hermanos tienen el trabajo sin
-commitear en el disco— lo que se commitea no son las huérfanas de CI. El audit
-daría 1 con 55 huérfanas nuevas y el motivo no nombraría la causa. El orden que
-funciona es: dejar cada hermano en el SHA del workflow, `--write-baseline`, y
-commitear la línea base **con el workflow ya subido**.
-
-
-#### El trabajo `foto`: la línea base tiene que decir contra qué SHA se midió
-
-Es el cuarto trabajo y cierra el agujero por el que el trinquete **empieza a
-mentir sin que se note**. La línea base decía 55 nombres, pero no decía contra
-qué foto se midieron, y el trinquete solo compara **nombres**. Medido en un clon
-con los cinco hermanos en su SHA: un commit nuevo en ABDNeural que no toca
-ningún consumidor deja el audit en **0**, porque el conjunto de huérfanas no
-cambia —siguen siendo las mismas 55, los consumidores siguen sin commitear— y
-nadie puede saber que se ha movido el suelo. El veredicto es verde y ya no
-habla de lo que CI va a medir.
-
-La solución es que la foto sea un **dato**: `--write-baseline` escribe en el
-JSON la clave `foto`, con el `git rev-parse HEAD` de cada repo hermano en el
-disco donde se midió. Y `tools/verificar_foto.py` compara esa foto con los SHA
-que este mismo workflow clona, leyendo el YAML en vez de llevar su propia lista
-—una lista sería una segunda copia de los SHA, y las copias se separan en
-silencio—. Por eso no hay nada que avisar cuando cambia un SHA: cambia lo que
-el guard lee.
-
-| Situación | Código |
-|---|---|
-| La foto de la línea base es la del workflow | **0** |
-| Un SHA del workflow no es el que dice la foto (se subió sin regenerar) | **1** |
-| La línea base no tiene clave `foto`: no se puede saber contra qué se midió | **1** |
-| Un repo de la foto sin SHA, que es una foto con huecos que parece completa | **1** |
-| Un repo que el workflow clona y no está en la foto | **1** |
-| El workflow no se puede leer | **2** (no es un hallazgo: no se midió nada) |
-
-Va como trabajo aparte y no como paso del job `audit` por una razón medida: si
-fuera un paso, su fallo y el del audit caerían en el mismo log y no se podrían
-distinguir. Así se sabe que lo que se movió es el suelo.
+> Cinco de las seis clases con métodos definidos fuera de línea —`SysExCodec`,
+> `NRPNParser`, `FskAudioModem`, `JunoTapeModem` y `CasioNibbleCodec`— se compilan
+> en `ABDShared::HardwareDrivers`. Las tres últimas estaban en disco y fuera del
+> target: se podían incluir y documentar, pero no enlazar, y el síntoma era un
+> `undefined reference` en el consumidor.
 
 ---
 
@@ -1775,6 +2141,11 @@ Motor de alta precisión para comparación acústica A/B, alineamiento temporal 
 ```cmake
 target_link_libraries(TuProyecto PRIVATE ABDShared::AudioComparator)
 ```
+
+El target se puede apagar con `-DABDSHAREDCODE_BUILD_AUDIOCOMPARATOR=OFF`, y
+arranca en `ON`. Propaga `juce_core`, `juce_audio_basics` y `juce_dsp`: este
+último no es opcional, porque la correlación cruzada FFT que se describe más
+abajo vive en la unidad de traducción que lo incluye.
 
 ### Componentes
 
@@ -1850,32 +2221,3 @@ El ecosistema ABDSynths adopta una **Arquitectura en Tres Niveles** para unifica
 3. **Nivel 2: Aplicaciones Consumidoras**:
    - **ABDAudioLab**: Carga dinámica mediante `core::HardwareContractRegistry` para calibración y perfilado acústico.
    - **ABDBankManager**: Sincronización e hidratación declarativa de `ModelContract`s mediante `npm run sync-contracts` (`scripts/sync_contracts.mjs`).
-- **`abd::hw::JunoTapeModem`**:
-  Módem de audio FSK de fase continua para la interfaz de cinta analógica de Roland, con portadoras de 1,3 kHz (Space/0) y 2,6 kHz (Mark/1), detección de tono piloto y demodulación para Juno-60, Juno-6 y HS-60.
-- **`abd::hw::CasioCzVirtualController`**:
-  Controlador autónomo para interrogar sintetizadores Casio CZ con Phase Distortion emulados (VES / núcleo MAME) o por hardware físico vía loopMIDI. Implementa `IHardwareController` con empaquetado estándar de 4 bits (Manufacturer ID 0x44) y una tabla de opcodes NZ-1 de 1984 con override por mapeo JSON.
-  Su **`.cpp` NO está en el target `ABDShared::HardwareDrivers`**, a propósito:
-  compilarlo allí convertiría `nlohmann/json` en una dependencia dura de
-  *compilación* para todo el que enlace el módulo, que es casi toda la suite y no
-  lo necesita para nada. Su **cabecera sí** es superficie pública del target, y el
-  target enlaza `nlohmann_json` en `PUBLIC` justo por eso: incluirla no da
-  `C1083`. Lo único que queda fuera es la implementación, y quien la use la
-  compila desde fuente —es lo que hace `ABDAudioLab`—:
-  ```cmake
-  target_sources(MiProyecto PRIVATE
-      ${ABDSHARED_CODE_DIR}/HardwareDrivers/CasioCzVirtualController.cpp)
-  target_link_libraries(MiProyecto PRIVATE nlohmann_json::nlohmann_json)
-  ```
-- **`abd::hw::CasioNibbleCodec`**:
-  Empaquetador/desempaquetador universal de 4 bits (nibbles `0x00..0x0F`) con verificación de checksum de 7 bits Casio.
-
-> Cinco de las seis clases con métodos definidos fuera de línea —`SysExCodec`,
-> `NRPNParser`, `FskAudioModem`, `JunoTapeModem` y `CasioNibbleCodec`— se compilan
-> en `ABDShared::HardwareDrivers`. Las tres últimas estaban en disco y fuera del
-> target: se podían incluir y documentar, pero no enlazar, y el síntoma era un
-> `undefined reference` en el consumidor.
-El target se puede apagar con `-DABDSHAREDCODE_BUILD_AUDIOCOMPARATOR=OFF`, y
-arranca en `ON`. Propaga `juce_core`, `juce_audio_basics` y `juce_dsp`: este
-último no es opcional, porque la correlación cruzada FFT que se describe más
-abajo vive en la unidad de traducción que lo incluye.
-
