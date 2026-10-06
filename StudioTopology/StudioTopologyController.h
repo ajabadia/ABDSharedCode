@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include <juce_gui_basics/juce_gui_basics.h>
-#include <juce_audio_devices/juce_audio_devices.h>
-#include <nlohmann/json.hpp>
-#include <memory>
-#include "StudioTopologyFloatingWindow.h"
 #include "AudioMidiInterfaceDetector.h"
+#include "StudioTopologyFloatingWindow.h"
+#include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <memory>
+#include <nlohmann/json.hpp>
 
 namespace abd::topology
 {
@@ -24,12 +24,12 @@ namespace abd::topology
  */
 struct TopologyTargetInfo
 {
-    juce::String name { "No Target Selected" };
-    juce::String category { "Hardware Device" };
-    juce::String details { "Direct Loopback" };
-    juce::String imageRelPath { "models/generic-digital-keyboard.png" };
-    bool hasMidi { false };
-    bool isVirtualPlugin { false };
+    juce::String name{"No Target Selected"};
+    juce::String category{"Hardware Device"};
+    juce::String details{"Direct Loopback"};
+    juce::String imageRelPath{"models/generic-digital-keyboard.png"};
+    bool hasMidi{false};
+    bool isVirtualPlugin{false};
 };
 
 /**
@@ -40,8 +40,8 @@ struct TopologyContext
 {
     juce::AudioDeviceManager& deviceManager;
     TopologyTargetInfo target;
-    juce::String theme { "audiolab-light" };
-    juce::Colour backgroundColour { juce::Colour(0xff0c0e12) };
+    juce::String theme{"audiolab-light"};
+    juce::Colour backgroundColour{juce::Colour(0xff0c0e12)};
 };
 
 /**

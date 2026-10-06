@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
 #include "JuceStudioTopologyComponent.h"
 #include <functional>
+#include <juce_gui_extra/juce_gui_extra.h>
 
 namespace abd::topology
 {
@@ -22,7 +22,7 @@ class StudioTopologyFloatingWindow : public juce::DocumentWindow
 {
 public:
     explicit StudioTopologyFloatingWindow(const juce::String& initialTheme = "audiolab-light",
-                                          std::function<void()> onClose = nullptr)
+                                          std::function<void()> onClose    = nullptr)
         : DocumentWindow(juce::String::fromUTF8(u8"Estudio - Topología Interactiva de Conexiones"),
                          juce::Colour(0xff0c0e12),
                          DocumentWindow::allButtons),
@@ -31,7 +31,7 @@ public:
     {
         setUsingNativeTitleBar(true);
 
-        auto comp = std::make_unique<JuceStudioTopologyComponent>(initialTheme);
+        auto comp       = std::make_unique<JuceStudioTopologyComponent>(initialTheme);
         topologyCompPtr = comp.get();
         setContentOwned(comp.release(), true);
 
@@ -71,7 +71,7 @@ public:
 
 private:
     juce::String currentThemeName;
-    JuceStudioTopologyComponent* topologyCompPtr { nullptr };
+    JuceStudioTopologyComponent* topologyCompPtr{nullptr};
     std::function<void()> onCloseCallback;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StudioTopologyFloatingWindow)

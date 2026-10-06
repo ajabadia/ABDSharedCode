@@ -6,8 +6,8 @@
  */
 
 #include "StudioTopologyResourceProvider.h"
-#include <WebView2Bridge/WebView2ResourceProvider.h>
 #include <StudioTopologyAssets.h>
+#include <WebView2Bridge/WebView2ResourceProvider.h>
 
 namespace abd::topology
 {
@@ -17,12 +17,11 @@ namespace
 
 const abd::webview2::BinaryAssetsCatalog& topologyAssetsCatalog()
 {
-    static const abd::webview2::BinaryAssetsCatalog catalog {
+    static const abd::webview2::BinaryAssetsCatalog catalog{
         StudioTopologyAssets::namedResourceListSize,
         StudioTopologyAssets::namedResourceList,
         StudioTopologyAssets::originalFilenames,
-        StudioTopologyAssets::getNamedResource
-    };
+        StudioTopologyAssets::getNamedResource};
     return catalog;
 }
 
@@ -31,7 +30,7 @@ const abd::webview2::BinaryAssetsCatalog& topologyAssetsCatalog()
 std::optional<juce::WebBrowserComponent::Resource> studioTopologyResourceProvider(const juce::String& url)
 {
     return abd::webview2::webView2ResourceProvider(url, topologyAssetsCatalog(),
-                                                   { "styles/", "models/", "interfaces/", "brands/" });
+                                                   {"styles/", "models/", "interfaces/", "brands/"});
 }
 
 } // namespace abd::topology

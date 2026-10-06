@@ -9,9 +9,9 @@
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_core/juce_core.h>
-#include <vector>
 #include <map>
 #include <set>
+#include <vector>
 
 namespace abd::topology
 {
@@ -22,10 +22,10 @@ namespace abd::topology
  */
 struct InterfacePortInfo
 {
-    juce::String portId;       // e.g. "audio_out", "audio_in", "midi_out_0", "midi_in_0"
-    juce::String name;         // e.g. "Salida 1-2", "loopMIDI Port 001"
-    juce::String type;         // "audioOut", "audioIn", "midiOut", "midiIn"
-    bool isConnected { false };// Whether this specific port is configured and in active use by the software
+    juce::String portId;     // e.g. "audio_out", "audio_in", "midi_out_0", "midi_in_0"
+    juce::String name;       // e.g. "Salida 1-2", "loopMIDI Port 001"
+    juce::String type;       // "audioOut", "audioIn", "midiOut", "midiIn"
+    bool isConnected{false}; // Whether this specific port is configured and in active use by the software
 };
 
 /**
@@ -34,16 +34,16 @@ struct InterfacePortInfo
  */
 struct DetectedInterfaceInfo
 {
-    juce::String id;                 // e.g. "presonus_audiobox_usb", "roland_mx_1", "loopmidi_hub", "realtek_audio"
-    juce::String displayName;        // e.g. "PreSonus AudioBox USB"
-    juce::String brand;              // e.g. "PreSonus", "Roland", "Generic"
-    juce::String imageRelPath;       // e.g. "interfaces/presonus-audiobox-usb.png"
-    bool isAudioConnected { false }; // At least one audio port is active in current software
-    bool isMidiInConnected { false };// At least one MIDI in is active
-    bool isMidiOutConnected { false };// At least one MIDI out is active
-    bool isPresentInSystem { false };// Detected in Windows/system devices
-    bool hasAudioHardware { true };
-    bool hasMidiHardware { true };
+    juce::String id;                // e.g. "presonus_audiobox_usb", "roland_mx_1", "loopmidi_hub", "realtek_audio"
+    juce::String displayName;       // e.g. "PreSonus AudioBox USB"
+    juce::String brand;             // e.g. "PreSonus", "Roland", "Generic"
+    juce::String imageRelPath;      // e.g. "interfaces/presonus-audiobox-usb.png"
+    bool isAudioConnected{false};   // At least one audio port is active in current software
+    bool isMidiInConnected{false};  // At least one MIDI in is active
+    bool isMidiOutConnected{false}; // At least one MIDI out is active
+    bool isPresentInSystem{false};  // Detected in Windows/system devices
+    bool hasAudioHardware{true};
+    bool hasMidiHardware{true};
     juce::String matchedAudioDeviceName;
     juce::String matchedMidiDeviceName;
 
@@ -72,7 +72,7 @@ public:
         if (auto* dev = deviceManager.getCurrentAudioDevice())
             currentAudioDevice = dev->getName();
 
-        auto midiInputs = juce::MidiInput::getAvailableDevices();
+        auto midiInputs  = juce::MidiInput::getAvailableDevices();
         auto midiOutputs = juce::MidiOutput::getAvailableDevices();
 
         auto isMidiInActive = [&](const juce::String& identifier) {
@@ -96,30 +96,30 @@ public:
         // 1. PreSonus AudioBox USB
         {
             bool audioMatches = currentAudioDevice.containsIgnoreCase("AudioBox");
-            bool midiMatches = hasMidiPattern("AudioBox") || hasMidiPattern("PreSonus");
+            bool midiMatches  = hasMidiPattern("AudioBox") || hasMidiPattern("PreSonus");
 
             if (audioMatches || midiMatches)
             {
                 DetectedInterfaceInfo presonus;
-                presonus.id = "presonus_audiobox_usb";
-                presonus.displayName = "PreSonus AudioBox USB";
-                presonus.brand = "PreSonus";
-                presonus.imageRelPath = "interfaces/presonus-audiobox-usb.png";
-                presonus.hasAudioHardware = true;
-                presonus.hasMidiHardware = true;
+                presonus.id                = "presonus_audiobox_usb";
+                presonus.displayName       = "PreSonus AudioBox USB";
+                presonus.brand             = "PreSonus";
+                presonus.imageRelPath      = "interfaces/presonus-audiobox-usb.png";
+                presonus.hasAudioHardware  = true;
+                presonus.hasMidiHardware   = true;
                 presonus.isPresentInSystem = true;
 
                 if (audioMatches)
                 {
-                    presonus.isAudioConnected = true;
+                    presonus.isAudioConnected       = true;
                     presonus.matchedAudioDeviceName = currentAudioDevice;
-                    presonus.ports.push_back({ "audio_out", "Main Out 1-2", "audioOut", true });
-                    presonus.ports.push_back({ "audio_in",  "Main In 1-2",  "audioIn",  true });
+                    presonus.ports.push_back({"audio_out", "Main Out 1-2", "audioOut", true});
+                    presonus.ports.push_back({"audio_in", "Main In 1-2", "audioIn", true});
                 }
                 else
                 {
-                    presonus.ports.push_back({ "audio_out", "Main Out 1-2", "audioOut", false });
-                    presonus.ports.push_back({ "audio_in",  "Main In 1-2",  "audioIn",  false });
+                    presonus.ports.push_back({"audio_out", "Main Out 1-2", "audioOut", false});
+                    presonus.ports.push_back({"audio_in", "Main In 1-2", "audioIn", false});
                 }
 
                 // Match PreSonus MIDI Ports
@@ -129,7 +129,7 @@ public:
                     {
                         bool active = isMidiInActive(dev.identifier);
                         if (active) presonus.isMidiInConnected = true;
-                        presonus.ports.push_back({ "midi_in_" + dev.identifier, dev.name, "midiIn", active });
+                        presonus.ports.push_back({"midi_in_" + dev.identifier, dev.name, "midiIn", active});
                     }
                 }
                 for (const auto& dev : midiOutputs)
@@ -138,7 +138,7 @@ public:
                     {
                         bool active = isMidiOutActive(dev.name);
                         if (active) presonus.isMidiOutConnected = true;
-                        presonus.ports.push_back({ "midi_out_" + dev.identifier, dev.name, "midiOut", active });
+                        presonus.ports.push_back({"midi_out_" + dev.identifier, dev.name, "midiOut", active});
                     }
                 }
 
@@ -149,31 +149,31 @@ public:
         // 2. Roland AIRA MX-1
         {
             bool audioMatches = currentAudioDevice.containsIgnoreCase("MX-1") ||
-                               (currentAudioDevice.containsIgnoreCase("AIRA") && currentAudioDevice.containsIgnoreCase("MX"));
+                                (currentAudioDevice.containsIgnoreCase("AIRA") && currentAudioDevice.containsIgnoreCase("MX"));
             bool midiMatches = hasMidiPattern("MX-1") || (hasMidiPattern("AIRA") && hasMidiPattern("MX"));
 
             if (audioMatches || midiMatches)
             {
                 DetectedInterfaceInfo roland;
-                roland.id = "roland_mx_1";
-                roland.displayName = "Roland AIRA MX-1";
-                roland.brand = "Roland";
-                roland.imageRelPath = "interfaces/roland-mx-1.png";
-                roland.hasAudioHardware = true;
-                roland.hasMidiHardware = true;
+                roland.id                = "roland_mx_1";
+                roland.displayName       = "Roland AIRA MX-1";
+                roland.brand             = "Roland";
+                roland.imageRelPath      = "interfaces/roland-mx-1.png";
+                roland.hasAudioHardware  = true;
+                roland.hasMidiHardware   = true;
                 roland.isPresentInSystem = true;
 
                 if (audioMatches)
                 {
-                    roland.isAudioConnected = true;
+                    roland.isAudioConnected       = true;
                     roland.matchedAudioDeviceName = currentAudioDevice;
-                    roland.ports.push_back({ "audio_out", "Master Out 1-2", "audioOut", true });
-                    roland.ports.push_back({ "audio_in",  "Return In 1-2",  "audioIn",  true });
+                    roland.ports.push_back({"audio_out", "Master Out 1-2", "audioOut", true});
+                    roland.ports.push_back({"audio_in", "Return In 1-2", "audioIn", true});
                 }
                 else
                 {
-                    roland.ports.push_back({ "audio_out", "Master Out 1-2", "audioOut", false });
-                    roland.ports.push_back({ "audio_in",  "Return In 1-2",  "audioIn",  false });
+                    roland.ports.push_back({"audio_out", "Master Out 1-2", "audioOut", false});
+                    roland.ports.push_back({"audio_in", "Return In 1-2", "audioIn", false});
                 }
 
                 for (const auto& dev : midiInputs)
@@ -182,7 +182,7 @@ public:
                     {
                         bool active = isMidiInActive(dev.identifier);
                         if (active) roland.isMidiInConnected = true;
-                        roland.ports.push_back({ "midi_in_" + dev.identifier, dev.name, "midiIn", active });
+                        roland.ports.push_back({"midi_in_" + dev.identifier, dev.name, "midiIn", active});
                     }
                 }
                 for (const auto& dev : midiOutputs)
@@ -191,7 +191,7 @@ public:
                     {
                         bool active = isMidiOutActive(dev.name);
                         if (active) roland.isMidiOutConnected = true;
-                        roland.ports.push_back({ "midi_out_" + dev.identifier, dev.name, "midiOut", active });
+                        roland.ports.push_back({"midi_out_" + dev.identifier, dev.name, "midiOut", active});
                     }
                 }
 
@@ -213,18 +213,18 @@ public:
         if (!anyBrandedHasAudio && currentAudioDevice.isNotEmpty())
         {
             DetectedInterfaceInfo audioIface;
-            audioIface.id = "active_host_audio";
-            audioIface.displayName = currentAudioDevice;
-            audioIface.brand = "Windows Audio";
-            audioIface.imageRelPath = "interfaces/generic-audio-midi-interface.png";
-            audioIface.hasAudioHardware = true;
-            audioIface.hasMidiHardware = false;
-            audioIface.isAudioConnected = true;
-            audioIface.isPresentInSystem = true;
+            audioIface.id                     = "active_host_audio";
+            audioIface.displayName            = currentAudioDevice;
+            audioIface.brand                  = "Windows Audio";
+            audioIface.imageRelPath           = "interfaces/generic-audio-midi-interface.png";
+            audioIface.hasAudioHardware       = true;
+            audioIface.hasMidiHardware        = false;
+            audioIface.isAudioConnected       = true;
+            audioIface.isPresentInSystem      = true;
             audioIface.matchedAudioDeviceName = currentAudioDevice;
 
-            audioIface.ports.push_back({ "audio_out", "Output 1-2", "audioOut", true });
-            audioIface.ports.push_back({ "audio_in",  "Input 1-2",  "audioIn",  true });
+            audioIface.ports.push_back({"audio_out", "Output 1-2", "audioOut", true});
+            audioIface.ports.push_back({"audio_in", "Input 1-2", "audioIn", true});
 
             results.push_back(audioIface);
         }
@@ -235,7 +235,7 @@ public:
 
         auto getFamilyKey = [](const juce::String& name) -> juce::String {
             if (name.containsIgnoreCase("loopMIDI")) return "loopMIDI Virtual Hub";
-            if (name.containsIgnoreCase("LoopBe"))   return "LoopBe Internal MIDI";
+            if (name.containsIgnoreCase("LoopBe")) return "LoopBe Internal MIDI";
             if (name.containsIgnoreCase("teVirtualMIDI")) return "teVirtualMIDI Router";
             if (name.containsIgnoreCase("Wavetable")) return "Microsoft GS Wavetable";
             return name; // Standalone port
@@ -263,12 +263,12 @@ public:
         for (const auto& family : allFamilies)
         {
             DetectedInterfaceInfo hub;
-            hub.id = "midi_hub_" + juce::File::createLegalFileName(family);
-            hub.displayName = family;
-            hub.brand = family.containsIgnoreCase("Virtual") || family.containsIgnoreCase("loop") ? "Virtual Driver" : "MIDI";
-            hub.imageRelPath = "interfaces/generic-audio-midi-interface.png";
-            hub.hasAudioHardware = false;
-            hub.hasMidiHardware = true;
+            hub.id                = "midi_hub_" + juce::File::createLegalFileName(family);
+            hub.displayName       = family;
+            hub.brand             = family.containsIgnoreCase("Virtual") || family.containsIgnoreCase("loop") ? "Virtual Driver" : "MIDI";
+            hub.imageRelPath      = "interfaces/generic-audio-midi-interface.png";
+            hub.hasAudioHardware  = false;
+            hub.hasMidiHardware   = true;
             hub.isPresentInSystem = true;
 
             // Add all inputs in this family
@@ -278,7 +278,7 @@ public:
                 {
                     bool active = isMidiInActive(port.identifier);
                     if (active) hub.isMidiInConnected = true;
-                    hub.ports.push_back({ "midi_in_" + juce::File::createLegalFileName(port.name), port.name, "midiIn", active });
+                    hub.ports.push_back({"midi_in_" + juce::File::createLegalFileName(port.name), port.name, "midiIn", active});
                 }
             }
 
@@ -289,7 +289,7 @@ public:
                 {
                     bool active = isMidiOutActive(port.name);
                     if (active) hub.isMidiOutConnected = true;
-                    hub.ports.push_back({ "midi_out_" + juce::File::createLegalFileName(port.name), port.name, "midiOut", active });
+                    hub.ports.push_back({"midi_out_" + juce::File::createLegalFileName(port.name), port.name, "midiOut", active});
                 }
             }
 
@@ -305,7 +305,7 @@ public:
 // Backward compatibility alias for ABDAudioLab codebase
 namespace abdaudiolab::hardware
 {
-    using InterfacePortInfo = abd::topology::InterfacePortInfo;
-    using DetectedInterfaceInfo = abd::topology::DetectedInterfaceInfo;
-    using AudioMidiInterfaceDetector = abd::topology::AudioMidiInterfaceDetector;
-}
+using InterfacePortInfo          = abd::topology::InterfacePortInfo;
+using DetectedInterfaceInfo      = abd::topology::DetectedInterfaceInfo;
+using AudioMidiInterfaceDetector = abd::topology::AudioMidiInterfaceDetector;
+} // namespace abdaudiolab::hardware

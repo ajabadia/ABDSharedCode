@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
-#include <WebView2Bridge/JuceWebView2Component.h>
 #include "StudioTopologyResourceProvider.h"
+#include <WebView2Bridge/JuceWebView2Component.h>
+#include <juce_gui_extra/juce_gui_extra.h>
 #include <nlohmann/json.hpp>
 
 namespace abd::topology
