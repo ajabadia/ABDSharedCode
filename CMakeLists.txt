@@ -378,6 +378,63 @@ if(ABDSHAREDCODE_BUILD_HARDWAREDRIVERS)
     endif()
 endif()
 
+# --- BankManager Module ---
+# El modulo embebible del Bank Manager, cortado desde ABDBankManager
+# (DOCS/bank-manager-module-cut.md, §2b): core C++ (ValueTree v1, blobs Base64,
+# IPC por callback), adaptador JSON <-> core sin dependencia de WebView2,
+# loader de factory content y el protocolo SysEx del Behringer Pro800
+# (buildDumpRequest/parseResponse/buildPatchDump, slot clamp 0-399).
+#
+# INTERFACE, igual que HardwareMidiDetect (el patron que el corte pide seguir):
+# los .cpp se propagan y se compilan en el consumidor, que es quien tiene su
+# JUCE y su catalogo de assets embebidos. El consumidor que quiera conservar su
+# propio artefacto (ABDBankManager lo hace: ABDBankManagerCore.lib es el nombre
+# que esperan su CI y su plugin) declara su estatico y enlaza este target: las
+# fuentes propagadas se compilan dentro del suyo.
+#
+# Depende de HardwareDrivers (Pro800Midi delega el pack 8->7 y el unpack 7->8
+# en abd::hw::SysExCodec), asi que este bloque va JUSTO DESPUES del de
+# HardwareDrivers y no puede vivir sin el.
+#
+# Default OFF: solo lo activa quien consume el modulo (ABDBankManager lo fuerza
+# en su bloque de integracion). Los demas consumidores del monorepo (p. ej. los
+# builds WASM de los synths, que no enlazan este modulo) no cambian de
+# comportamiento por el corte.
+option(ABDSHAREDCODE_BUILD_BANKMANAGER "Build BankManager embeddable module" OFF)
+if(ABDSHAREDCODE_BUILD_BANKMANAGER)
+    add_library(ABDShared_BankManagerCore INTERFACE)
+
+    add_library(ABDShared::BankManagerCore ALIAS ABDShared_BankManagerCore)
+
+    target_include_directories(ABDShared_BankManagerCore INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    # Cabeceras y fuentes juntos: es un paquete, y la superficie publica del
+    # modulo es la que el consumidor incluye como <BankManager/...>.
+    target_sources(ABDShared_BankManagerCore INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/ABDBankManagerCore.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/ABDBankManagerCore.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/BankManagerWebViewAdapter.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/BankManagerWebViewAdapter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/FactoryContentLoader.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/FactoryContentLoader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/Pro800Midi.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/Pro800Midi.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/BankManager/HardwareMidiPipe.h
+    )
+
+    target_compile_features(ABDShared_BankManagerCore INTERFACE cxx_std_20)
+
+    target_link_libraries(ABDShared_BankManagerCore INTERFACE
+        ABDShared::HardwareDrivers
+        juce_core
+        juce_data_structures
+        juce_cryptography
+        juce_audio_devices
+    )
+endif()
+
 # --- AudioComparator Module ---
 # Motor de comparacion acustica A/B: alinea dos tomas en el tiempo (correlacion
 # cruzada FFT), mide error temporal y espectral, y emite un veredicto formal
