@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABDScope Studio Telemetry</title>
+  <script>
+    window.setTheme = function(themeName) {
+      if (!themeName) return;
+      document.documentElement.setAttribute('data-theme', themeName);
+      if (document.body) {
+        document.body.setAttribute('data-theme', themeName);
+        document.body.dataset.theme = themeName;
+        const classes = Array.from(document.body.classList).filter(c => !c.startsWith('theme-') && !c.startsWith('skin-'));
+        classes.push('theme-' + themeName, 'skin-' + themeName);
+        document.body.className = classes.join(' ');
+      }
+    };
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme") || "audiolab";
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <link rel="stylesheet" href="./src/scope.css">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--scope-bg, #06120a);
+      color: var(--scope-text-main, #e8f4fc);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+    #scope-app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+  <div id="scope-app"></div>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme") || (document.documentElement.getAttribute("data-theme") || "audiolab");
+      window.setTheme(theme);
+      try {
+        if (window.__JUCE__ && window.__JUCE__.backend && typeof window.__JUCE__.backend.emitEvent === 'function') {
+          window.__JUCE__.backend.emitEvent("pageLoaded", {});
+        }
+      } catch (e) {}
+    });
+
+    // React immediately when JuceWebView2Component sets data-theme on documentElement
+    const themeObserver = new MutationObserver(() => {
+      const curTheme = document.documentElement.getAttribute("data-theme") || "audiolab";
+      if (document.body && document.body.getAttribute("data-theme") !== curTheme) {
+        window.setTheme(curTheme);
+      }
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  </script>
+  <script type="module">
+    import { createScope } from './src/scope.js';
+
+    const scope = createScope({
+      containerId: 'scope-app',
+      mountMode: 'embedded',
+      title: 'ABDSCOPE - STUDIO TELEMETRY',
+      maxLanes: 4,
+      layout: '2',
+      enabledModes: ['oscilloscope', 'spectrum', 'lissajous', 'phase', 'spectrogram'],
+      defaultMode: 'oscilloscope',
+      showFreeze: true,
+      showSnapshot: true,
+      showVuMeters: true,
+      availableTaps: [
+        { id: 'stimulus',    name: 'Stimulus Generator' },
+        { id: 'hardware_in', name: 'Hardware In (DUT)' },
+        { id: 'diag_tone',   name: 'Diagnostic 1kHz' }
+      ],
+      defaultTap: 'hardware_in',
+      onTapChange: (tapId, laneIdx) => {
+        if (window.__JUCE__?.backend?.emitEvent) {
+          window.__JUCE__.backend.emitEvent('SET_ACTIVE_TAP', { tapId, laneIdx });
+        }
+        if (window.chrome?.webview?.postMessage) {
+          window.chrome.webview.postMessage({ type: 'SET_ACTIVE_TAP', tapId, laneIdx });
+        }
+      }
+    });
+
+    // Handle direct JS evaluation from C++ timer pump
+    window.__pushScopeFrame = function(frameJson) {
+      try {
+        const frameData = typeof frameJson === 'string' ? JSON.parse(frameJson) : frameJson;
+        scope.pushFrame(frameData);
+      } catch (err) {
+        if (window.__ABDSCOPE_DEBUG__) console.error('[ABDScope IPC Error]', err);
+      }
+    };
+
+    // Standard message event listener
+    window.addEventListener('message', (e) => {
+      if (e.data?.event === 'scopeFrame' && e.data?.payload) {
+        scope.pushFrame(e.data.payload);
+      }
+    });
+  </script>
+</body>
+</html>

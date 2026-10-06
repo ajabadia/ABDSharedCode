@@ -1,0 +1,459 @@
+﻿/**
+ * ABDScope Unified Styling System
+ * ================================
+ * Pure Vanilla CSS with cascading token fallbacks from host themes.
+ * Canonical defaults only: per-theme palettes are owned by ABDSharedAssets
+ * (themes + component adapter) and reach this module through the host
+ * cascade. Zero hardcoded colors in layout — fully skin-adaptable.
+ */
+
+:root {
+  --scope-bg: #080c14;
+  --scope-surface: #0f1622;
+  --scope-surface-elevated: #162234;
+  --scope-border: rgba(0, 195, 255, 0.25);
+  --scope-border-strong: rgba(0, 195, 255, 0.5);
+  --scope-accent: #00c3ff;
+  --scope-accent-hover: #38d3ff;
+  --scope-trace-l: #00c3ff;
+  --scope-trace-r: #ff007f;
+  --scope-spectrum: #00e676;
+  --scope-grid: rgba(255, 255, 255, 0.07);
+  --scope-grid-center: rgba(255, 255, 255, 0.12);
+  --scope-header-bg: rgba(0, 0, 0, 0.6);
+  --scope-text-main: #e8f4fc;
+  --scope-text-muted: #7e9bb5;
+  --scope-font-lcd: 'Courier New', 'Roboto Mono', monospace;
+}
+
+{
+
+
+/* ─── Global Theme-Aware Scrollbars ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scope-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scope-surface-elevated);
+  border: 1px solid var(--scope-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scope-accent);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scope-border) var(--scope-bg);
+}
+
+/* Root Component Frame */
+.abd-scope-root {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  color: var(--scope-text-main);
+  box-sizing: border-box;
+  user-select: none;
+  container-type: inline-size;
+}
+
+/* ─── Embedded Mount Layout ─── */
+.abd-scope-embedded {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  background: var(--scope-bg);
+  border: 1px solid var(--scope-border);
+  border-radius: var(--radius-panel, 4px);
+  overflow: hidden;
+}
+
+/* ─── Floating Modal Layout ─── */
+.abd-scope-floating {
+  position: fixed;
+  top: 70px;
+  right: 24px;
+  width: 520px;
+  height: 310px;
+  min-width: 340px;
+  min-height: 200px;
+  max-width: 95vw;
+  max-height: 95vh;
+  resize: both;
+  background: var(--scope-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--scope-border);
+  border-radius: var(--radius-chassis, 6px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  z-index: 1500;
+  overflow: hidden;
+  animation: abdScopeFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes abdScopeFadeIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── Top Header & Global Actions ─── */
+.abd-scope-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--scope-header-bg, rgba(0, 0, 0, 0.6));
+  border-bottom: 1px solid var(--scope-border);
+  flex-shrink: 0;
+}
+
+.abd-scope-drag-handle {
+  cursor: move;
+}
+
+.abd-scope-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--scope-accent);
+  white-space: nowrap;
+}
+
+.abd-scope-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--scope-accent);
+  box-shadow: 0 0 8px var(--scope-accent);
+  flex-shrink: 0;
+}
+
+.abd-scope-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Layout buttons group (1 / 2 / 3 / 4 lanes) */
+.abd-scope-layout-group {
+  display: inline-flex;
+  border: 1px solid var(--scope-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.abd-scope-layout-btn {
+  background: var(--scope-surface);
+  border: none;
+  border-right: 1px solid var(--scope-border);
+  color: var(--scope-text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 19px;
+}
+
+.abd-scope-layout-btn:last-child {
+  border-right: none;
+}
+
+.abd-scope-layout-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.abd-scope-layout-btn.active,
+.abd-scope-layout-btn:not(:disabled):hover {
+  background: var(--scope-accent);
+  color: #ffffff;
+}
+
+.abd-scope-freeze-btn,
+.abd-scope-snapshot-btn {
+  background: var(--scope-surface);
+  border: 1px solid var(--scope-border);
+  color: var(--scope-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 19px;
+}
+
+.abd-scope-freeze-btn.active,
+.abd-scope-freeze-btn:hover,
+.abd-scope-snapshot-btn:hover {
+  background: var(--scope-accent);
+  color: #ffffff;
+  border-color: var(--scope-accent);
+}
+
+.abd-scope-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--scope-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.abd-scope-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Icon sizing: icon markup (ABDSharedAssets/icons) ships with a 16px
+   default; per-control sizes are applied here via CSS. */
+.abd-scope-snapshot-btn svg {
+  width: 10px;
+  height: 10px;
+}
+.abd-scope-close-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.abd-scope-lane-freeze-btn svg {
+  width: 8px;
+  height: 8px;
+}
+.abd-scope-lane-snapshot-btn svg {
+  width: 9px;
+  height: 9px;
+}
+
+/* ─── Visualizer Body & 2-Column Responsive Grid Container ─── */
+.abd-scope-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  background: var(--scope-bg, #000000);
+  overflow: hidden;
+}
+
+.abd-scope-lanes-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--scope-border);
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ─── Individual Lane Toolbar & Canvas ─── */
+.abd-scope-lane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--scope-bg, #000000);
+  min-height: 125px;
+  position: relative;
+  grid-column: span 2; /* Full width 2-cols by default */
+}
+
+.abd-scope-lane[data-col-span="1"] {
+  grid-column: span 1; /* Half width 1-col */
+}
+
+.abd-scope-lane[data-col-span="2"] {
+  grid-column: span 2; /* Full width 2-cols */
+}
+
+/* Responsive Fallback: On narrow viewports (< 480px), force all lanes to full-width */
+@container (max-width: 480px) {
+  .abd-scope-lane,
+  .abd-scope-lane[data-col-span="1"],
+  .abd-scope-lane[data-col-span="2"] {
+    grid-column: 1 / -1 !important;
+  }
+}
+@media (max-width: 520px) {
+  .abd-scope-lane,
+  .abd-scope-lane[data-col-span="1"],
+  .abd-scope-lane[data-col-span="2"] {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+.abd-scope-lane-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--scope-surface, rgba(15, 22, 34, 0.94));
+  border-bottom: 1px solid var(--scope-border);
+  font-size: 9px;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.abd-scope-lane-group-left,
+.abd-scope-lane-group-right {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.abd-scope-lane-badge {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: var(--scope-surface-elevated);
+  border: 1px solid var(--scope-border);
+  color: var(--scope-accent);
+}
+
+/* Mode Buttons in Lane Header */
+.abd-scope-lane-mode-group {
+  display: inline-flex;
+  border: 1px solid var(--scope-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.abd-scope-lane-mode-btn {
+  background: var(--scope-surface);
+  border: none;
+  border-right: 1px solid var(--scope-border);
+  color: var(--scope-text-muted);
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 16px;
+}
+
+.abd-scope-lane-mode-btn:last-child {
+  border-right: none;
+}
+
+.abd-scope-lane-mode-btn.active,
+.abd-scope-lane-mode-btn:hover {
+  background: var(--scope-accent);
+  color: #ffffff;
+}
+
+/* Probe / Tap Selector Dropdown in Lane Header */
+.abd-scope-lane-select {
+  background: var(--scope-surface);
+  border: 1px solid var(--scope-border);
+  color: var(--scope-accent);
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 1px 3px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  max-width: 90px;
+}
+
+.abd-scope-lane-select:focus,
+.abd-scope-lane-select:hover {
+  border-color: var(--scope-accent);
+}
+
+.abd-scope-lane-select option {
+  background: var(--scope-surface-elevated);
+  color: var(--scope-text-main);
+}
+
+/* Note / Hz / dB Telemetry Badge inside Lane Header */
+.abd-scope-lane-info {
+  font-family: var(--scope-font-lcd, monospace);
+  font-size: 8.5px;
+  font-weight: bold;
+  color: var(--scope-accent, #54ff72);
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
+/* Per-Lane Action Tool Buttons (Span, Freeze, Snapshot) */
+.abd-scope-lane-tool-btn {
+  background: var(--scope-surface);
+  border: 1px solid var(--scope-border);
+  color: var(--scope-text-muted);
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 16px;
+  line-height: 1;
+}
+
+.abd-scope-lane-tool-btn:hover,
+.abd-scope-lane-tool-btn.active {
+  background: var(--scope-accent);
+  color: #ffffff;
+  border-color: var(--scope-accent);
+}
+
+.abd-scope-lane-canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.abd-scope-lane-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.abd-scope-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+.abd-scope-vu-container {
+  width: 24px;
+  border-left: 1px solid var(--scope-border);
+  background: var(--scope-surface-elevated, rgba(0, 0, 0, 0.4));
+  display: flex;
+  padding: 4px 2px;
+  gap: 2px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+
