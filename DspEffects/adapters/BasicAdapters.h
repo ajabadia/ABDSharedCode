@@ -44,8 +44,8 @@
 #include "DspEffects/DspSchroederReverb.h"
 #include "DspEffects/FxRegistry.h"
 #include "DspEffects/JunoBBD.h"
-#include "DspEffects/ShelfFilter.h"
 #include "DspEffects/Phaser4.h"
+#include "DspEffects/ShelfFilter.h"
 #include "DspEffects/characters/BbdNoise.h"
 #include "DspEffects/profiles/JunoBbdProfile.h"
 
@@ -57,14 +57,14 @@ namespace abd::dsp::adapters
 struct Knobs
 {
     const FxParamSpec* specs = nullptr;
-    int count = 0;
+    int count                = 0;
 
-    float to (int index, float normalised) const noexcept
+    float to(int index, float normalised) const noexcept
     {
         if (specs == nullptr || index < 0 || index >= count)
             return 0.0f;
 
-        return fxDenormalise (specs[index], normalised);
+        return fxDenormalise(specs[index], normalised);
     }
 };
 
@@ -95,18 +95,18 @@ struct Knobs
 class SmoothedKnob
 {
 public:
-    void reset (double sampleRate, float initial, double rampSeconds = 0.020) noexcept
+    void reset(double sampleRate, float initial, double rampSeconds = 0.020) noexcept
     {
-        smoother_.reset (sampleRate, rampSeconds);
+        smoother_.reset(sampleRate, rampSeconds);
         target_ = initial;
-        smoother_.setCurrentAndTargetValue (initial);
+        smoother_.setCurrentAndTargetValue(initial);
     }
 
     /** El hueco avisa del valor nuevo. No se aplica aqui: se aplica ramping. */
-    void setTarget (float physical) noexcept
+    void setTarget(float physical) noexcept
     {
         target_ = physical;
-        smoother_.setTargetValue (physical);
+        smoother_.setTargetValue(physical);
     }
 
     float getNextValue() noexcept { return smoother_.getNextValue(); }
@@ -114,7 +114,7 @@ public:
     /** El valor ya asentado, para lo que se lee una vez por bloque. */
     float getTarget() const noexcept { return target_; }
 
-    void jumpToTarget() noexcept { smoother_.setCurrentAndTargetValue (target_); }
+    void jumpToTarget() noexcept { smoother_.setCurrentAndTargetValue(target_); }
 
 private:
     LinearSmoothedValue<float> smoother_;
@@ -148,72 +148,76 @@ public:
         // implementado es una promesa que el motor no cumple. Cuando haya voz
         // doble de verdad, se anade con su rango.
         static const FxParamSpec table[kNumParams] = {
-            { "rate",  0.10f, 8.00f, 0.85f, 0.55f, 0 },   // Hz, con recorrido abajo
-            { "depth", 0.00f, 1.00f, 0.50f, 1.00f, 0 }
-        };
+            {"rate", 0.10f, 8.00f, 0.85f, 0.55f, 0}, // Hz, con recorrido abajo
+            {"depth", 0.00f, 1.00f, 0.50f, 1.00f, 0}};
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new ChorusFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<ChorusFx*> (instance); }
-    static void reset (void* instance) noexcept   { static_cast<ChorusFx*> (instance)->engine_.reset(); }
+    static void destroy(void* instance) noexcept { delete static_cast<ChorusFx*>(instance); }
+    static void reset(void* instance) noexcept { static_cast<ChorusFx*>(instance)->engine_.reset(); }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<ChorusFx*> (instance)->setParam (index, value);
+        static_cast<ChorusFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<ChorusFx*> (instance);
+        auto* self = static_cast<ChorusFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<ChorusFx*> (instance);
+        auto* self        = static_cast<ChorusFx*>(instance);
         const float depth = self->depth_;
-        const float rate   = self->rate_;
+        const float rate  = self->rate_;
 
         for (int i = 0; i < n; ++i)
         {
-            const float l = self->engine_.processSample (0, inL[i], depth, 1.0f);
-            const float r = self->engine_.processSample (1, inR[i], depth, 1.0f);
-            self->engine_.advance (rate);
+            const float l = self->engine_.processSample(0, inL[i], depth, 1.0f);
+            const float r = self->engine_.processSample(1, inR[i], depth, 1.0f);
+            self->engine_.advance(rate);
             outL[i] = l;
             outR[i] = r;
         }
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
         // 100 ms, el maximo que necesita la modulacion de 5..30 ms del motor.
-        engine_.prepare (sampleRate, 0.1);
+        engine_.prepare(sampleRate, 0.1);
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         switch (index)
         {
-            case 0:  rate_  = p;  break;
-            case 1:  depth_ = p;  break;
-            default: break;
+            case 0:
+                rate_ = p;
+                break;
+            case 1:
+                depth_ = p;
+                break;
+            default:
+                break;
         }
     }
 
     Chorus engine_;
-    Knobs knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
     float rate_  = 0.85f;
     float depth_ = 0.50f;
 };
@@ -232,45 +236,44 @@ public:
         // que la tiene es `DspReverb` y la de la cinta. Declararla aqui sin
         // implementarla es un knob que no hace nada (ver la nota del coro).
         static const FxParamSpec table[kNumParams] = {
-            { "time",     0.010f, 2.0f, 0.375f, 0.30f, 0 },   // segundos
-            { "feedback", 0.000f, 0.95f, 0.350f, 1.00f, 0 }
-        };
+            {"time", 0.010f, 2.0f, 0.375f, 0.30f, 0}, // segundos
+            {"feedback", 0.000f, 0.95f, 0.350f, 1.00f, 0}};
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new DelayFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<DelayFx*> (instance); }
-    static void reset (void* instance) noexcept   { static_cast<DelayFx*> (instance)->engine_.reset(); }
+    static void destroy(void* instance) noexcept { delete static_cast<DelayFx*>(instance); }
+    static void reset(void* instance) noexcept { static_cast<DelayFx*>(instance)->engine_.reset(); }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<DelayFx*> (instance)->setParam (index, value);
+        static_cast<DelayFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<DelayFx*> (instance);
+        auto* self = static_cast<DelayFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<DelayFx*> (instance);
+        auto* self          = static_cast<DelayFx*>(instance);
         const float samples = self->delaySamples_;
         const float fb      = self->feedback_;
 
         for (int i = 0; i < n; ++i)
         {
-            const float l = self->engine_.processSample (0, inL[i], samples, fb);
-            const float r = self->engine_.processSample (1, inR[i], samples, fb);
+            const float l = self->engine_.processSample(0, inL[i], samples, fb);
+            const float r = self->engine_.processSample(1, inR[i], samples, fb);
             self->engine_.advanceWritePosition();
             outL[i] = l;
             outR[i] = r;
@@ -278,25 +281,25 @@ public:
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        sampleRate_ = sampleRate;
-        maxDelaySamples_ = static_cast<int> (sampleRate * kMaxSeconds);
-        engine_.prepare (sampleRate, maxDelaySamples_);
-        setParam (0, 0.375f);   // el tiempo por defecto, en normalizado
+        sampleRate_      = sampleRate;
+        maxDelaySamples_ = static_cast<int>(sampleRate * kMaxSeconds);
+        engine_.prepare(sampleRate, maxDelaySamples_);
+        setParam(0, 0.375f); // el tiempo por defecto, en normalizado
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         if (index == 0)
         {
             // El retardo va en muestras, y el maximo del motor es el de
             // `prepare`. Un tiempo pedido por encima se recorta al maximo en
             // vez de dejar el retardo en un sitio que el motor no tiene.
-            delaySamples_ = jmin (p * static_cast<float> (sampleRate_),
-                                  static_cast<float> (maxDelaySamples_));
+            delaySamples_ = jmin(p * static_cast<float>(sampleRate_),
+                                 static_cast<float>(maxDelaySamples_));
         }
         else if (index == 1)
         {
@@ -307,11 +310,11 @@ private:
     static constexpr double kMaxSeconds = 2.0;
 
     Delay engine_;
-    Knobs  knobs { specs(), kNumParams };
-    double sampleRate_ = 44100.0;
+    Knobs knobs{specs(), kNumParams};
+    double sampleRate_   = 44100.0;
     int maxDelaySamples_ = 88200;
-    float delaySamples_ = 0.0f;
-    float feedback_ = 0.35f;
+    float delaySamples_  = 0.0f;
+    float feedback_      = 0.35f;
 };
 
 //==============================================================================
@@ -332,69 +335,83 @@ public:
         // vuelva a ser de Samples, y que deja el mando con recorrido en las dos
         // direcciones.
         static const FxParamSpec table[kNumParams] = {
-            { "size",    0.0f, 1.0f, 0.50f, 1.0f, 0 },
-            { "damping", 0.0f, 1.0f, 0.50f, 1.0f, 0 },
-            { "width",   0.0f, 1.0f, 0.90f, 1.0f, 0 },
-            { "levels",  0.0f, 1.0f, 0.33f, 1.0f, 0 }   // los dos niveles internos
+            {"size", 0.0f, 1.0f, 0.50f, 1.0f, 0},
+            {"damping", 0.0f, 1.0f, 0.50f, 1.0f, 0},
+            {"width", 0.0f, 1.0f, 0.90f, 1.0f, 0},
+            {"levels", 0.0f, 1.0f, 0.33f, 1.0f, 0} // los dos niveles internos
         };
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new ReverbFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<ReverbFx*> (instance); }
-    static void reset (void* instance) noexcept   { static_cast<ReverbFx*> (instance)->engine_.reset(); }
+    static void destroy(void* instance) noexcept { delete static_cast<ReverbFx*>(instance); }
+    static void reset(void* instance) noexcept { static_cast<ReverbFx*>(instance)->engine_.reset(); }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<ReverbFx*> (instance)->setParam (index, value);
+        static_cast<ReverbFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<ReverbFx*> (instance);
+        auto* self = static_cast<ReverbFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<ReverbFx*> (instance);
+        auto* self = static_cast<ReverbFx*>(instance);
 
-        for (int i = 0; i < n; ++i) { outL[i] = inL[i]; outR[i] = inR[i]; }
-        self->engine_.processStereo (outL, outR, n);
+        for (int i = 0; i < n; ++i)
+        {
+            outL[i] = inL[i];
+            outR[i] = inR[i];
+        }
+        self->engine_.processStereo(outL, outR, n);
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        engine_.setSampleRate (sampleRate);
+        engine_.setSampleRate(sampleRate);
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         Reverb::Parameters params = engine_.getParameters();
         switch (index)
         {
-            case 0: params.roomSize = p;  break;
-            case 1: params.damping  = p;  break;
-            case 2: params.width    = p;  break;
-            case 3: params.wetLevel = p; params.dryLevel = 0.0f; break;
-            default: break;
+            case 0:
+                params.roomSize = p;
+                break;
+            case 1:
+                params.damping = p;
+                break;
+            case 2:
+                params.width = p;
+                break;
+            case 3:
+                params.wetLevel = p;
+                params.dryLevel = 0.0f;
+                break;
+            default:
+                break;
         }
-        engine_.setParameters (params);
+        engine_.setParameters(params);
     }
 
     Reverb engine_;
-    Knobs  knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
 };
 
 //==============================================================================
@@ -430,63 +447,62 @@ public:
         // 0.05 del mando — es decir, un boton de saturacion que de verdad no se
         // puede tocar sin pasarse. Con sesgo 0.5 y tope 8, el 2 cae en el 0.38.
         static const FxParamSpec table[kNumParams] = {
-            { "drive", 1.0f, 8.0f, 2.0f, 0.50f, 0 }
-        };
+            {"drive", 1.0f, 8.0f, 2.0f, 0.50f, 0}};
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
-        auto* self = new SaturationFx();
+        auto* self        = new SaturationFx();
         self->sampleRate_ = sampleRate;
         // 5 ms de rampa, no los 20 ms de NEURONiK: aqui la saturacion esta
         // detras de un slot con su propia mezcla, y 20 ms de rampa en el `drive`
         // se oyen como un golpe de ganancia al mover el mando. Los 20 ms de
         // NEURONiK son de su cadena entera, no de este parametro.
-        self->smoother_.reset (sampleRate, kDriveRampSeconds);
-        self->smoother_.setCurrentAndTargetValue (self->target_);
+        self->smoother_.reset(sampleRate, kDriveRampSeconds);
+        self->smoother_.setCurrentAndTargetValue(self->target_);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<SaturationFx*> (instance); }
+    static void destroy(void* instance) noexcept { delete static_cast<SaturationFx*>(instance); }
 
-    static void reset (void* instance) noexcept
+    static void reset(void* instance) noexcept
     {
         // El motor no tiene estado, asi que "vaciarlo" es dejar el suavizado en
         // su valor en vez de a mitad de una rampa: si no, el primer bloque
         // tras un `reset` sale con el drive de una transicion que el usuario
         // no pidio.
-        auto* self = static_cast<SaturationFx*> (instance);
-        self->smoother_.setCurrentAndTargetValue (self->target_);
+        auto* self = static_cast<SaturationFx*>(instance);
+        self->smoother_.setCurrentAndTargetValue(self->target_);
     }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<SaturationFx*> (instance)->setParam (index, value);
+        static_cast<SaturationFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<SaturationFx*> (instance);
+        auto* self = static_cast<SaturationFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<SaturationFx*> (instance);
+        auto* self = static_cast<SaturationFx*>(instance);
 
         for (int i = 0; i < n; ++i)
         {
             const float drive = self->smoother_.getNextValue();
-            outL[i] = Saturation::processSample (inL[i], drive);
-            outR[i] = Saturation::processSample (inR[i], drive);
+            outL[i]           = Saturation::processSample(inL[i], drive);
+            outR[i]           = Saturation::processSample(inR[i], drive);
         }
     }
 
 private:
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
         if (index != 0)
             return;
@@ -499,14 +515,14 @@ private:
         // atras la completa `getNextValue` igual de rapido. Las dos llegan a
         // 8.0 con error 0.0000. La diferencia es que `setCurrentAndTargetValue`
         // mata la rampa, y un salto seco del `drive` es un tictac.
-        target_ = knobs.to (index, value);
-        smoother_.setTargetValue (target_);
+        target_ = knobs.to(index, value);
+        smoother_.setTargetValue(target_);
     }
 
     LinearSmoothedValue<float> smoother_;
-    Knobs  knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
     double sampleRate_ = 44100.0;
-    float target_ = 2.0f;
+    float target_      = 2.0f;
 };
 
 //==============================================================================
@@ -521,69 +537,78 @@ public:
     static const FxParamSpec* specs() noexcept
     {
         static const FxParamSpec table[kNumParams] = {
-            { "decay",      0.10f, 0.98f, 0.60f, 1.00f, 0 },
-            { "damping",    0.00f, 1.00f, 0.30f, 1.00f, 0 },
-            { "diffusion",  0.00f, 1.00f, 0.70f, 1.00f, 0 },
-            { "predelay",   0.00f, 0.12f, 0.02f, 1.00f, 0 }  // segundos
+            {"decay", 0.10f, 0.98f, 0.60f, 1.00f, 0},
+            {"damping", 0.00f, 1.00f, 0.30f, 1.00f, 0},
+            {"diffusion", 0.00f, 1.00f, 0.70f, 1.00f, 0},
+            {"predelay", 0.00f, 0.12f, 0.02f, 1.00f, 0} // segundos
         };
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new SchroederFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<SchroederFx*> (instance); }
-    static void reset (void* instance) noexcept   { static_cast<SchroederFx*> (instance)->engine_.reset(); }
+    static void destroy(void* instance) noexcept { delete static_cast<SchroederFx*>(instance); }
+    static void reset(void* instance) noexcept { static_cast<SchroederFx*>(instance)->engine_.reset(); }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<SchroederFx*> (instance)->setParam (index, value);
+        static_cast<SchroederFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<SchroederFx*> (instance);
+        auto* self = static_cast<SchroederFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<SchroederFx*> (instance);
+        auto* self = static_cast<SchroederFx*>(instance);
         for (int i = 0; i < n; ++i)
-            self->engine_.processFrame (inL[i], inR[i], outL[i], outR[i]);
+            self->engine_.processFrame(inL[i], inR[i], outL[i], outR[i]);
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
         // 0.25 s, el techo por defecto del motor. Es el que usa el unico
         // consumidor que tiene hoy (el reverb de ABDEep).
-        engine_.prepare (sampleRate, 0.25);
-        engine_.setPreDelaySeconds (0.02f);
+        engine_.prepare(sampleRate, 0.25);
+        engine_.setPreDelaySeconds(0.02f);
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         switch (index)
         {
-            case 0: engine_.setDecay (p);      break;
-            case 1: engine_.setDamping (p);    break;
-            case 2: engine_.setDiffusion (p);  break;
-            case 3: engine_.setPreDelaySeconds (p); break;
-            default: break;
+            case 0:
+                engine_.setDecay(p);
+                break;
+            case 1:
+                engine_.setDamping(p);
+                break;
+            case 2:
+                engine_.setDiffusion(p);
+                break;
+            case 3:
+                engine_.setPreDelaySeconds(p);
+                break;
+            default:
+                break;
         }
     }
 
     SchroederReverb engine_;
-    Knobs knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
 };
 
 //==============================================================================
@@ -597,50 +622,50 @@ public:
     static const FxParamSpec* specs() noexcept
     {
         static const FxParamSpec table[kNumParams] = {
-            { "mode",  0.0f, 3.0f, 1.0f, 1.0f, 4 },   // Off, I, II, I+II
-            { "rate",  0.10f, 8.0f, 0.513f, 0.60f, 0 },
-            { "depth", 0.00f, 1.0f, 0.60f, 1.00f, 0 },
-            { "wear",  0.00f, 1.0f, 0.35f, 1.00f, 0 }   // multiplicador de ruido
+            {"mode", 0.0f, 3.0f, 1.0f, 1.0f, 4}, // Off, I, II, I+II
+            {"rate", 0.10f, 8.0f, 0.513f, 0.60f, 0},
+            {"depth", 0.00f, 1.0f, 0.60f, 1.00f, 0},
+            {"wear", 0.00f, 1.0f, 0.35f, 1.00f, 0} // multiplicador de ruido
         };
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new BbdChorusFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<BbdChorusFx*> (instance); }
+    static void destroy(void* instance) noexcept { delete static_cast<BbdChorusFx*>(instance); }
 
-    static void reset (void* instance) noexcept
+    static void reset(void* instance) noexcept
     {
-        static_cast<BbdChorusFx*> (instance)->engine_.reset();
+        static_cast<BbdChorusFx*>(instance)->engine_.reset();
     }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<BbdChorusFx*> (instance)->setParam (index, value);
+        static_cast<BbdChorusFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<BbdChorusFx*> (instance);
+        auto* self = static_cast<BbdChorusFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<BbdChorusFx*> (instance);
+        auto* self = static_cast<BbdChorusFx*>(instance);
         for (int i = 0; i < n; ++i)
-            self->engine_.process (inL[i], inR[i], outL[i], outR[i]);
+            self->engine_.process(inL[i], inR[i], outL[i], outR[i]);
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
         // Y NO se llama a `setReconstructionCutoff` despues. `prepare` ya
         // rearma el biquad con `biquadFc` del perfil, y llamar al `set` despues
@@ -649,22 +674,29 @@ private:
         // mismo error de orden que rompia el test de paridad de JUNiO601
         // (biquad 0.5774 contra 0.7326), y por eso el adaptador no lo repite:
         // quien quiera otra frecuencia de reconstruccion cambia el perfil.
-        engine_.prepare (sampleRate);
+        engine_.prepare(sampleRate);
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         switch (index)
         {
             case 0:
-                engine_.setMode (static_cast<JunoBbdMode> (static_cast<int> (p + 0.5f)));
+                engine_.setMode(static_cast<JunoBbdMode>(static_cast<int>(p + 0.5f)));
                 break;
-            case 1: engine_.setRate (p);    break;
-            case 2: engine_.setDepth (p);   break;
-            case 3: engine_.setHissMultiplier (p); break;
-            default: break;
+            case 1:
+                engine_.setRate(p);
+                break;
+            case 2:
+                engine_.setDepth(p);
+                break;
+            case 3:
+                engine_.setHissMultiplier(p);
+                break;
+            default:
+                break;
         }
     }
 
@@ -673,7 +705,7 @@ private:
     // lee nunca. Cuando haya una calibracion de J60 de verdad, es cambiar esta
     // linea y nada mas.
     JunoBBD<JunoBbdJ106Profile, BbdNoiseStage> engine_;
-    Knobs knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
 };
 
 //==============================================================================
@@ -759,51 +791,51 @@ public:
         // sin sesgo caia en el 0,05 — la zona donde un filtro de graves no se
         // puede afinar.
         static const FxParamSpec table[kNumParams] = {
-            { "mode",  0.0f,     1.0f,    0.0f,  1.00f, 2 },   // baja, alta
-            { "freq",  20.0f, 20000.0f, 1000.0f,  0.50f, 0 },   // Hz
-            { "gain", -12.0f,    12.0f,    3.0f,  1.00f, 0 }    // dB
+            {"mode", 0.0f, 1.0f, 0.0f, 1.00f, 2},         // baja, alta
+            {"freq", 20.0f, 20000.0f, 1000.0f, 0.50f, 0}, // Hz
+            {"gain", -12.0f, 12.0f, 3.0f, 1.00f, 0}       // dB
         };
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new ShelfEqFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<ShelfEqFx*> (instance); }
+    static void destroy(void* instance) noexcept { delete static_cast<ShelfEqFx*>(instance); }
 
-    static void reset (void* instance) noexcept
+    static void reset(void* instance) noexcept
     {
         // El estado de audio del motor Y las rampas. Sin lo segundo, el primer
         // bloque despues de un `reset` de host sale con los mandos a medio
         // camino: el usuario no lo ha pedido y suena como un golpe de ganancia.
-        auto* self = static_cast<ShelfEqFx*> (instance);
+        auto* self = static_cast<ShelfEqFx*>(instance);
         self->engine_.reset();
         self->ganancia_.jumpToTarget();
         self->frecuencia_.jumpToTarget();
-        self->aplicaMandos (self->ganancia_.getTarget(), self->frecuencia_.getTarget());
+        self->aplicaMandos(self->ganancia_.getTarget(), self->frecuencia_.getTarget());
     }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<ShelfEqFx*> (instance)->setParam (index, value);
+        static_cast<ShelfEqFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<ShelfEqFx*> (instance);
+        auto* self = static_cast<ShelfEqFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
         self->asientaMandos();
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<ShelfEqFx*> (instance);
+        auto* self = static_cast<ShelfEqFx*>(instance);
 
         for (int i = 0; i < n; ++i)
         {
@@ -812,7 +844,7 @@ public:
             // rampa seria 32 veces mas rapida en un bloque de 32 muestras que
             // en uno de 512, y el mismo barrido sonaria distinto segun el
             // tamanio de bloque del host.
-            const float ganancia = self->ganancia_.getNextValue();
+            const float ganancia   = self->ganancia_.getNextValue();
             const float frecuencia = self->frecuencia_.getNextValue();
 
             // Lo que llega al motor es DONDE ESTA LA RAMPA, no su destino. La
@@ -834,25 +866,25 @@ public:
             if (++self->cuenta_ >= kControlRate)
             {
                 self->cuenta_ = 0;
-                self->aplicaMandos (ganancia, frecuencia);
+                self->aplicaMandos(ganancia, frecuencia);
             }
 
             float l = inL[i];
             float r = inR[i];
-            self->engine_.processFrame (l, r);
+            self->engine_.processFrame(l, r);
             outL[i] = l;
             outR[i] = r;
         }
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        engine_.prepare (sampleRate);
+        engine_.prepare(sampleRate);
 
         // 20 ms, la rampa que ya usan los envoltorios que este sustituye.
-        ganancia_.reset (sampleRate, 3.0f);
-        frecuencia_.reset (sampleRate, 1000.0f);
+        ganancia_.reset(sampleRate, 3.0f);
+        frecuencia_.reset(sampleRate, 1000.0f);
 
         // El contador arranca ATRASADO, para que la primera muestra ya empuje
         // los mandos. Ver la nota del phaser: un coeficiente atascado un bloque
@@ -860,22 +892,28 @@ private:
         // menor, porque en `prepare` los mandos ya estan en su sitio, pero el
         // mismo razonamiento vale y el mismo numero lo hace.
         cuenta_ = kControlRate - 1;
-        aplicaMandos (ganancia_.getTarget(), frecuencia_.getTarget());
+        aplicaMandos(ganancia_.getTarget(), frecuencia_.getTarget());
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         switch (index)
         {
-            case 0: modo_ = (p < 0.5f) ? ShelfMode::Low : ShelfMode::High; break;
-            case 1: frecuencia_.setTarget (p); break;
-            case 2: ganancia_.setTarget (p);  break;
-            default: break;
+            case 0:
+                modo_ = (p < 0.5f) ? ShelfMode::Low : ShelfMode::High;
+                break;
+            case 1:
+                frecuencia_.setTarget(p);
+                break;
+            case 2:
+                ganancia_.setTarget(p);
+                break;
+            default:
+                break;
         }
     }
-
 
     /** Asienta las rampas en su destino.
 
@@ -901,15 +939,15 @@ private:
         Se llama con el destino en `prepare` y en `reset` —donde no hay rampa
         todavia, porque no ha pasado ninguna muestra— y con la posicion
         interpolada en el lazo de audio. */
-    void aplicaMandos (float ganancia, float frecuencia) noexcept
+    void aplicaMandos(float ganancia, float frecuencia) noexcept
     {
-        engine_.setMode (modo_);
-        engine_.setFrequencyHz (frecuencia);
-        engine_.setGainDB (ganancia);
+        engine_.setMode(modo_);
+        engine_.setFrequencyHz(frecuencia);
+        engine_.setGainDB(ganancia);
     }
 
     ShelfFilter engine_;
-    Knobs knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
     SmoothedKnob ganancia_;
     SmoothedKnob frecuencia_;
     ShelfMode modo_ = ShelfMode::Low;
@@ -1002,53 +1040,53 @@ public:
         // sea 0,225: se oye el barrido abriéndose sin que la resonacion se
         // lleve el sinal, que es como arranca un phaser.
         static const FxParamSpec table[kNumParams] = {
-            { "rate",     0.02f, 15.00f, 0.60f, 0.45f, 0 },  // Hz
-            { "depth",    0.00f,  1.00f, 0.50f, 1.00f, 0 },  // exponente del barrido
-            { "feedback", 0.00f,  1.00f, 0.25f, 1.00f, 0 }   // 0..1; el tope de 0,90 es del motor
+            {"rate", 0.02f, 15.00f, 0.60f, 0.45f, 0},   // Hz
+            {"depth", 0.00f, 1.00f, 0.50f, 1.00f, 0},   // exponente del barrido
+            {"feedback", 0.00f, 1.00f, 0.25f, 1.00f, 0} // 0..1; el tope de 0,90 es del motor
         };
         return table;
     }
 
-    static void* create (double sampleRate) noexcept
+    static void* create(double sampleRate) noexcept
     {
         auto* self = new PhaserFx();
-        self->prepare (sampleRate);
+        self->prepare(sampleRate);
         return self;
     }
 
-    static void destroy (void* instance) noexcept { delete static_cast<PhaserFx*> (instance); }
+    static void destroy(void* instance) noexcept { delete static_cast<PhaserFx*>(instance); }
 
-    static void reset (void* instance) noexcept
+    static void reset(void* instance) noexcept
     {
         // El estado del motor Y las rampas, por el mismo motivo que en la
         // repisa: sin lo segundo, el primer bloque despues de un `reset` de
         // host sale con los mandos a medio camino.
-        auto* self = static_cast<PhaserFx*> (instance);
+        auto* self = static_cast<PhaserFx*>(instance);
         self->engine_.reset();
         self->rate_.jumpToTarget();
         self->depth_.jumpToTarget();
         self->feedback_.jumpToTarget();
-        self->aplicaMandos (self->rate_.getTarget(), self->depth_.getTarget(),
-                            self->feedback_.getTarget());
+        self->aplicaMandos(self->rate_.getTarget(), self->depth_.getTarget(),
+                           self->feedback_.getTarget());
     }
 
-    static void setParam (void* instance, int index, float value) noexcept
+    static void setParam(void* instance, int index, float value) noexcept
     {
-        static_cast<PhaserFx*> (instance)->setParam (index, value);
+        static_cast<PhaserFx*>(instance)->setParam(index, value);
     }
 
-    static void setAll (void* instance, const float* v, int count) noexcept
+    static void setAll(void* instance, const float* v, int count) noexcept
     {
-        auto* self = static_cast<PhaserFx*> (instance);
+        auto* self = static_cast<PhaserFx*>(instance);
         for (int i = 0; i < count && i < kNumParams; ++i)
-            self->setParam (i, v[i]);
+            self->setParam(i, v[i]);
         self->asientaMandos();
     }
 
-    static void process (void* instance, const float* inL, const float* inR,
-                         float* outL, float* outR, int n) noexcept
+    static void process(void* instance, const float* inL, const float* inR,
+                        float* outL, float* outR, int n) noexcept
     {
-        auto* self = static_cast<PhaserFx*> (instance);
+        auto* self = static_cast<PhaserFx*>(instance);
 
         for (int i = 0; i < n; ++i)
         {
@@ -1056,8 +1094,8 @@ public:
             // empuja nada, por el motivo que ya esta escrito en la repisa: si
             // solo se leyera en las de control, la rampa seria 16 veces mas
             // rapida en un bloque de 16 muestras que en uno de 512.
-            const float rate = self->rate_.getNextValue();
-            const float depth = self->depth_.getNextValue();
+            const float rate     = self->rate_.getNextValue();
+            const float depth    = self->depth_.getNextValue();
             const float feedback = self->feedback_.getNextValue();
 
             // Lo que llega al motor es DONDE ESTA LA RAMPA, no su destino. Si se
@@ -1072,44 +1110,50 @@ public:
             if (++self->cuenta_ >= kControlRate)
             {
                 self->cuenta_ = 0;
-                self->aplicaMandos (rate, depth, feedback);
+                self->aplicaMandos(rate, depth, feedback);
             }
 
             float l = inL[i];
             float r = inR[i];
-            self->engine_.processFrame (l, r);
+            self->engine_.processFrame(l, r);
             outL[i] = l;
             outR[i] = r;
         }
     }
 
 private:
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        engine_.prepare (sampleRate);
+        engine_.prepare(sampleRate);
 
         // 20 ms, la misma rampa que la repisa.
-        rate_.reset (sampleRate, 0.60f);
-        depth_.reset (sampleRate, 0.50f);
-        feedback_.reset (sampleRate, 0.25f);
+        rate_.reset(sampleRate, 0.60f);
+        depth_.reset(sampleRate, 0.50f);
+        feedback_.reset(sampleRate, 0.25f);
 
         cuenta_ = kControlRate - 1;
-        aplicaMandos (rate_.getTarget(), depth_.getTarget(), feedback_.getTarget());
+        aplicaMandos(rate_.getTarget(), depth_.getTarget(), feedback_.getTarget());
     }
 
-    void setParam (int index, float value) noexcept
+    void setParam(int index, float value) noexcept
     {
-        const float p = knobs.to (index, value);
+        const float p = knobs.to(index, value);
 
         switch (index)
         {
-            case 0: rate_.setTarget (p);     break;
-            case 1: depth_.setTarget (p);    break;
-            case 2: feedback_.setTarget (p); break;
-            default: break;
+            case 0:
+                rate_.setTarget(p);
+                break;
+            case 1:
+                depth_.setTarget(p);
+                break;
+            case 2:
+                feedback_.setTarget(p);
+                break;
+            default:
+                break;
         }
     }
-
 
     /** Asienta las rampas en su destino.
 
@@ -1132,15 +1176,15 @@ private:
     }
 
     /** Empuja al motor la posicion ACTUAL de las rampas. */
-    void aplicaMandos (float rate, float depth, float feedback) noexcept
+    void aplicaMandos(float rate, float depth, float feedback) noexcept
     {
-        engine_.setRateHz (rate);
-        engine_.setDepth (depth);
-        engine_.setFeedback (feedback);
+        engine_.setRateHz(rate);
+        engine_.setDepth(depth);
+        engine_.setFeedback(feedback);
     }
 
     Phaser4<4> engine_;
-    Knobs knobs { specs(), kNumParams };
+    Knobs knobs{specs(), kNumParams};
     SmoothedKnob rate_;
     SmoothedKnob depth_;
     SmoothedKnob feedback_;
@@ -1152,4 +1196,3 @@ private:
 };
 
 } // namespace abd::dsp::adapters
-

@@ -63,8 +63,8 @@
 
 #pragma once
 
-#include "DspCore/DspMath.h"
 #include "DspCore/DspCore.h"
+#include "DspCore/DspMath.h"
 
 namespace abd::dsp
 {
@@ -75,8 +75,8 @@ namespace abd::dsp
     funciones gemelas. */
 enum class ShelfMode
 {
-    Low,      ///< Repisa baja: sube lo grave, baja el medio.
-    High      ///< Repisa alta: sube lo agudo, baja el medio.
+    Low, ///< Repisa baja: sube lo grave, baja el medio.
+    High ///< Repisa alta: sube lo agudo, baja el medio.
 };
 
 /** Repisa de segundo orden con Q de Butterworth, continua en frecuencia.
@@ -87,15 +87,15 @@ enum class ShelfMode
 class ShelfFilter
 {
 public:
-    ShelfFilter() = default;
+    ShelfFilter()  = default;
     ~ShelfFilter() = default;
 
     //-------------------------------------------------------------------------
     /** Fija el sample rate y recalcula. Un sample rate invalido deja el
         defecto, que es 44,1 kHz, nunca un coeficiente roto. */
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        sampleRate_ = (sampleRate > 1000.0) ? (float) sampleRate : 44100.0f;
+        sampleRate_ = (sampleRate > 1000.0) ? (float)sampleRate : 44100.0f;
         updateCoefficients();
         reset();
     }
@@ -108,7 +108,7 @@ public:
     }
 
     //-------------------------------------------------------------------------
-    void setMode (ShelfMode mode) noexcept
+    void setMode(ShelfMode mode) noexcept
     {
         if (mode == mode_) return;
         mode_ = mode;
@@ -131,12 +131,12 @@ public:
         ser un filtro de verdad, y por encima de todo lo que usa el hardware. El
         minimo de 10 Hz es por el otro lado: a 0 Hz la repisa se aplana y se
         convierte en un pasabajos que no hace lo que su nombre dice. */
-    void setFrequencyHz (float hz) noexcept
+    void setFrequencyHz(float hz) noexcept
     {
-        const float limite = sampleRate_ * 0.45f;
-        const float recortada = (hz < 10.0f) ? 10.0f
-                            : (hz > limite) ? limite
-                            : hz;
+        const float limite    = sampleRate_ * 0.45f;
+        const float recortada = (hz < 10.0f)    ? 10.0f
+                                : (hz > limite) ? limite
+                                                : hz;
         if (recortada != frequencyHz_)
         {
             frequencyHz_ = recortada;
@@ -152,11 +152,11 @@ public:
         sin ella, una automatizacion que se mueve en pasos de milisegundo
         recalcula cinco coeficientes por paso, y con ella solo cuando la ganancia
         se ha movido de verdad. */
-    void setGainDB (float db) noexcept
+    void setGainDB(float db) noexcept
     {
-        const float recortada = jlimit (-12.0f, 12.0f, db);
+        const float recortada  = jlimit(-12.0f, 12.0f, db);
         const float diferencia = recortada - gainDB_;
-        if (jmax (diferencia, -diferencia) > 0.05f)
+        if (jmax(diferencia, -diferencia) > 0.05f)
         {
             gainDB_ = recortada;
             updateCoefficients();
@@ -167,12 +167,12 @@ public:
 
     //-------------------------------------------------------------------------
     /** Una muestra. In situ, que es la forma que usa el resto del modulo. */
-    float processSample (float& x) noexcept
+    float processSample(float& x) noexcept
     {
         const float y = b0_ * x + s1L_;
-        s1L_ = b1_ * x - a1_ * y + s2L_;
-        s2L_ = b2_ * x - a2_ * y;
-        x = y;
+        s1L_          = b1_ * x - a1_ * y + s2L_;
+        s2L_          = b2_ * x - a2_ * y;
+        x             = y;
         return y;
     }
 
@@ -181,17 +181,17 @@ public:
         Dos canales con el mismo estado seria un filtro de canal unico aplicado a
         dos señales: en estéreo la imagen se iría al centro. El original ya
         llevaba cuatro estados, y aqui tambien. */
-    void processFrame (float& left, float& right) noexcept
+    void processFrame(float& left, float& right) noexcept
     {
         const float yL = b0_ * left + s1L_;
-        s1L_ = b1_ * left - a1_ * yL + s2L_;
-        s2L_ = b2_ * left - a2_ * yL;
+        s1L_           = b1_ * left - a1_ * yL + s2L_;
+        s2L_           = b2_ * left - a2_ * yL;
 
         const float yR = b0_ * right + s1R_;
-        s1R_ = b1_ * right - a1_ * yR + s2R_;
-        s2R_ = b2_ * right - a2_ * yR;
+        s1R_           = b1_ * right - a1_ * yR + s2R_;
+        s2R_           = b2_ * right - a2_ * yR;
 
-        left = yL;
+        left  = yL;
         right = yR;
     }
 
@@ -225,10 +225,7 @@ public:
         cuesta mas encontrar porque parece que el filtro este roto. */
     bool esIdentidad() const noexcept
     {
-        return gainDB_ == 0.0f
-            && b0_ == 1.0f
-            && b1_ == a1_
-            && b2_ == a2_;
+        return gainDB_ == 0.0f && b0_ == 1.0f && b1_ == a1_ && b2_ == a2_;
     }
 
 private:
@@ -246,13 +243,13 @@ private:
         // cambiar de sustituto en una migracion es cambiar la medicion que hay
         // escrita. La cuenta de transcendentales por coeficiente no es lo que
         // limita aqui: los coeficientes se calculan una vez por cambio de mando.
-        const float A  = pow (10.0f, gainDB_ / 40.0f);
-        const float rA = exp2 (0.5f * log2 (A));
+        const float A  = pow(10.0f, gainDB_ / 40.0f);
+        const float rA = exp2(0.5f * log2(A));
 
         const float w0    = frequencyHz_ * twoPi() / sampleRate_;
-        const float cosW0 = cos (w0);
-        const float sinW0 = sin (w0);
-        const float alpha = sinW0 / (2.0f * 0.70710678f);   // Q de Butterworth
+        const float cosW0 = cos(w0);
+        const float sinW0 = sin(w0);
+        const float alpha = sinW0 / (2.0f * 0.70710678f); // Q de Butterworth
 
         // Las dos repisas son las MISMAS cinco formulas con el signo de los
         // terminos que llevan `cos` cambiado, asi que estan en dos ramas
@@ -262,27 +259,27 @@ private:
         // tener que leer la cuenta para saber cual de las dos formas es cual.
         // Transcripcion literal de las que tiene ABDMS2000, que es de donde
         // viene, y el test compara los coeficientes contra esa referencia.
-        const float m = (A - 1.0f) * cosW0;      // el termino que cambia de signo
-        const float p = (A + 1.0f) * cosW0;      // el que no cambia
+        const float m = (A - 1.0f) * cosW0; // el termino que cambia de signo
+        const float p = (A + 1.0f) * cosW0; // el que no cambia
         const float g = 2.0f * rA * alpha;
 
         if (mode_ == ShelfMode::High)
         {
             const float a0 = (A + 1.0f) - m + g;
-            b0_ = (A * ((A + 1.0f) + m + g)) / a0;
-            b1_ = (-2.0f * A * ((A - 1.0f) + p)) / a0;
-            b2_ = (A * ((A + 1.0f) + m - g)) / a0;
-            a1_ = (2.0f * ((A - 1.0f) - p)) / a0;
-            a2_ = ((A + 1.0f) - m - g) / a0;
+            b0_            = (A * ((A + 1.0f) + m + g)) / a0;
+            b1_            = (-2.0f * A * ((A - 1.0f) + p)) / a0;
+            b2_            = (A * ((A + 1.0f) + m - g)) / a0;
+            a1_            = (2.0f * ((A - 1.0f) - p)) / a0;
+            a2_            = ((A + 1.0f) - m - g) / a0;
         }
         else
         {
             const float a0 = (A + 1.0f) + m + g;
-            b0_ = (A * ((A + 1.0f) - m + g)) / a0;
-            b1_ = (2.0f * A * ((A - 1.0f) - p)) / a0;
-            b2_ = (A * ((A + 1.0f) - m - g)) / a0;
-            a1_ = (-2.0f * ((A - 1.0f) + p)) / a0;
-            a2_ = ((A + 1.0f) + m - g) / a0;
+            b0_            = (A * ((A + 1.0f) - m + g)) / a0;
+            b1_            = (2.0f * A * ((A - 1.0f) - p)) / a0;
+            b2_            = (A * ((A + 1.0f) - m - g)) / a0;
+            a1_            = (-2.0f * ((A - 1.0f) + p)) / a0;
+            a2_            = ((A + 1.0f) + m - g) / a0;
         }
     }
 

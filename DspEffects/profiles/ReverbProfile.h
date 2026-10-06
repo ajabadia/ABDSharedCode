@@ -70,13 +70,13 @@ struct ReverbProfile
     /** Una variante. Todos los numeros estan en el rango que espera el motor. */
     struct Variant
     {
-        int         id;              // id que usa la fabrica de slots
-        const char* name;            // como se muestra en el panel
-        int         numParameters;   // controles que expone esta variante
+        int id;            // id que usa la fabrica de slots
+        const char* name;  // como se muestra en el panel
+        int numParameters; // controles que expone esta variante
 
         // Valores de fabrica del motor. Son los que se aplican al construir y
         // los que se quedan fijos cuando un mando no esta mapeado.
-        float decay;                 // < 0 = variante de cola corta ("Reverse")
+        float decay; // < 0 = variante de cola corta ("Reverse")
         float damping;
         float diffusion;
         float roomSize;
@@ -92,33 +92,32 @@ struct ReverbProfile
         int paramIndexDamping;
         int paramIndexDiffusion;
 
-        bool invertLeft;             // "Reverse" niega solo el canal izquierdo
+        bool invertLeft; // "Reverse" niega solo el canal izquierdo
     };
 
     static constexpr int numVariants = 10;
 
     // Ordenada por id, que es como la reparte la fabrica.
     static constexpr Variant variants[numVariants] =
-    {
-        // id  name          n   decay   damp   diff   size   pre    preIdx dcyIdx szIdx dmpIdx difIdx  invL
-        {   1, "Hall",        12,  0.70f, 0.40f, 0.70f, 0.80f, 0.10f,   0,    1,    2,    3,    4,  false },
-        {   2, "Plate",       12,  0.60f, 0.30f, 0.80f, 0.50f, 0.05f,   0,    1,    2,    3,    4,  false },
-        {   3, "Rich Plate",  12,  0.75f, 0.20f, 0.90f, 0.60f, 0.05f,   0,    1,    2,    3,    4,  false },
-        {   4, "Ambience",    10,  0.30f, 0.60f, 0.50f, 0.30f, 0.00f,   0,    1,    2,    3,    4,  false },
+        {
+            // id  name          n   decay   damp   diff   size   pre    preIdx dcyIdx szIdx dmpIdx difIdx  invL
+            {1, "Hall", 12, 0.70f, 0.40f, 0.70f, 0.80f, 0.10f, 0, 1, 2, 3, 4, false},
+            {2, "Plate", 12, 0.60f, 0.30f, 0.80f, 0.50f, 0.05f, 0, 1, 2, 3, 4, false},
+            {3, "Rich Plate", 12, 0.75f, 0.20f, 0.90f, 0.60f, 0.05f, 0, 1, 2, 3, 4, false},
+            {4, "Ambience", 10, 0.30f, 0.60f, 0.50f, 0.30f, 0.00f, 0, 1, 2, 3, 4, false},
 
-        // Gated: el diffusion va al mando 9, y NO hay mandos de size ni damping.
-        {   5, "Gated",       10,  0.20f, 0.80f, 0.30f, 0.40f, 0.00f,   0,    1,   -1,   -1,    9,  false },
+            // Gated: el diffusion va al mando 9, y NO hay mandos de size ni damping.
+            {5, "Gated", 10, 0.20f, 0.80f, 0.30f, 0.40f, 0.00f, 0, 1, -1, -1, 9, false},
 
-        // Reverse: el decay es NEGATIVO (cola corta) y ademas niega el izquierdo.
-        {   6, "Reverse",      9, -0.30f, 0.90f, 0.20f, 0.70f, 0.15f,   0,    1,   -1,   -1,    3,   true },
+            // Reverse: el decay es NEGATIVO (cola corta) y ademas niega el izquierdo.
+            {6, "Reverse", 9, -0.30f, 0.90f, 0.20f, 0.70f, 0.15f, 0, 1, -1, -1, 3, true},
 
-        // Deep Verb: el unico con el pre-retardo en el mando 3 y sin diffusion.
-        {  22, "Deep Verb",    5,  0.85f, 0.30f, 0.80f, 0.90f, 0.10f,   3,    1,   -1,   -1,   -1,  false },
+            // Deep Verb: el unico con el pre-retardo en el mando 3 y sin diffusion.
+            {22, "Deep Verb", 5, 0.85f, 0.30f, 0.80f, 0.90f, 0.10f, 3, 1, -1, -1, -1, false},
 
-        {  26, "Chamber",     12,  0.50f, 0.50f, 0.60f, 0.60f, 0.05f,   0,    1,    2,    3,    4,  false },
-        {  27, "Room",        12,  0.35f, 0.60f, 0.40f, 0.40f, 0.02f,   0,    1,    2,    3,    4,  false },
-        {  28, "Vintage",     12,  0.65f, 0.35f, 0.70f, 0.70f, 0.08f,   0,    1,    2,    3,    4,  false }
-    };
+            {26, "Chamber", 12, 0.50f, 0.50f, 0.60f, 0.60f, 0.05f, 0, 1, 2, 3, 4, false},
+            {27, "Room", 12, 0.35f, 0.60f, 0.40f, 0.40f, 0.02f, 0, 1, 2, 3, 4, false},
+            {28, "Vintage", 12, 0.65f, 0.35f, 0.70f, 0.70f, 0.08f, 0, 1, 2, 3, 4, false}};
 
     /**
         La fila que se usa cuando el id no es ninguno de los diez.
@@ -137,9 +136,9 @@ struct ReverbProfile
         prefiere un id desconocido que suene a algo antes que uno que se calle
         en silencio.
     */
-    static constexpr Variant fallback { -1, "Reverb", 12,
-                                        0.50f, 0.50f, 0.50f, 0.50f, 0.05f,
-                                        0, 1, 2, 3, 4, false };
+    static constexpr Variant fallback{-1, "Reverb", 12,
+                                      0.50f, 0.50f, 0.50f, 0.50f, 0.05f,
+                                      0, 1, 2, 3, 4, false};
 
     /**
         Busca una variante por id. Devuelve nullptr si ese id no es un reverb.
@@ -148,7 +147,7 @@ struct ReverbProfile
         fabrica tiene que verse, no sonar a otra reverb. Para el caso de "no se
         que hacer con esto" esta `findOrFallback`.
     */
-    static constexpr const Variant* find (int id) noexcept
+    static constexpr const Variant* find(int id) noexcept
     {
         for (int i = 0; i < numVariants; ++i)
             if (variants[i].id == id)
@@ -158,9 +157,9 @@ struct ReverbProfile
     }
 
     /** Como `find`, pero devuelve la fila generica en vez de nullptr. */
-    static constexpr const Variant* findOrFallback (int id) noexcept
+    static constexpr const Variant* findOrFallback(int id) noexcept
     {
-        const Variant* found = find (id);
+        const Variant* found = find(id);
 
         return found != nullptr ? found : &fallback;
     }

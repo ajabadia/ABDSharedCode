@@ -76,41 +76,41 @@ namespace bbdnoise_detail
     del BBD tiene que ser el MISMO ruido, muestra a muestra, y un PRNG de la
     plataforma no lo garantiza.
 */
-inline float nextWhite (std::uint32_t& seed) noexcept
+inline float nextWhite(std::uint32_t& seed) noexcept
 {
     seed = seed * 196314165u + 907633515u;
-    return 2.0f * static_cast<float> (seed) / static_cast<float> (0xFFFFFFFFu) - 1.0f;
+    return 2.0f * static_cast<float>(seed) / static_cast<float>(0xFFFFFFFFu) - 1.0f;
 }
 
 /** Siseo de fondo del amplificador: rosa de 6 polos, con realzador de agudas. */
 class FloorNoise
 {
 public:
-    void prepare (double sampleRate, float lpCutoffHz, float shelfHz, float shelfDb) noexcept
+    void prepare(double sampleRate, float lpCutoffHz, float shelfHz, float shelfDb) noexcept
     {
-        const float sr = static_cast<float> (sampleRate);
+        const float sr = static_cast<float>(sampleRate);
         const float fc = lpCutoffHz < sr * 0.45f ? lpCutoffHz : sr * 0.45f;
-        lpCoeff_ = 1.0f - junobbd_detail::expDet (-2.0f * dspmath_detail::kPi * fc / sr);
+        lpCoeff_       = 1.0f - junobbd_detail::expDet(-2.0f * dspmath_detail::kPi * fc / sr);
 
         const float sc = shelfHz < sr * 0.45f ? shelfHz : sr * 0.45f;
-        shelfCoeff_ = 1.0f - junobbd_detail::expDet (-2.0f * dspmath_detail::kPi * sc / sr);
-        shelfGain_  = pow (10.0f, shelfDb / 20.0f) - 1.0f;
+        shelfCoeff_    = 1.0f - junobbd_detail::expDet(-2.0f * dspmath_detail::kPi * sc / sr);
+        shelfGain_     = pow(10.0f, shelfDb / 20.0f) - 1.0f;
 
         pink_ = true;
     }
 
-    void setSeed (std::uint32_t s) noexcept { seed_ = s; }
+    void setSeed(std::uint32_t s) noexcept { seed_ = s; }
 
     void reset() noexcept
     {
-        seed_ = 0x12345678u;
+        seed_    = 0x12345678u;
         lpState_ = shelfState_ = 0.0f;
         p0_ = p1_ = p2_ = p3_ = p4_ = p5_ = p6_ = 0.0f;
     }
 
-    float processSample (float whiteToPink) noexcept
+    float processSample(float whiteToPink) noexcept
     {
-        const float white = nextWhite (seed_);
+        const float white = nextWhite(seed_);
 
         float out;
         if (pink_)
@@ -123,7 +123,7 @@ public:
             p5_ = -0.7616f * p5_ - white * 0.0168980f;
 
             const float pink = p0_ + p1_ + p2_ + p3_ + p4_ + p5_ + p6_ + white * 0.5362f;
-            p6_ = white * 0.115926f;
+            p6_              = white * 0.115926f;
 
             out = pink * 0.11f * (1.0f - whiteToPink) + white * whiteToPink;
         }
@@ -144,7 +144,7 @@ public:
 
 private:
     std::uint32_t seed_ = 0x12345678u;
-    bool pink_ = true;
+    bool pink_          = true;
     float lpCoeff_ = 0.0f, lpState_ = 0.0f;
     float shelfCoeff_ = 0.0f, shelfGain_ = 0.0f, shelfState_ = 0.0f;
     float p0_ = 0.0f, p1_ = 0.0f, p2_ = 0.0f, p3_ = 0.0f;
@@ -155,24 +155,24 @@ private:
 class LeakNoise
 {
 public:
-    void prepare (double sampleRate, float hpHz) noexcept
+    void prepare(double sampleRate, float hpHz) noexcept
     {
-        const float sr = static_cast<float> (sampleRate);
-        hpCoeff_ = 1.0f - junobbd_detail::expDet (-2.0f * dspmath_detail::kPi * hpHz / sr);
-        lpCoeff_ = 1.0f - junobbd_detail::expDet (-2.0f * dspmath_detail::kPi * 4000.0f / sr);
+        const float sr = static_cast<float>(sampleRate);
+        hpCoeff_       = 1.0f - junobbd_detail::expDet(-2.0f * dspmath_detail::kPi * hpHz / sr);
+        lpCoeff_       = 1.0f - junobbd_detail::expDet(-2.0f * dspmath_detail::kPi * 4000.0f / sr);
     }
 
     void reset() noexcept
     {
         // Las DOS lineas comparten semilla: es lo que hace el original, y son
         // ruido especular. Ver la nota de la cabecera del fichero.
-        seed_ = 0xDEADBEEFu;
+        seed_    = 0xDEADBEEFu;
         hpState_ = lpState_ = 0.0f;
     }
 
     float processSample() noexcept
     {
-        const float white = nextWhite (seed_);
+        const float white = nextWhite(seed_);
         hpState_ += hpCoeff_ * (white - hpState_);
         const float hp = white - hpState_;
         lpState_ += lpCoeff_ * (hp - lpState_);
@@ -194,20 +194,28 @@ private:
 class BbdClick
 {
 public:
-    void prepare (double sampleRate, float threshold, float durationMs) noexcept
+    void prepare(double sampleRate, float threshold, float durationMs) noexcept
     {
         threshold_ = threshold;
-        duration_  = static_cast<int> (durationMs * 0.001f * static_cast<float> (sampleRate));
+        duration_  = static_cast<int>(durationMs * 0.001f * static_cast<float>(sampleRate));
     }
 
-    void reset() noexcept { counter_ = -1; wasInZone_ = false; }
-    void suppress() noexcept { counter_ = -1; wasInZone_ = true; }
+    void reset() noexcept
+    {
+        counter_   = -1;
+        wasInZone_ = false;
+    }
+    void suppress() noexcept
+    {
+        counter_   = -1;
+        wasInZone_ = true;
+    }
 
-    float processSample (float lfoForLine) noexcept
+    float processSample(float lfoForLine) noexcept
     {
         const bool inZone = lfoForLine > threshold_;
 
-        if (inZone && ! wasInZone_) counter_ = 0;
+        if (inZone && !wasInZone_) counter_ = 0;
         wasInZone_ = inZone;
 
         if (counter_ < 0 || counter_ >= duration_)
@@ -221,24 +229,23 @@ public:
         constexpr float kLeadDecayRate   = 4.0f;
         constexpr float kTrailDecayRate  = 8.0f;
 
-        const float t = static_cast<float> (counter_) / static_cast<float> (duration_);
+        const float t = static_cast<float>(counter_) / static_cast<float>(duration_);
         ++counter_;
 
         if (t < kAsymPoint)
         {
             const float u = t / kAsymPoint;
-            return -junobbd_detail::expDet (-kLeadDecayRate * u) * sin (dspmath_detail::kPi * u);
+            return -junobbd_detail::expDet(-kLeadDecayRate * u) * sin(dspmath_detail::kPi * u);
         }
 
         const float u = (t - kAsymPoint) / (1.0f - kAsymPoint);
-        return kSecondLobeScale * junobbd_detail::expDet (-kTrailDecayRate * u)
-                                  * sin (dspmath_detail::kPi * u);
+        return kSecondLobeScale * junobbd_detail::expDet(-kTrailDecayRate * u) * sin(dspmath_detail::kPi * u);
     }
 
 private:
-    int counter_ = -1;
-    int duration_ = 0;
-    bool wasInZone_ = false;
+    int counter_     = -1;
+    int duration_    = 0;
+    bool wasInZone_  = false;
     float threshold_ = 0.95f;
 };
 
@@ -260,13 +267,13 @@ private:
 class BbdNoiseStage
 {
 public:
-    void setProfile (const JunoBbdProfile& p) noexcept
+    void setProfile(const JunoBbdProfile& p) noexcept
     {
-        profile_ = &p;
+        profile_  = &p;
         prepared_ = false;
     }
 
-    void prepareSampleRate (double sampleRate) noexcept
+    void prepareSampleRate(double sampleRate) noexcept
     {
         sampleRate_ = sampleRate;
         prepared_   = false;
@@ -276,14 +283,16 @@ public:
 
     /** 0 = rosa, 1 = blanco. Es del panel, no de la maquina, asi que NO esta en
         el perfil: el perfil es `constexpr` y esto lo mueve el usuario. */
-    void setHissColour (float c) noexcept { hissColor_ = jlimit (0.0f, 1.0f, c); }
+    void setHissColour(float c) noexcept { hissColor_ = jlimit(0.0f, 1.0f, c); }
 
     void reset() noexcept
     {
         // Las semillas de las dos lineas de fondo son DISTINTAS aqui, y las dos
         // lineas de fuga arrancan con la misma. Ver la cabecera del fichero.
-        floorL_.reset(); floorL_.setSeed (0x12345678u);
-        floorR_.reset(); floorR_.setSeed (0x87654321u);
+        floorL_.reset();
+        floorL_.setSeed(0x12345678u);
+        floorR_.reset();
+        floorR_.setSeed(0x87654321u);
         leakL_.reset();
         leakR_.reset();
         clickPriL_.reset();
@@ -302,7 +311,7 @@ public:
     }
 
     /** Entrada conforme al contrato de `EffectPolicy.h`; aqui no colorea nada. */
-    float processSample (float, float = 0.0f, float = 0.0f) noexcept { return 0.0f; }
+    float processSample(float, float = 0.0f, float = 0.0f) noexcept { return 0.0f; }
 
     /**
         `leakAmount` es la profundidad del LFO (CUANTA fuga hay en este punto),
@@ -319,53 +328,50 @@ public:
         (cuando manda el siseo) el error es de 1e-5 y no se oye, asi que un
         test de "suena parecido" no lo caza: solo lo caza la paridad a 0 ulps.
     */
-    BbdStageOutput processLeft (float leakAmount, float lfo, float clickScale,
+    BbdStageOutput processLeft(float leakAmount, float lfo, float clickScale,
+                               float baseNoiseGain, float hissMultiplier) noexcept
+    {
+        ensurePrepared();
+        return one(floorL_, leakL_, clickPriL_, clickSloL_, leakAmount, -lfo, lfo,
+                   clickScale, baseNoiseGain, hissMultiplier);
+    }
+
+    BbdStageOutput processRight(float leakAmount, float lfo, float clickScale,
                                 float baseNoiseGain, float hissMultiplier) noexcept
     {
         ensurePrepared();
-        return one (floorL_, leakL_, clickPriL_, clickSloL_, leakAmount, -lfo, lfo,
-                    clickScale, baseNoiseGain, hissMultiplier);
-    }
-
-    BbdStageOutput processRight (float leakAmount, float lfo, float clickScale,
-                                 float baseNoiseGain, float hissMultiplier) noexcept
-    {
-        ensurePrepared();
-        return one (floorR_, leakR_, clickPriR_, clickSloR_, leakAmount, lfo, -lfo,
-                    clickScale, baseNoiseGain, hissMultiplier);
+        return one(floorR_, leakR_, clickPriR_, clickSloR_, leakAmount, lfo, -lfo,
+                   clickScale, baseNoiseGain, hissMultiplier);
     }
 
 private:
-    BbdStageOutput one (bbdnoise_detail::FloorNoise&  floorN,
-                        bbdnoise_detail::LeakNoise&   leakN,
-                        bbdnoise_detail::BbdClick&    pri,
-                        bbdnoise_detail::BbdClick&    slo,
-                        float leakAmount,
-                        float priLfo,
-                        float sloLfo,
-                        float clickScale,
-                        float baseNoiseGain,
-                        float hissMultiplier) noexcept
+    BbdStageOutput one(bbdnoise_detail::FloorNoise& floorN,
+                       bbdnoise_detail::LeakNoise& leakN,
+                       bbdnoise_detail::BbdClick& pri,
+                       bbdnoise_detail::BbdClick& slo,
+                       float leakAmount,
+                       float priLfo,
+                       float sloLfo,
+                       float clickScale,
+                       float baseNoiseGain,
+                       float hissMultiplier) noexcept
     {
         const JunoBbdProfile& p = *profile_;
 
         // El orden importa: es el orden del original, y el estado es recurrente.
         const float leakNoise = leakN.processSample();
-        const float floor     = floorN.processSample (hissColor_);
+        const float floor     = floorN.processSample(hissColor_);
 
-        const float priValue = pri.processSample (priLfo) * p.clickGain * clickScale;
-        const float sloValue = slo.processSample (sloLfo) * p.slowClickGain * clickScale;
+        const float priValue = pri.processSample(priLfo) * p.clickGain * clickScale;
+        const float sloValue = slo.processSample(sloLfo) * p.slowClickGain * clickScale;
 
         // El desgaste se aplica al conjunto, y el nivel de siseo SOLO al fondo.
         // Ver el comentario de `processLeft`.
         const float wetPink = floor * baseNoiseGain * hissMultiplier;
 
         BbdStageOutput out;
-        out.click    = priValue;                 // el anillo lo usa sin escalar
-        out.injected = (wetPink
-                      + leakNoise * p.leakGain * leakAmount
-                      + priValue
-                      - sloValue) * hissMultiplier;
+        out.click    = priValue; // el anillo lo usa sin escalar
+        out.injected = (wetPink + leakNoise * p.leakGain * leakAmount + priValue - sloValue) * hissMultiplier;
 
         return out;
     }
@@ -377,29 +383,29 @@ private:
 
         const JunoBbdProfile& p = *profile_;
 
-        floorL_.prepare (sampleRate_, p.noiseLpCutoffHz, p.noiseShelfHz, p.noiseShelfDb);
-        floorR_.prepare (sampleRate_, p.noiseLpCutoffHz, p.noiseShelfHz, p.noiseShelfDb);
+        floorL_.prepare(sampleRate_, p.noiseLpCutoffHz, p.noiseShelfHz, p.noiseShelfDb);
+        floorR_.prepare(sampleRate_, p.noiseLpCutoffHz, p.noiseShelfHz, p.noiseShelfDb);
         hissColor_ = p.hissColor;
-        leakL_.prepare  (sampleRate_, p.leakHpHz);
-        leakR_.prepare  (sampleRate_, p.leakHpHz);
+        leakL_.prepare(sampleRate_, p.leakHpHz);
+        leakR_.prepare(sampleRate_, p.leakHpHz);
 
-        clickPriL_.prepare (sampleRate_, p.clickThreshold, p.clickDurationMs);
-        clickPriR_.prepare (sampleRate_, p.clickThreshold, p.clickDurationMs);
-        clickSloL_.prepare (sampleRate_, p.clickThreshold, p.clickDurationMs);
-        clickSloR_.prepare (sampleRate_, p.clickThreshold, p.clickDurationMs);
+        clickPriL_.prepare(sampleRate_, p.clickThreshold, p.clickDurationMs);
+        clickPriR_.prepare(sampleRate_, p.clickThreshold, p.clickDurationMs);
+        clickSloL_.prepare(sampleRate_, p.clickThreshold, p.clickDurationMs);
+        clickSloR_.prepare(sampleRate_, p.clickThreshold, p.clickDurationMs);
 
         prepared_ = true;
     }
 
     const JunoBbdProfile* profile_ = nullptr;
-    double sampleRate_ = 44100.0;
-    bool prepared_ = false;
-    float hissColor_ = 0.4f;
+    double sampleRate_             = 44100.0;
+    bool prepared_                 = false;
+    float hissColor_               = 0.4f;
 
     bbdnoise_detail::FloorNoise floorL_, floorR_;
-    bbdnoise_detail::LeakNoise  leakL_, leakR_;
-    bbdnoise_detail::BbdClick   clickPriL_, clickPriR_;
-    bbdnoise_detail::BbdClick   clickSloL_, clickSloR_;
+    bbdnoise_detail::LeakNoise leakL_, leakR_;
+    bbdnoise_detail::BbdClick clickPriL_, clickPriR_;
+    bbdnoise_detail::BbdClick clickSloL_, clickSloR_;
 };
 
 } // namespace abd::dsp

@@ -107,8 +107,8 @@
 
 #pragma once
 
-#include "DspCore/DspMath.h"
 #include "DspCore/DspCore.h"
+#include "DspCore/DspMath.h"
 
 namespace abd::dsp
 {
@@ -130,15 +130,15 @@ template <int kEtapas = 4, int kTasa = 16>
 class Phaser4
 {
 public:
-    Phaser4() = default;
+    Phaser4()  = default;
     ~Phaser4() = default;
 
     // Sin etapas no hay phaser, y con una tasa de cero el contador se cumple
     // en cada muestra, que es el caso degenerado de "sin bloque". Se dicen aqui
     // y no en un comentario porque un `static_assert` sale en la compilacion del
     // que se equivoca, y un comentario sale en la del que lo lee.
-    static_assert (kEtapas >= 1, "un phaser necesita al menos una etapa");
-    static_assert (kTasa >= 1, "la tasa de control tiene que ser al menos una muestra");
+    static_assert(kEtapas >= 1, "un phaser necesita al menos una etapa");
+    static_assert(kTasa >= 1, "la tasa de control tiene que ser al menos una muestra");
 
     //-------------------------------------------------------------------------
     /** Cada cuanto se recalcula el coeficiente, en muestras. MEDIDO: el coste
@@ -155,15 +155,15 @@ public:
 
     /** Fija el sample rate, el barrido y la velocidad, y recalcula. Un sample
         rate invalido deja el defecto, que es 44,1 kHz. */
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        sampleRate_ = (sampleRate > 1000.0) ? (float) sampleRate : 44100.0f;
-        setSweepRange (minHz_, maxHz_);
+        sampleRate_ = (sampleRate > 1000.0) ? (float)sampleRate : 44100.0f;
+        setSweepRange(minHz_, maxHz_);
         // El LFO se mide en ciclos por MUESTRA, asi que depende del sample rate.
         // Sin esta linea, un `prepare` a 96 kHz con el mismo `setRateHz` barria
         // cuatro veces mas rapido que a 24 kHz, y el motor no tendria el mismo
         // sonido en un host que cambia de sample rate.
-        incLfo_ = (double) rateHz_ / (double) sampleRate_;
+        incLfo_ = (double)rateHz_ / (double)sampleRate_;
         updateCoefficients();
         reset();
     }
@@ -178,8 +178,8 @@ public:
             estadoR_[k].x1 = estadoR_[k].y1 = 0.0f;
         }
         fbL_ = fbR_ = 0.0f;
-        fbMono_ = 0.0f;
-        faseLfo_ = 0.0;
+        fbMono_     = 0.0f;
+        faseLfo_    = 0.0;
 
         // Y EL CONTADOR VA ATRASADO UNA MUESTRA, a proposito. `prepare` calcula
         // el coeficiente con la profundidad y la velocidad POR DEFECTO, porque
@@ -214,10 +214,10 @@ public:
         muestreo por ciclo y "barrido" deja de significar nada. El suelo de
         0,001 Hz es un ciclo cada mil segundos, por debajo del cual el barrido
         es una constante con un deriva que tarda horas en oírse. */
-    void setRateHz (float hz) noexcept
+    void setRateHz(float hz) noexcept
     {
-        rateHz_ = jlimit (0.001f, 1000.0f, hz);
-        incLfo_ = (double) rateHz_ / (double) sampleRate_;
+        rateHz_ = jlimit(0.001f, 1000.0f, hz);
+        incLfo_ = (double)rateHz_ / (double)sampleRate_;
     }
 
     float getRateHz() const noexcept { return rateHz_; }
@@ -229,18 +229,18 @@ public:
         de lo que el nombre sugiere: a 0,5 el corte recorre la mitad del
         recorrido logaritmico, no la mitad del rango de frecuencia, y por eso
         el barrido pasa mas tiempo en lo grave. Se conserva. */
-    void setDepth (float d) noexcept
+    void setDepth(float d) noexcept
     {
-        depth_ = jlimit (0.0f, 1.0f, d);
+        depth_ = jlimit(0.0f, 1.0f, d);
     }
 
     float getDepth() const noexcept { return depth_; }
 
     /** Realimentacion, de 0 a 1. El tope interno es 0,90, que es donde el lazo
         es estable con cuatro etapas; ver la cabecera. */
-    void setFeedback (float f) noexcept
+    void setFeedback(float f) noexcept
     {
-        feedback_ = jlimit (0.0f, 1.0f, f) * 0.90f;
+        feedback_ = jlimit(0.0f, 1.0f, f) * 0.90f;
     }
 
     float getFeedback() const noexcept { return feedback_; }
@@ -254,12 +254,12 @@ public:
 
         El minimo tiene un suelo de 20 Hz porque por debajo el todo-paso se
         acerca a la identidad y el phaser deja de hacer la muesca. */
-    void setSweepRange (float minHz, float maxHz) noexcept
+    void setSweepRange(float minHz, float maxHz) noexcept
     {
         const float limite = sampleRate_ * 0.45f;
-        minHz_ = jmax (20.0f, jmin (minHz, limite));
-        maxHz_ = jmax (minHz_, jmin (maxHz, limite));
-        sweepRatio_ = maxHz_ / minHz_;
+        minHz_             = jmax(20.0f, jmin(minHz, limite));
+        maxHz_             = jmax(minHz_, jmin(maxHz, limite));
+        sweepRatio_        = maxHz_ / minHz_;
     }
 
     float getMinHz() const noexcept { return minHz_; }
@@ -274,7 +274,7 @@ public:
         original. El estado es por etapa y por canal: ocho estados, porque las
         cuatro etapas de un canal no se pueden compartir el estado con las del
         otro. */
-    void processFrame (float& left, float& right) noexcept
+    void processFrame(float& left, float& right) noexcept
     {
         // El contador TIENE que volver a cero, y NO se reinicia por bloque: si
         // se reiniciara, con un bloque de 384 muestras la division no cuadra y
@@ -291,8 +291,8 @@ public:
 
         for (int k = 0; k < kEtapas; ++k)
         {
-            xL = etapa (estadoL_[k], xL, coefL_);
-            xR = etapa (estadoR_[k], xR, coefR_);
+            xL = etapa(estadoL_[k], xL, coefL_);
+            xR = etapa(estadoR_[k], xR, coefR_);
         }
 
         fbL_ = xL;
@@ -301,7 +301,7 @@ public:
         // 50 % humeda/seca, fijo y del original: la mezcla al 50 % es lo que
         // cancela la muesca con la senal directa. Con mezcla ajustable la
         // muesca desaparece al bajar de 0,5, y el efecto deja de ser un phaser.
-        left  = left  * 0.5f + xL * 0.5f;
+        left  = left * 0.5f + xL * 0.5f;
         right = right * 0.5f + xR * 0.5f;
     }
 
@@ -311,7 +311,7 @@ public:
         barrido es el mismo en los dos canales o dos barridos distintos, y la
         respuesta cambia el timbre entero. En `processFrame` son dos barridos en
         cuadratura, que es lo del original. */
-    float processSample (float x) noexcept
+    float processSample(float x) noexcept
     {
         if (++cuenta_ >= kTasa)
         {
@@ -321,7 +321,7 @@ public:
 
         float y = x + fbMono_ * feedback_;
         for (int k = 0; k < kEtapas; ++k)
-            y = etapa (estadoMono_[k], y, coefMono_);
+            y = etapa(estadoMono_[k], y, coefMono_);
 
         fbMono_ = y;
         return x * 0.5f + y * 0.5f;
@@ -346,10 +346,10 @@ public:
         dentro su propia `std::tan` de libm, sin reimplementar el filtro entero
         en el test. La alternativa —escribir la formula otra vez dentro del
         test— daria verde siempre, porque compararia el motor consigo mismo. */
-    static float coeficienteDe (float freqHz, float sampleRate) noexcept
+    static float coeficienteDe(float freqHz, float sampleRate) noexcept
     {
         const float x = 3.14159265f * freqHz / sampleRate;
-        const float t = sin (x) / cos (x);
+        const float t = sin(x) / cos(x);
         return (t - 1.0f) / (t + 1.0f);
     }
 
@@ -372,11 +372,11 @@ private:
         transpuesta porque en un todo-paso de primer orden las dos dan el mismo
         resultado con el mismo numero de operaciones, y aqui importa mas la
         traza con la referencia congelada que la forma. */
-    static float etapa (Estado& e, float x, float a) noexcept
+    static float etapa(Estado& e, float x, float a) noexcept
     {
         const float y = a * x + e.x1 - a * e.y1;
-        e.x1 = x;
-        e.y1 = y;
+        e.x1          = x;
+        e.y1          = y;
         return y;
     }
 
@@ -398,9 +398,9 @@ private:
         El mapeo es logaritmico, del original: `f = min · (max/min)^profundidad`
         con la profundidad media entre 0 y 1. La razon `max/min` se calcula UNA
         vez en `setSweepRange` y no por bloque, porque no cambia. */
-    float corteDe (float lfo) const noexcept
+    float corteDe(float lfo) const noexcept
     {
-        return minHz_ * pow (sweepRatio_, (lfo * 0.5f + 0.5f) * depth_);
+        return minHz_ * pow(sweepRatio_, (lfo * 0.5f + 0.5f) * depth_);
     }
 
     /** El bloque de control. Avanza el LFO y recalcula los DOS coeficientes.
@@ -415,11 +415,11 @@ private:
         `double` son 2^-53. Es un `double` por BLOQUE, que no cuesta nada. */
     void updateCoefficients() noexcept
     {
-        const float dosPi = 6.28318530718f;
+        const float dosPi   = 6.28318530718f;
         const float medioPi = 1.5707963f;
 
-        const float lfoL = (float) sin (dosPi * (float) faseLfo_);
-        const float lfoR = (float) sin (dosPi * (float) faseLfo_ + medioPi);
+        const float lfoL = (float)sin(dosPi * (float)faseLfo_);
+        const float lfoR = (float)sin(dosPi * (float)faseLfo_ + medioPi);
 
         // La fase avanza UN BLOQUE, que son `kTasa` muestras, y por eso el
         // incremento va multiplicado por `kTasa`. Sin esa multiplicacion el LFO
@@ -437,43 +437,43 @@ private:
         // un motor que avanza muestra a muestra. Hay que quitar las vueltas
         // enteras de golpe.
         if (faseLfo_ >= 1.0)
-            faseLfo_ -= (double) floorToInt ((float) faseLfo_);
+            faseLfo_ -= (double)floorToInt((float)faseLfo_);
 
-        cutoffL_ = corteDe (lfoL);
-        cutoffR_ = corteDe (lfoR);
+        cutoffL_ = corteDe(lfoL);
+        cutoffR_ = corteDe(lfoR);
 
-        coefL_ = coeficienteDe (cutoffL_, sampleRate_);
-        coefR_ = coeficienteDe (cutoffR_, sampleRate_);
+        coefL_ = coeficienteDe(cutoffL_, sampleRate_);
+        coefR_ = coeficienteDe(cutoffR_, sampleRate_);
     }
 
     /** El bloque de control en mono: un LFO, un coeficiente. */
     void updateCoefficientsMono() noexcept
     {
-        const float lfo = (float) sin (6.28318530718f * (float) faseLfo_);
+        const float lfo = (float)sin(6.28318530718f * (float)faseLfo_);
 
         faseLfo_ += incLfo_ * kTasa;
         if (faseLfo_ >= 1.0)
-            faseLfo_ -= (double) floorToInt ((float) faseLfo_);
+            faseLfo_ -= (double)floorToInt((float)faseLfo_);
 
-        cutoffL_ = corteDe (lfo);
-        coefMono_ = coeficienteDe (cutoffL_, sampleRate_);
+        cutoffL_  = corteDe(lfo);
+        coefMono_ = coeficienteDe(cutoffL_, sampleRate_);
     }
 
     //-------------------------------------------------------------------------
     float sampleRate_ = 44100.0f;
-    float minHz_ = 200.0f;
-    float maxHz_ = 5500.0f;
+    float minHz_      = 200.0f;
+    float maxHz_      = 5500.0f;
     float sweepRatio_ = 27.5f;
 
-    float rateHz_ = 0.5f;
-    float depth_ = 0.5f;
+    float rateHz_   = 0.5f;
+    float depth_    = 0.5f;
     float feedback_ = 0.0f;
 
     /** La fase del LFO y su incremento en ciclos por MUESTRA. Se avanza por
         bloque, multiplicando por `kControlRate`, que es lo mismo que avanzar
         `kControlRate` veces y da la misma trayectoria. */
     double faseLfo_ = 0.0;
-    double incLfo_ = 0.5 / 44100.0;
+    double incLfo_  = 0.5 / 44100.0;
 
     float coefL_ = 0.0f, coefR_ = 0.0f, coefMono_ = 0.0f;
     float cutoffL_ = 0.0f, cutoffR_ = 0.0f;

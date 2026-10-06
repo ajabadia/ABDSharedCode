@@ -52,23 +52,23 @@ class Chorus
 public:
     /** Capacidad por defecto: 2 canales x 100ms @ 44.1 kHz, como el original. */
     Chorus()
-        : delayBuffer (2, 4096)
+        : delayBuffer(2, 4096)
     {
         delayBuffer.clear();
     }
 
     /** Fija el sample rate y la capacidad del buffer (100ms por defecto, que es
         el maximo que necesita la modulacion de 5ms..30ms). */
-    void prepare (double sampleRate, double maxDelaySeconds = 0.1)
+    void prepare(double sampleRate, double maxDelaySeconds = 0.1)
     {
-        dspAssert (sampleRate > 0.0);
-        dspAssert (maxDelaySeconds > 0.0);
+        dspAssert(sampleRate > 0.0);
+        dspAssert(maxDelaySeconds > 0.0);
 
         sampleRate_ = sampleRate;
-        delayBuffer.setSize (2, static_cast<int> (sampleRate * maxDelaySeconds));
+        delayBuffer.setSize(2, static_cast<int>(sampleRate * maxDelaySeconds));
         delayBuffer.clear();
-        phase = 0.0f;
-        writePos = 0;   // desviacion documentada: ver cabecera
+        phase    = 0.0f;
+        writePos = 0; // desviacion documentada: ver cabecera
     }
 
     /** Vacia el buffer sin tocar la fase ni el puntero de escritura (como el
@@ -82,40 +82,39 @@ public:
 
         Orden identico al original: primero escribe la entrada en la posicion
         actual, luego lee la posicion modulada, y devuelve la mezcla wet/dry. */
-    float processSample (int channel, float input, float depth, float mix) noexcept
+    float processSample(int channel, float input, float depth, float mix) noexcept
     {
-        const int chan = channel % 2;
+        const int chan       = channel % 2;
         const int bufferSize = delayBuffer.getNumSamples();
 
         // Modulacion: LFO entre 5ms y 30ms. Sin determinista propio (no la
         // libm de la plataforma): ver DspCore/DspMath.h. Es lo que sostiene la
         // paridad bit a bit nativo <-> WASM del escenario C.
-        const float mod = (dsp::sin (phase) + 1.0f) * 0.5f;   // 0 a 1
-        const float delaySamples = (0.005f + mod * 0.025f * depth) * static_cast<float> (sampleRate_);
+        const float mod          = (dsp::sin(phase) + 1.0f) * 0.5f; // 0 a 1
+        const float delaySamples = (0.005f + mod * 0.025f * depth) * static_cast<float>(sampleRate_);
 
-        delayBuffer.setSample (chan, writePos, input);
+        delayBuffer.setSample(chan, writePos, input);
 
-        float readPos = static_cast<float> (writePos) - delaySamples;
+        float readPos = static_cast<float>(writePos) - delaySamples;
         if (readPos < 0.0f)
-            readPos += static_cast<float> (bufferSize);
+            readPos += static_cast<float>(bufferSize);
 
-        const int index1 = static_cast<int> (readPos);
-        const int index2 = (index1 + 1) % bufferSize;
-        const float fraction = readPos - static_cast<float> (index1);
+        const int index1     = static_cast<int>(readPos);
+        const int index2     = (index1 + 1) % bufferSize;
+        const float fraction = readPos - static_cast<float>(index1);
 
-        const float delayedSample = (1.0f - fraction) * delayBuffer.getSample (chan, index1)
-                                  + fraction * delayBuffer.getSample (chan, index2);
+        const float delayedSample = (1.0f - fraction) * delayBuffer.getSample(chan, index1) + fraction * delayBuffer.getSample(chan, index2);
 
         return (input * (1.0f - mix * 0.5f)) + (delayedSample * mix * 0.5f);
     }
 
     /** Avanza la fase del LFO y el puntero de escritura. Una vez por muestra,
         tras recorrer los canales, con la frecuencia de ESA muestra. */
-    void advance (float rateHz) noexcept
+    void advance(float rateHz) noexcept
     {
         const float twoPi = MathConstants<float>::twoPi;
 
-        const float phaseInc = twoPi * rateHz / static_cast<float> (sampleRate_);
+        const float phaseInc = twoPi * rateHz / static_cast<float>(sampleRate_);
 
         // `rateHz` entra POR MUESTRA y desde el consumidor, SIN recortar. Con
         // un `if` de una sola resta (que es lo que habia) el envuelto solo vale
@@ -129,7 +128,7 @@ public:
         // resta y deja la fase en 6.283182 en vez de 0, con un error que se
         // acumula muestra a muestra. Medido: el `while` desviaba la salida
         // 9.9e-2 respecto a rate 0, `wrapPhase` la reproduce BIT A BIT.
-        phase = dsp::wrapPhase (phase + phaseInc, twoPi);
+        phase = dsp::wrapPhase(phase + phaseInc, twoPi);
 
         if (++writePos >= delayBuffer.getNumSamples())
             writePos = 0;
@@ -140,11 +139,11 @@ public:
 
 private:
     AudioBuffer<float> delayBuffer;
-    int writePos = 0;
-    float phase = 0.0f;
+    int writePos       = 0;
+    float phase        = 0.0f;
     double sampleRate_ = 44100.0;
 
-    dspDeclareNonCopyableWithLeakDetector (Chorus)
+    dspDeclareNonCopyableWithLeakDetector(Chorus)
 };
 
 } // namespace abd::dsp

@@ -47,20 +47,24 @@ public:
 
     ~FxSlot() { destroy(); }
 
-    FxSlot (const FxSlot&) = delete;
-    FxSlot& operator= (const FxSlot&) = delete;
+    FxSlot(const FxSlot&)            = delete;
+    FxSlot& operator=(const FxSlot&) = delete;
 
-    FxSlot (FxSlot&& other) noexcept { moveFrom (other); }
-    FxSlot& operator= (FxSlot&& other) noexcept
+    FxSlot(FxSlot&& other) noexcept { moveFrom(other); }
+    FxSlot& operator=(FxSlot&& other) noexcept
     {
-        if (this != &other) { destroy(); moveFrom (other); }
+        if (this != &other)
+        {
+            destroy();
+            moveFrom(other);
+        }
         return *this;
     }
 
     /// Un hueco se puede mover (lo devuelve la fabrica) pero no copiar: copiarlo
     /// exigiria clonar el efecto, que es estado opaco con un destructor
     /// arbitrario. Por eso el constructor de copia esta eliminado.
-    void moveFrom (FxSlot& other) noexcept
+    void moveFrom(FxSlot& other) noexcept
     {
         catalogue_     = other.catalogue_;
         catalogueSize_ = other.catalogueSize_;
@@ -74,27 +78,27 @@ public:
 
         for (int i = 0; i < kFxMaxParams; ++i)
         {
-            params_[i] = other.params_[i];
+            params_[i]  = other.params_[i];
             touched_[i] = other.touched_[i];
         }
 
-        wetBuffer_ = std::move (other.wetBuffer_);
+        wetBuffer_ = std::move(other.wetBuffer_);
 
-        other.info_ = nullptr;
-        other.effect_ = nullptr;
-        other.catalogue_ = nullptr;
+        other.info_          = nullptr;
+        other.effect_        = nullptr;
+        other.catalogue_     = nullptr;
         other.catalogueSize_ = 0;
     }
 
     //==============================================================================
     /** Prepara el hueco y sus buffers. El catalogo puede cambiar entre llamadas,
         asi que se pasa aqui y no se deduce del tipo. */
-    void prepare (double sampleRate, int numChannels, int maxBlockSize,
-                  const FxEffectInfo* catalogue, int catalogueSize) noexcept
+    void prepare(double sampleRate, int numChannels, int maxBlockSize,
+                 const FxEffectInfo* catalogue, int catalogueSize) noexcept
     {
-        sampleRate_    = sampleRate > 0.0 ? sampleRate : 44100.0;
-        maxBlockSize_  = maxBlockSize > 0 ? maxBlockSize : 512;
-        (void) numChannels;   // los dos primeros canales; el resto no se toca
+        sampleRate_   = sampleRate > 0.0 ? sampleRate : 44100.0;
+        maxBlockSize_ = maxBlockSize > 0 ? maxBlockSize : 512;
+        (void)numChannels; // los dos primeros canales; el resto no se toca
 
         catalogue_     = catalogue;
         catalogueSize_ = catalogueSize;
@@ -106,7 +110,7 @@ public:
         // modulo lo dice al final del programa, y con razon.
         destroy();
 
-        wetBuffer_.setSize (2, maxBlockSize_);
+        wetBuffer_.setSize(2, maxBlockSize_);
         wetBuffer_.clear();
 
         // Los parametros por defecto son los de la fila del catalogo, que estan
@@ -132,7 +136,7 @@ public:
 
         Los valores por defecto son los de `prepare`, que es donde nace el
         hueco. Despues, el usuario manda. */
-    void setType (int type) noexcept
+    void setType(int type) noexcept
     {
         if (type == type_)
             return;
@@ -140,7 +144,7 @@ public:
         type_ = type;
         destroy();
         syncDefaultsFromCatalogue();
-        createInstance();   // `createInstance` reaplica los mandos que ya hay
+        createInstance(); // `createInstance` reaplica los mandos que ya hay
     }
 
     int getType() const noexcept { return type_; }
@@ -150,7 +154,7 @@ public:
     //==============================================================================
     /** Pone un parametro NORMALIZADO 0..1. Se guarda aunque no haya efecto:
         un parametro puesto antes de meter el efecto tiene que seguir ahi. */
-    void setParameter (int index, float value) noexcept
+    void setParameter(int index, float value) noexcept
     {
         if (index < 0 || index >= kFxMaxParams)
             return;
@@ -163,12 +167,12 @@ public:
         //
         // `std::isfinite` no es libm: es una prueba de bits que el compilador
         // resuelve sin llamada, asi que el modulo sigue siendo libm-free.
-        if (! std::isfinite (value))
+        if (!std::isfinite(value))
             return;
 
         touched_[index] = true;
 
-        const float v = jlimit (0.0f, 1.0f, value);
+        const float v = jlimit(0.0f, 1.0f, value);
         if (v == params_[index])
             return;
 
@@ -177,18 +181,18 @@ public:
         if (effect_ != nullptr && info_ != nullptr)
         {
             if (index < info_->numParams)
-                info_->setParam (effect_, index, v);
+                info_->setParam(effect_, index, v);
         }
     }
 
-    float getParameter (int index) const noexcept
+    float getParameter(int index) const noexcept
     {
         return (index >= 0 && index < kFxMaxParams) ? params_[index] : 0.0f;
     }
 
     /** Si el usuario ha movido ese mando alguna vez. Un mando sin tocar sigue
         tomando el valor por defecto de la fila que haya en el hueco. */
-    bool isParameterTouched (int index) const noexcept
+    bool isParameterTouched(int index) const noexcept
     {
         return index >= 0 && index < kFxMaxParams && touched_[index];
     }
@@ -196,11 +200,17 @@ public:
     // Los dos unten las manos: un valor que no es un numero se IGNORA y el
     // mando se queda como estaba, en vez de recortarse a un numero valido. Es
     // la unica diferencia con el recorte de verdad, que sigue igual.
-    void setGain (float gain) noexcept  { if (std::isfinite (gain)) gain_ = gain < 0.0f ? 0.0f : gain; }
-    float getGain() const noexcept      { return gain_; }
+    void setGain(float gain) noexcept
+    {
+        if (std::isfinite(gain)) gain_ = gain < 0.0f ? 0.0f : gain;
+    }
+    float getGain() const noexcept { return gain_; }
 
-    void setMix (float mix) noexcept    { if (std::isfinite (mix)) mix_ = jlimit (0.0f, 1.0f, mix); }
-    float getMix() const noexcept       { return mix_; }
+    void setMix(float mix) noexcept
+    {
+        if (std::isfinite(mix)) mix_ = jlimit(0.0f, 1.0f, mix);
+    }
+    float getMix() const noexcept { return mix_; }
 
     //==============================================================================
     /** Vacia el estado de audio del efecto sin tocar los mandos.
@@ -215,7 +225,7 @@ public:
             return;
 
         if (info_->reset != nullptr)
-            info_->reset (effect_);
+            info_->reset(effect_);
 
         // Los mandos se reaplican porque un `reset()` de motor de efectos
         // significa "vuelve al estado de partida", y en un producto el estado
@@ -234,15 +244,15 @@ public:
         ganancia de un slot en bypass cambiase el sonido, que es la clase de
         bug mas dificil de ver que tiene un sistema de efectos.
     */
-    void process (AudioBuffer<float>& buffer, int numSamples) noexcept
+    void process(AudioBuffer<float>& buffer, int numSamples) noexcept
     {
         if (effect_ == nullptr || info_ == nullptr)
-            return;   // bypass: la senal pasa intacta
+            return; // bypass: la senal pasa intacta
 
         if (buffer.getNumChannels() < 1)
             return;
 
-        const int n = jmin (numSamples, jmin (maxBlockSize_, buffer.getNumSamples()));
+        const int n = jmin(numSamples, jmin(maxBlockSize_, buffer.getNumSamples()));
         if (n <= 0)
             return;
 
@@ -250,14 +260,14 @@ public:
         // recoge el canal 0 dos veces. Leer el canal 1 de un buffer de un canal
         // es un nullptr disfrazado, y el motor de ABDEep hacia justo eso.
         const int channels = buffer.getNumChannels();
-        const float* inL = buffer.getReadPointer (0);
-        const float* inR = channels > 1 ? buffer.getReadPointer (1) : inL;
-        float* outL = wetBuffer_.getWritePointer (0);
-        float* outR = wetBuffer_.getWritePointer (1);
+        const float* inL   = buffer.getReadPointer(0);
+        const float* inR   = channels > 1 ? buffer.getReadPointer(1) : inL;
+        float* outL        = wetBuffer_.getWritePointer(0);
+        float* outR        = wetBuffer_.getWritePointer(1);
 
-        info_->process (effect_, inL, inR, outL, outR, n);
+        info_->process(effect_, inL, inR, outL, outR, n);
 
-        float* bufL = buffer.getWritePointer (0);
+        float* bufL      = buffer.getWritePointer(0);
         const float seca = 1.0f - mix_;
 
         for (int i = 0; i < n; ++i)
@@ -265,7 +275,7 @@ public:
 
         if (channels > 1)
         {
-            float* bufR = buffer.getWritePointer (1);
+            float* bufR = buffer.getWritePointer(1);
             for (int i = 0; i < n; ++i)
                 bufR[i] = inR[i] * seca + outR[i] * mix_ * gain_;
         }
@@ -278,21 +288,21 @@ private:
     void destroy() noexcept
     {
         if (effect_ != nullptr && info_ != nullptr && info_->destroy != nullptr)
-            info_->destroy (effect_);
+            info_->destroy(effect_);
         effect_ = nullptr;
-        info_ = nullptr;
+        info_   = nullptr;
     }
 
     void createInstance() noexcept
     {
-        info_ = fxEffectAt (catalogue_, catalogueSize_, type_);
+        info_ = fxEffectAt(catalogue_, catalogueSize_, type_);
         if (info_ == nullptr || info_->create == nullptr)
         {
             info_ = nullptr;
             return;
         }
 
-        effect_ = info_->create (sampleRate_);
+        effect_ = info_->create(sampleRate_);
         if (effect_ != nullptr)
             pushAllParams();
     }
@@ -304,12 +314,12 @@ private:
 
         if (info_->setAllParams != nullptr)
         {
-            info_->setAllParams (effect_, params_, info_->numParams);
+            info_->setAllParams(effect_, params_, info_->numParams);
             return;
         }
 
         for (int i = 0; i < info_->numParams; ++i)
-            info_->setParam (effect_, i, params_[i]);
+            info_->setParam(effect_, i, params_[i]);
     }
 
     /**
@@ -330,7 +340,7 @@ private:
     */
     void syncDefaultsFromCatalogue() noexcept
     {
-        const FxEffectInfo* info = fxEffectAt (catalogue_, catalogueSize_, type_);
+        const FxEffectInfo* info = fxEffectAt(catalogue_, catalogueSize_, type_);
         if (info == nullptr || info->params == nullptr)
             return;
 
@@ -339,24 +349,24 @@ private:
             if (touched_[i])
                 continue;
 
-            params_[i] = fxNormalise (info->params[i], info->params[i].defaultValue);
+            params_[i] = fxNormalise(info->params[i], info->params[i].defaultValue);
         }
     }
 
     //--- Estado ------------------------------------------------------------
     const FxEffectInfo* catalogue_ = nullptr;
-    int catalogueSize_ = 0;
-    const FxEffectInfo* info_ = nullptr;
-    void* effect_ = nullptr;
+    int catalogueSize_             = 0;
+    const FxEffectInfo* info_      = nullptr;
+    void* effect_                  = nullptr;
 
-    int type_ = 0;
+    int type_                   = 0;
     float params_[kFxMaxParams] = {};
     bool touched_[kFxMaxParams] = {};
-    float gain_ = 1.0f;
-    float mix_ = 0.5f;
+    float gain_                 = 1.0f;
+    float mix_                  = 0.5f;
 
     double sampleRate_ = 44100.0;
-    int maxBlockSize_ = 512;
+    int maxBlockSize_  = 512;
 
     AudioBuffer<float> wetBuffer_;
 };

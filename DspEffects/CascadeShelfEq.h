@@ -66,7 +66,7 @@ template <typename Profile>
 class CascadeShelfEq
 {
 public:
-    CascadeShelfEq() = default;
+    CascadeShelfEq()  = default;
     ~CascadeShelfEq() = default;
 
     //==============================================================================
@@ -74,13 +74,13 @@ public:
 
         Los modos se fijan AQUI y no en cada cambio: son fijos por construccion,
         y un `setMode` por bloque seria trabajo de la nada. */
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
-        bajo_.prepare (sampleRate);
-        alto_.prepare (sampleRate);
+        bajo_.prepare(sampleRate);
+        alto_.prepare(sampleRate);
 
-        bajo_.setMode (ShelfMode::Low);
-        alto_.setMode (ShelfMode::High);
+        bajo_.setMode(ShelfMode::Low);
+        alto_.setMode(ShelfMode::High);
 
         lowIndex_  = Profile::defaultLowIndex;
         highIndex_ = Profile::defaultHighIndex;
@@ -95,8 +95,8 @@ public:
         highUsaTabla_ = true;
 
         aplicaFrecuencias();
-        bajo_.setGainDB (Profile::defaultLowGainDb);
-        alto_.setGainDB (Profile::defaultHighGainDb);
+        bajo_.setGainDB(Profile::defaultLowGainDb);
+        alto_.setGainDB(Profile::defaultHighGainDb);
     }
 
     /** Vacia el estado de audio de las dos. Los coeficientes se quedan: un
@@ -109,9 +109,9 @@ public:
 
     //==============================================================================
     /** El indice de la repisa baja, 0..numPositions-1. */
-    void setLowIndex (int index) noexcept
+    void setLowIndex(int index) noexcept
     {
-        const int recortado = recorte (index);
+        const int recortado = recorte(index);
 
         // EL "HA CAMBIADO?" MIRA TAMBIEN SI MANDA LA TABLA. Con la guarda de
         // solo el indice, escribir un hercio a mano y luego pedir el indice que
@@ -121,24 +121,24 @@ public:
         if (recortado == lowIndex_ && lowUsaTabla_)
             return;
 
-        lowIndex_ = recortado;
+        lowIndex_    = recortado;
         lowUsaTabla_ = true;
         aplicaFrecuencias();
     }
 
-    void setHighIndex (int index) noexcept
+    void setHighIndex(int index) noexcept
     {
-        const int recortado = recorte (index);
+        const int recortado = recorte(index);
 
         if (recortado == highIndex_ && highUsaTabla_)
             return;
 
-        highIndex_ = recortado;
+        highIndex_    = recortado;
         highUsaTabla_ = true;
         aplicaFrecuencias();
     }
 
-    int getLowIndex() const noexcept  { return lowIndex_; }
+    int getLowIndex() const noexcept { return lowIndex_; }
     int getHighIndex() const noexcept { return highIndex_; }
 
     //==============================================================================
@@ -161,68 +161,68 @@ public:
         que el producto acababa de poner se perdia. Y no siempre: solo cuando el
         indice de la alta casualmente no era el que ya estaba, porque la guarda
         de "no ha cambiado" cortaba antes. Dos banderas quitan las dos cosas. */
-    void setLowFrequencyHz (float hz) noexcept
+    void setLowFrequencyHz(float hz) noexcept
     {
         // El "ha cambiado?" lo decide `ShelfFilter`, que es quien conoce el
         // techo de 0,45 veces el sample rate. Aqui no se puede repetir ese
         // recorte sin inventar un techo: es la unica razon por la que este
         // setter no lleva su propia guarda.
-        bajo_.setFrequencyHz (hz);
+        bajo_.setFrequencyHz(hz);
         lowUsaTabla_ = false;
     }
 
-    void setHighFrequencyHz (float hz) noexcept
+    void setHighFrequencyHz(float hz) noexcept
     {
-        alto_.setFrequencyHz (hz);
+        alto_.setFrequencyHz(hz);
         highUsaTabla_ = false;
     }
 
-    float getLowFrequencyHz() const noexcept  { return bajo_.getFrequencyHz(); }
+    float getLowFrequencyHz() const noexcept { return bajo_.getFrequencyHz(); }
     float getHighFrequencyHz() const noexcept { return alto_.getFrequencyHz(); }
 
     //==============================================================================
     /** Ganancia en dB. NO toca la frecuencia: son dos mandos y van por dos
         caminos (ver la nota de la cabecera). */
-    void setLowGainDB (float db) noexcept  { bajo_.setGainDB (db); }
-    void setHighGainDB (float db) noexcept { alto_.setGainDB (db); }
+    void setLowGainDB(float db) noexcept { bajo_.setGainDB(db); }
+    void setHighGainDB(float db) noexcept { alto_.setGainDB(db); }
 
-    float getLowGainDB() const noexcept  { return bajo_.getGainDB(); }
+    float getLowGainDB() const noexcept { return bajo_.getGainDB(); }
     float getHighGainDB() const noexcept { return alto_.getGainDB(); }
 
     //==============================================================================
     /** Un par, con las dos repisas en cascada. */
-    void processFrame (float& left, float& right) noexcept
+    void processFrame(float& left, float& right) noexcept
     {
-        bajo_.processFrame (left, right);
-        alto_.processFrame (left, right);
+        bajo_.processFrame(left, right);
+        alto_.processFrame(left, right);
     }
 
     /** Una muestra, in situ. El estado es el del canal izquierdo, que es lo que
         hace `ShelfFilter::processSample`; un producto monofono que alterna no
         nota la diferencia, y uno que no, deberia usar `processFrame`. */
-    float processSample (float& x) noexcept
+    float processSample(float& x) noexcept
     {
-        bajo_.processSample (x);
-        return alto_.processSample (x);
+        bajo_.processSample(x);
+        return alto_.processSample(x);
     }
 
     //==============================================================================
     /** Las dos repisas, para poder mirar o medir el motor. */
-    const ShelfFilter& getLowShelf() const noexcept  { return bajo_; }
+    const ShelfFilter& getLowShelf() const noexcept { return bajo_; }
     const ShelfFilter& getHighShelf() const noexcept { return alto_; }
 
 private:
     //==============================================================================
-    static int recorte (int index) noexcept
+    static int recorte(int index) noexcept
     {
         // Sin esta linea, un perfil con `numPositions == 0` recortaba a -1 y
         // `aplicaFrecuencias` leia `lowFreqs[-1]`. Un perfil sin posiciones es
         // un error de quien lo escribe, y aqui se dice al escribirlo.
-        static_assert (Profile::numPositions > 0,
-                       "CascadeShelfEq necesita un perfil con al menos una posicion");
-        return index < 0 ? 0
-             : (index > Profile::numPositions - 1) ? Profile::numPositions - 1
-             : index;
+        static_assert(Profile::numPositions > 0,
+                      "CascadeShelfEq necesita un perfil con al menos una posicion");
+        return index < 0                             ? 0
+               : (index > Profile::numPositions - 1) ? Profile::numPositions - 1
+                                                     : index;
     }
 
     void aplicaFrecuencias() noexcept
@@ -232,10 +232,10 @@ private:
         // dos selectores, y eso hacia que el selector de la alta borrase el
         // hercio continuo de la baja. Ver la nota de `setLowFrequencyHz`.
         if (lowUsaTabla_)
-            bajo_.setFrequencyHz (Profile::lowFreqs [lowIndex_]);
+            bajo_.setFrequencyHz(Profile::lowFreqs[lowIndex_]);
 
         if (highUsaTabla_)
-            alto_.setFrequencyHz (Profile::highFreqs[highIndex_]);
+            alto_.setFrequencyHz(Profile::highFreqs[highIndex_]);
     }
 
     //--- Estado ------------------------------------------------------------

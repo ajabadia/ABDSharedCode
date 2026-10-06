@@ -58,30 +58,30 @@ public:
     static constexpr float atanNormalisation = 0.63661977236f;
 
     /** Un sample saturado con la ganancia de drive dada. */
-    static float processSample (float input, float drive) noexcept
+    static float processSample(float input, float drive) noexcept
     {
-        return dsp::atan (input * drive) * atanNormalisation;
+        return dsp::atan(input * drive) * atanNormalisation;
     }
 
     /** Aplica la saturacion a todo el buffer con una ganancia constante.
         Para ganancias que cambian muestra a muestra (el caso del suavizado de
         parametros) hay que llamar a processSample. */
-    static void processBlock (AudioBuffer<float>& buffer, float drive) noexcept
+    static void processBlock(AudioBuffer<float>& buffer, float drive) noexcept
     {
         const int numChannels = buffer.getNumChannels();
         const int numSamples  = buffer.getNumSamples();
 
         for (int ch = 0; ch < numChannels; ++ch)
         {
-            float* samples = buffer.getWritePointer (ch);
+            float* samples = buffer.getWritePointer(ch);
 
             for (int s = 0; s < numSamples; ++s)
-                samples[s] = processSample (samples[s], drive);
+                samples[s] = processSample(samples[s], drive);
         }
     }
 
 private:
-    Saturation() = delete;   // utilidad estatica: no se instancia
+    Saturation() = delete; // utilidad estatica: no se instancia
 };
 
 } // namespace abd::dsp

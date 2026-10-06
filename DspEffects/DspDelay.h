@@ -56,7 +56,7 @@ class Delay
 public:
     /** Capacidad por defecto: 2 canales x 2s @ 48 kHz, como el original. */
     Delay()
-        : delayBuffer (2, 96000)
+        : delayBuffer(2, 96000)
     {
         delayBuffer.clear();
     }
@@ -64,13 +64,13 @@ public:
     /** Fija el sample rate y la capacidad del buffer.
         Se reservan `maxDelaySamples + 1024` muestras porque la lectura va por
         delante de la escritura (mismo margen que el original). */
-    void prepare (double sampleRate, int maxDelaySamples)
+    void prepare(double sampleRate, int maxDelaySamples)
     {
-        dspAssert (sampleRate > 0.0);
-        dspAssert (maxDelaySamples > 0);
+        dspAssert(sampleRate > 0.0);
+        dspAssert(maxDelaySamples > 0);
 
         sampleRate_ = sampleRate;
-        delayBuffer.setSize (2, maxDelaySamples + 1024);
+        delayBuffer.setSize(2, maxDelaySamples + 1024);
         delayBuffer.clear();
         writePos = 0;
     }
@@ -85,25 +85,24 @@ public:
         en la posicion actual. Devuelve el tap leido, NO la mezcla.
 
         `delayInSamples` y `feedback` son los valores de ESTA muestra. */
-    float processSample (int channel, float input, float delayInSamples, float feedback) noexcept
+    float processSample(int channel, float input, float delayInSamples, float feedback) noexcept
     {
-        const int chan = channel % 2;
+        const int chan       = channel % 2;
         const int bufferSize = delayBuffer.getNumSamples();
 
-        const float readPos = wrapReadPosition (static_cast<float> (writePos) - delayInSamples,
-                                                bufferSize);
+        const float readPos = wrapReadPosition(static_cast<float>(writePos) - delayInSamples,
+                                               bufferSize);
 
         // El indice y la fraccion salen de la posicion YA ENVUELTA, y por eso
         // ambos estan dentro del buffer. El arreglo del desbordamiento esta en
         // `wrapReadPosition`; aqui solo se lee.
-        const int index1 = static_cast<int> (readPos);
-        const int index2 = (index1 + 1) % bufferSize;
-        const float fraction = readPos - static_cast<float> (index1);
+        const int index1     = static_cast<int>(readPos);
+        const int index2     = (index1 + 1) % bufferSize;
+        const float fraction = readPos - static_cast<float>(index1);
 
-        const float delayedSample = (1.0f - fraction) * delayBuffer.getSample (chan, index1)
-                                  + fraction * delayBuffer.getSample (chan, index2);
+        const float delayedSample = (1.0f - fraction) * delayBuffer.getSample(chan, index1) + fraction * delayBuffer.getSample(chan, index2);
 
-        delayBuffer.setSample (chan, writePos, input + (delayedSample * feedback));
+        delayBuffer.setSample(chan, writePos, input + (delayedSample * feedback));
 
         return delayedSample;
     }
@@ -141,14 +140,14 @@ private:
         de antes, bit a bit, asi que esto no cambia el sonido de nadie: solo
         cambia lo que antes se salia del buffer.
     */
-    static float wrapReadPosition (float readPos, int bufferSize) noexcept
+    static float wrapReadPosition(float readPos, int bufferSize) noexcept
     {
-        const float size = static_cast<float> (bufferSize);
+        const float size = static_cast<float>(bufferSize);
 
         // division entera: el truncamiento va hacia cero, asi que al FINAL hay
         // que corregir el caso negativo, que es donde el cociente "se pasa".
-        const long long q = static_cast<long long> (readPos / size);
-        float r = readPos - size * static_cast<float> (q);
+        const long long q = static_cast<long long>(readPos / size);
+        float r           = readPos - size * static_cast<float>(q);
 
         if (r < 0.0f)
             r += size;
@@ -189,10 +188,10 @@ private:
     }
 
     AudioBuffer<float> delayBuffer;
-    int writePos = 0;
+    int writePos       = 0;
     double sampleRate_ = 44100.0;
 
-    dspDeclareNonCopyableWithLeakDetector (Delay)
+    dspDeclareNonCopyableWithLeakDetector(Delay)
 };
 
 } // namespace abd::dsp

@@ -47,70 +47,70 @@ namespace abd::dsp
 /** Un parametro de un efecto, en las unidades en que lo entiende el motor. */
 struct FxParamSpec
 {
-    const char* name;          /**< Nombre para la interface. */
-    float minValue;            /**< Valor fisico en el extremo izquierdo. */
-    float maxValue;            /**< Valor fisico en el extremo derecho. */
-    float defaultValue;        /**< Valor fisico por defecto. */
-    float skew;                /**< 1.0 = lineal. < 1 da MAS RECORRIDO a la parte
-                                    baja del rango.
-
-                                    El signo esta al reves de lo que parece, y
-                                    escribiendolo al derecho se eligieron seis
-                                    mandos inservibles. Con `skew = 0.3`, la
-                                    mitad fisica del rango cae en el 0.10 del
-                                    recorrido del mando, no en el 0.5: el
-                                    recorrido se reparte `1 / 0.3 = 3.3` veces
-                                    mas hacia los valores bajos. Eso es lo que
-                                    quiere un retardo (resolucion fina entre
-                                    20 y 200 ms) y lo que NO quiere un coro
-                                    (sus 0.5 a 2 Hz estan en el ultimo 10% del
-                                    recorrido si el rango llega a 10 Hz). */
-    int   steps;               /**< 0 = continuo. > 1 = discreto, este numero
-                                    de valores repartidos entre min y max. El
-                                    modo del BBD son 4 estados, y en un mando
-                                    continuo el usuario tendria que adivinar en
-                                    que fraccion del recorrido esta el segundo. */
+    const char* name;   /**< Nombre para la interface. */
+    float minValue;     /**< Valor fisico en el extremo izquierdo. */
+    float maxValue;     /**< Valor fisico en el extremo derecho. */
+    float defaultValue; /**< Valor fisico por defecto. */
+    float skew;         /**< 1.0 = lineal. < 1 da MAS RECORRIDO a la parte
+                             baja del rango.
+        
+                             El signo esta al reves de lo que parece, y
+                             escribiendolo al derecho se eligieron seis
+                             mandos inservibles. Con `skew = 0.3`, la
+                             mitad fisica del rango cae en el 0.10 del
+                             recorrido del mando, no en el 0.5: el
+                             recorrido se reparte `1 / 0.3 = 3.3` veces
+                             mas hacia los valores bajos. Eso es lo que
+                             quiere un retardo (resolucion fina entre
+                             20 y 200 ms) y lo que NO quiere un coro
+                             (sus 0.5 a 2 Hz estan en el ultimo 10% del
+                             recorrido si el rango llega a 10 Hz). */
+    int steps;          /**< 0 = continuo. > 1 = discreto, este numero
+                             de valores repartidos entre min y max. El
+                             modo del BBD son 4 estados, y en un mando
+                             continuo el usuario tendria que adivinar en
+                             que fraccion del recorrido esta el segundo. */
 };
 
 //==============================================================================
 /** Crea una instancia del efecto, o devuelve nullptr si no se puede. */
-using FxCreateFn = void* (*) (double sampleRate);
+using FxCreateFn = void* (*)(double sampleRate);
 
 /** Procesa un bloque stereo. Los punteros pueden coincidir (proceso in-place). */
-using FxProcessFn = void (*) (void* instance, const float* inL, const float* inR,
-                              float* outL, float* outR, int numSamples);
+using FxProcessFn = void (*)(void* instance, const float* inL, const float* inR,
+                             float* outL, float* outR, int numSamples);
 
 /** Pone un parametro por indice, NORMALIZADO 0..1. El adaptador traduce. */
-using FxSetParamFn = void (*) (void* instance, int index, float normalisedValue);
+using FxSetParamFn = void (*)(void* instance, int index, float normalisedValue);
 
 /** Pone TODOS los parametros de golpe. Opcional: si es nullptr, el slot los
     pone uno a uno. Existe para los efectos que tienen un bloque de parametros
     (la reverb, que toma una estructura entera) y asi se ahorra un bucle. */
-using FxSetAllParamsFn = void (*) (void* instance, const float* normalised, int count);
+using FxSetAllParamsFn = void (*)(void* instance, const float* normalised, int count);
 
 /** Libera la instancia creada por `create`. */
-using FxDestroyFn = void (*) (void* instance);
+using FxDestroyFn = void (*)(void* instance);
 
 /** Vacia el estado de AUDIO del efecto, sin tocar los mandos. Se llama en un
     `reset()` de host: los buffers a cero, las fases a su sitio, los retardos a
     cero. Es una operacion distinta de `setAllParams`, y por eso tiene su propia
     funcion: reponer los parametros no limpia una cola que ya tiene contenido. */
-using FxResetFn = void (*) (void* instance);
+using FxResetFn = void (*)(void* instance);
 
 //==============================================================================
 /** Una fila del catalogo: que es este efecto y como se habla con el. */
 struct FxEffectInfo
 {
-    const char* name;              /**< Nombre tecnico, sin espacios. */
-    const char* displayName;       /**< Nombre para el panel. */
-    int numParams;                 /**< Cuantos parametros tiene. */
-    const FxParamSpec* params;     /**< Tabla de `numParams` entradas. */
-    FxCreateFn     create;
-    FxProcessFn    process;
-    FxSetParamFn   setParam;
+    const char* name;          /**< Nombre tecnico, sin espacios. */
+    const char* displayName;   /**< Nombre para el panel. */
+    int numParams;             /**< Cuantos parametros tiene. */
+    const FxParamSpec* params; /**< Tabla de `numParams` entradas. */
+    FxCreateFn create;
+    FxProcessFn process;
+    FxSetParamFn setParam;
     FxSetAllParamsFn setAllParams; /**< Puede ser nullptr. */
-    FxResetFn      reset;          /**< Puede ser nullptr. */
-    FxDestroyFn    destroy;
+    FxResetFn reset;               /**< Puede ser nullptr. */
+    FxDestroyFn destroy;
 };
 
 //==============================================================================
@@ -132,32 +132,32 @@ struct FxEffectInfo
 
 /** El valor fisico de un parametro a partir de su valor normalizado 0..1. Es la
     operacion inversa de `fxNormalise`, y la que usa todo adaptador. */
-float fxDenormalise (const FxParamSpec& p, float normalised) noexcept;
+float fxDenormalise(const FxParamSpec& p, float normalised) noexcept;
 
 /** Un valor fisico a su normalizado 0..1, con el sesgo de la tabla. El recorrido
     completo del mando queda DESPUES de aplicar el sesgo, no antes: por eso el
     sesgo es propiedad del MANDO y cambiar las unidades de un efecto no cambia
     lo que se siente al moverlo. */
-float fxNormalise (const FxParamSpec& p, float physical) noexcept;
+float fxNormalise(const FxParamSpec& p, float physical) noexcept;
 
 /** Busca un efecto por nombre tecnico. Devuelve nullptr si no esta. */
-const FxEffectInfo* fxFindEffect (const FxEffectInfo* catalogue, int count,
-                                  const char* name) noexcept;
+const FxEffectInfo* fxFindEffect(const FxEffectInfo* catalogue, int count,
+                                 const char* name) noexcept;
 
 /** Busca un efecto por indice. Devuelve nullptr si el indice no vale. */
-const FxEffectInfo* fxEffectAt (const FxEffectInfo* catalogue, int count,
-                                int index) noexcept;
+const FxEffectInfo* fxEffectAt(const FxEffectInfo* catalogue, int count,
+                               int index) noexcept;
 
 //==============================================================================
 // Implementaciones. Van aqui, y no en un .cpp, porque el modulo es header-only.
 
 //==============================================================================
-inline float fxNormalise (const FxParamSpec& p, float physical) noexcept
+inline float fxNormalise(const FxParamSpec& p, float physical) noexcept
 {
     if (p.maxValue <= p.minValue)
         return 0.0f;
 
-    const float t = jlimit (0.0f, 1.0f, (physical - p.minValue) / (p.maxValue - p.minValue));
+    const float t = jlimit(0.0f, 1.0f, (physical - p.minValue) / (p.maxValue - p.minValue));
     if (p.skew <= 0.0f || t <= 0.0f)
         return t;
 
@@ -174,12 +174,12 @@ inline float fxNormalise (const FxParamSpec& p, float physical) noexcept
     // nativa <-> WASM que DspMath sostiene entera. `pow` solo vale para base > 0,
     // y por eso el `t <= 0` de arriba (0^k es 0 para toda k, no un NaN) esta
     // antes de la llamada y no dentro.
-    return pow (t, p.skew);
+    return pow(t, p.skew);
 }
 
-inline float fxDenormalise (const FxParamSpec& p, float normalised) noexcept
+inline float fxDenormalise(const FxParamSpec& p, float normalised) noexcept
 {
-    const float v = jlimit (0.0f, 1.0f, normalised);
+    const float v = jlimit(0.0f, 1.0f, normalised);
 
     if (p.maxValue <= p.minValue)
         return p.minValue;
@@ -197,8 +197,8 @@ inline float fxDenormalise (const FxParamSpec& p, float normalised) noexcept
         // el 3 se alcanzaba solo en el ultimo 25%. Con cuatro modos, un selector
         // al que le falta un cuarto es un selector roto.
         const int steps = p.steps;
-        const int index = jlimit (0, steps - 1, floorToInt (v * static_cast<float> (steps)));
-        const float u = static_cast<float> (index) / static_cast<float> (steps - 1);
+        const int index = jlimit(0, steps - 1, floorToInt(v * static_cast<float>(steps)));
+        const float u   = static_cast<float>(index) / static_cast<float>(steps - 1);
         return p.minValue + u * (p.maxValue - p.minValue);
     }
 
@@ -209,12 +209,12 @@ inline float fxDenormalise (const FxParamSpec& p, float normalised) noexcept
     // de un retardo de 375 ms salia en 0.0035, y ese mismo mando reinterpretado
     // daba 1.63 s— y el sintoma es que casi todos los mandos se agrupan en un
     // extremo del recorrido y el otro extremo no se puede alcanzar.
-    const float u = p.skew <= 0.0f ? v : pow (v, 1.0f / p.skew);
+    const float u = p.skew <= 0.0f ? v : pow(v, 1.0f / p.skew);
     return p.minValue + u * (p.maxValue - p.minValue);
 }
 
-inline const FxEffectInfo* fxEffectAt (const FxEffectInfo* catalogue, int count,
-                                       int index) noexcept
+inline const FxEffectInfo* fxEffectAt(const FxEffectInfo* catalogue, int count,
+                                      int index) noexcept
 {
     // El indice 0 es SIEMPRE bypass, este o no este en la tabla. Un panel
     // permite elegir "nada" sin que ningun producto tenga que acordarlo.
@@ -230,8 +230,8 @@ inline const FxEffectInfo* fxEffectAt (const FxEffectInfo* catalogue, int count,
     return &catalogue[index - 1];
 }
 
-inline const FxEffectInfo* fxFindEffect (const FxEffectInfo* catalogue, int count,
-                                         const char* name) noexcept
+inline const FxEffectInfo* fxFindEffect(const FxEffectInfo* catalogue, int count,
+                                        const char* name) noexcept
 {
     if (catalogue == nullptr || name == nullptr)
         return nullptr;
@@ -239,10 +239,14 @@ inline const FxEffectInfo* fxFindEffect (const FxEffectInfo* catalogue, int coun
     for (int i = 0; i < count; ++i)
     {
         const char* other = catalogue[i].name;
-        bool igual = true;
+        bool igual        = true;
         for (int c = 0; other[c] != 0 && name[c] != 0; ++c)
         {
-            if (other[c] != name[c]) { igual = false; break; }
+            if (other[c] != name[c])
+            {
+                igual = false;
+                break;
+            }
         }
         if (igual && other[0] != 0)
             return &catalogue[i];

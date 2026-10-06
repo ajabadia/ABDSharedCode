@@ -71,18 +71,18 @@ struct MS2000EqProfile
     //--- Las dos tablas del selector --------------------------------------
     static constexpr int numPositions = 4;
 
-    static constexpr float lowFreqs[numPositions]  = { 160.0f, 250.0f, 400.0f, 600.0f };
-    static constexpr float highFreqs[numPositions] = { 4000.0f, 6000.0f, 8000.0f, 12000.0f };
+    static constexpr float lowFreqs[numPositions]  = {160.0f, 250.0f, 400.0f, 600.0f};
+    static constexpr float highFreqs[numPositions] = {4000.0f, 6000.0f, 8000.0f, 12000.0f};
 
     //--- La posicion central es la de fabrica -------------------------------
     // Ni la primera ni la ultima: es donde el hardware se enciende, y por eso
     // un preset nuevo nace en el medio y no echado hacia un lado.
-    static constexpr int defaultLowIndex  = 1;   // 250 Hz
-    static constexpr int defaultHighIndex = 2;   // 8.0 kHz
+    static constexpr int defaultLowIndex  = 1; // 250 Hz
+    static constexpr int defaultHighIndex = 2; // 8.0 kHz
 
     //--- Ganancia -----------------------------------------------------------
-    static constexpr float gainMinDb = -12.0f;
-    static constexpr float gainMaxDb =  12.0f;
+    static constexpr float gainMinDb         = -12.0f;
+    static constexpr float gainMaxDb         = 12.0f;
     static constexpr float defaultLowGainDb  = 0.0f;
     static constexpr float defaultHighGainDb = 0.0f;
 

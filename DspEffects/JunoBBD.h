@@ -118,7 +118,7 @@ static constexpr int kJunoBbdStages = 256;
     aritmetica del original no es una extraccion, es una reescritura, y por eso
     la constante sale de `kPi` (float) y no de un literal de doble precision.
 */
-static constexpr double kTwoPiDouble = 2.0 * static_cast<double> (dspmath_detail::kPi);
+static constexpr double kTwoPiDouble = 2.0 * static_cast<double>(dspmath_detail::kPi);
 
 //==============================================================================
 namespace junobbd_detail
@@ -128,15 +128,15 @@ namespace junobbd_detail
 constexpr float kLog2E = 1.4426950408889634f;
 
 /** `tan` sin libm. Medido: error relativo <= 6.6e-07 en (0, 0.45*pi]. */
-inline float tanDet (float x) noexcept
+inline float tanDet(float x) noexcept
 {
-    return sin (x) / cos (x);
+    return sin(x) / cos(x);
 }
 
 /** `exp` sin libm. Medido: error relativo <= 6.1e-07 en [-8, 0]. */
-inline float expDet (float y) noexcept
+inline float expDet(float y) noexcept
 {
-    return exp2 (y * kLog2E);
+    return exp2(y * kLog2E);
 }
 
 /**
@@ -148,38 +148,38 @@ inline float expDet (float y) noexcept
 class ReconstructionFilter
 {
 public:
-    void prepare (double sampleRate, float biquadFc, float biquadQ, float poleFc) noexcept
+    void prepare(double sampleRate, float biquadFc, float biquadQ, float poleFc) noexcept
     {
-        sampleRate_ = static_cast<float> (sampleRate);
+        sampleRate_ = static_cast<float>(sampleRate);
         biquadQ_    = biquadQ;
         poleFc_     = poleFc;
 
         const float fc = biquadFc < sampleRate_ * 0.45f ? biquadFc : sampleRate_ * 0.45f;
-        gBiquad_ = tanDet (dspmath_detail::kPi * fc / sampleRate_);
+        gBiquad_       = tanDet(dspmath_detail::kPi * fc / sampleRate_);
 
         a1_ = 1.0f / (1.0f + gBiquad_ / biquadQ_ + gBiquad_ * gBiquad_);
 
         const float fcP = poleFc < sampleRate_ * 0.45f ? poleFc : sampleRate_ * 0.45f;
-        gPole_ = tanDet (dspmath_detail::kPi * fcP / sampleRate_);
+        gPole_          = tanDet(dspmath_detail::kPi * fcP / sampleRate_);
 
         reset();
     }
 
     void reset() noexcept { ic1_ = ic2_ = pole_ = 0.0f; }
 
-    float processSample (float input) noexcept
+    float processSample(float input) noexcept
     {
         // SVF de 2º orden, pasabajos.
         const float v3 = input - ic2_;
         const float v1 = a1_ * ic1_ + a1_ * gBiquad_ * v3;
         const float v2 = ic2_ + gBiquad_ * v1;
-        ic1_ = 2.0f * v1 - ic1_;
-        ic2_ = 2.0f * v2 - ic2_;
+        ic1_           = 2.0f * v1 - ic1_;
+        ic2_           = 2.0f * v2 - ic2_;
 
         // Polo de inclinacion de agudas.
-        const float v = (v2 - pole_) * gPole_ / (1.0f + gPole_);
+        const float v  = (v2 - pole_) * gPole_ / (1.0f + gPole_);
         const float lp = pole_ + v;
-        pole_ = lp + v;
+        pole_          = lp + v;
 
         return lp;
     }
@@ -206,20 +206,20 @@ private:
 class BbdLine
 {
 public:
-    void prepare (double sampleRate, float minSeconds, float fc, float q, float poleFc) noexcept
+    void prepare(double sampleRate, float minSeconds, float fc, float q, float poleFc) noexcept
     {
-        int minLen = static_cast<int> (sampleRate * minSeconds) + 4;
-        int len = 1;
+        int minLen = static_cast<int>(sampleRate * minSeconds) + 4;
+        int len    = 1;
         while (len < minLen) len <<= 1;
 
-        buffer_.setSize (1, len, false, false, true);
+        buffer_.setSize(1, len, false, false, true);
         buffer_.clear();
         mask_ = len - 1;
 
-        pre_.prepare (sampleRate, fc, q, poleFc);
-        post_.prepare (sampleRate, fc, q, poleFc);
+        pre_.prepare(sampleRate, fc, q, poleFc);
+        post_.prepare(sampleRate, fc, q, poleFc);
 
-        sampleRate_ = static_cast<float> (sampleRate);
+        sampleRate_ = static_cast<float>(sampleRate);
     }
 
     void reset() noexcept
@@ -240,32 +240,32 @@ public:
     }
 
     /** Drive de saturacion. Lo fija el motor desde el perfil. */
-    void setSatDrive (float drive) noexcept { satDrive_ = drive; }
+    void setSatDrive(float drive) noexcept { satDrive_ = drive; }
 
     /** Suavizado del drive, por muestra. */
-    void setSatSlew (float slew) noexcept { satSlew_ = slew; }
+    void setSatSlew(float slew) noexcept { satSlew_ = slew; }
 
-    float processSample (float input, float delaySamples, float injectedNoise) noexcept
+    float processSample(float input, float delaySamples, float injectedNoise) noexcept
     {
         const float withNoise = input + injectedNoise;
-        const float filtered   = pre_.processSample (withNoise);
+        const float filtered  = pre_.processSample(withNoise);
 
         satDriveSmooth_ += (satDrive_ - satDriveSmooth_) * satSlew_;
-        const float sd = satDriveSmooth_;
-        const float sat = sd > 0.01f ? tanh (filtered * sd) / sd : filtered;
+        const float sd  = satDriveSmooth_;
+        const float sat = sd > 0.01f ? tanh(filtered * sd) / sd : filtered;
 
-        const int w = writePos_ & mask_;
-        buffer_.getWritePointer (0)[w] = sat;
+        const int w                   = writePos_ & mask_;
+        buffer_.getWritePointer(0)[w] = sat;
 
-        const float wet = readHermite (delaySamples);
+        const float wet = readHermite(delaySamples);
 
         writePos_ = (writePos_ + 1) & mask_;
 
-        return post_.processSample (wet);
+        return post_.processSample(wet);
     }
 
 private:
-    static float hermite (float frac, float y0, float y1, float y2, float y3) noexcept
+    static float hermite(float frac, float y0, float y1, float y2, float y3) noexcept
     {
         const float c0 = y1;
         const float c1 = 0.5f * (y2 - y0);
@@ -274,35 +274,35 @@ private:
         return ((c3 * frac + c2) * frac + c1) * frac + c0;
     }
 
-    float readHermite (float delaySamples) const noexcept
+    float readHermite(float delaySamples) const noexcept
     {
-        const float* b = buffer_.getReadPointer (0);
+        const float* b = buffer_.getReadPointer(0);
 
-        float rPos = static_cast<float> (writePos_) - delaySamples;
-        if (rPos < 0.0f) rPos += static_cast<float> (mask_ + 1);
+        float rPos = static_cast<float>(writePos_) - delaySamples;
+        if (rPos < 0.0f) rPos += static_cast<float>(mask_ + 1);
 
-        const int i1   = static_cast<int> (rPos);
-        const float frac = rPos - static_cast<float> (i1);
+        const int i1     = static_cast<int>(rPos);
+        const float frac = rPos - static_cast<float>(i1);
 
-        return hermite (frac,
-                        b[(i1 - 1) & mask_],
-                        b[ i1        & mask_],
-                        b[(i1 + 1) & mask_],
-                        b[(i1 + 2) & mask_]);
+        return hermite(frac,
+                       b[(i1 - 1) & mask_],
+                       b[i1 & mask_],
+                       b[(i1 + 1) & mask_],
+                       b[(i1 + 2) & mask_]);
     }
 
     AudioBuffer<float> buffer_;
-    int mask_ = 0;
-    int writePos_ = 0;
+    int mask_         = 0;
+    int writePos_     = 0;
     float sampleRate_ = 44100.0f;
 
     // Los dos arrancan en 0.12, como los miembros del original. El `0.1` del
     // perfil es la BASE antes del boost de saturacion (el original calcula
     // `0.1f * calSatBoost`), y son cosas distintas: confundirlas cambia la
     // primera muestra.
-    float satDrive_ = 0.12f;
+    float satDrive_       = 0.12f;
     float satDriveSmooth_ = 0.12f;
-    float satSlew_ = 0.001f;
+    float satSlew_        = 0.001f;
     ReconstructionFilter pre_, post_;
 };
 
@@ -317,16 +317,20 @@ private:
 class ClickRing
 {
 public:
-    void prepare (double sampleRate, float resHz, float q) noexcept
+    void prepare(double sampleRate, float resHz, float q) noexcept
     {
-        freqCoeff_ = 2.0f * sin (dspmath_detail::kPi * resHz / static_cast<float> (sampleRate));
+        freqCoeff_ = 2.0f * sin(dspmath_detail::kPi * resHz / static_cast<float>(sampleRate));
         damp_      = 1.0f / q;
         reset();
     }
 
-    void reset() noexcept { low_ = 0.0f; band_ = 0.0f; }
+    void reset() noexcept
+    {
+        low_  = 0.0f;
+        band_ = 0.0f;
+    }
 
-    float processSample (float input) noexcept
+    float processSample(float input) noexcept
     {
         low_ += freqCoeff_ * band_;
         const float high = input - low_ - damp_ * band_;
@@ -336,7 +340,7 @@ public:
 
 private:
     float freqCoeff_ = 0.0f;
-    float damp_ = 0.0f;
+    float damp_      = 0.0f;
     float low_ = 0.0f, band_ = 0.0f;
 };
 
@@ -353,12 +357,14 @@ private:
 class MainsRipple
 {
 public:
-    void prepare (double sampleRate, float mainsHz, float a1, float a2, float a3) noexcept
+    void prepare(double sampleRate, float mainsHz, float a1, float a2, float a3) noexcept
     {
         // Onda completa: 2 x la frecuencia de red. No es un error, es lo que
         // rectifica el puente del medidor de corriente del chip.
-        inc_  = 2.0f * mainsHz / static_cast<float> (sampleRate);
-        a1_ = a1; a2_ = a2; a3_ = a3;
+        inc_ = 2.0f * mainsHz / static_cast<float>(sampleRate);
+        a1_  = a1;
+        a2_  = a2;
+        a3_  = a3;
     }
 
     void reset() noexcept { phase_ = 0.0f; }
@@ -369,7 +375,7 @@ public:
         if (phase_ >= 1.0f) phase_ -= 1.0f;
 
         const float tp = 2.0f * dspmath_detail::kPi * phase_;
-        return a1_ * sin (tp) + a2_ * sin (2.0f * tp) + a3_ * sin (3.0f * tp);
+        return a1_ * sin(tp) + a2_ * sin(2.0f * tp) + a3_ * sin(3.0f * tp);
     }
 
 private:
@@ -412,17 +418,17 @@ struct BbdStageOutput
 class BbdNullStage
 {
 public:
-    float processSample (float, float = 0.0f, float = 0.0f) noexcept { return 0.0f; }
+    float processSample(float, float = 0.0f, float = 0.0f) noexcept { return 0.0f; }
 
-    BbdStageOutput processLeft  (float, float, float, float, float) noexcept { return {}; }
-    BbdStageOutput processRight (float, float, float, float, float) noexcept { return {}; }
+    BbdStageOutput processLeft(float, float, float, float, float) noexcept { return {}; }
+    BbdStageOutput processRight(float, float, float, float, float) noexcept { return {}; }
 
-    void prepareSampleRate (double sr) noexcept { sampleRate_ = sr; }
+    void prepareSampleRate(double sr) noexcept { sampleRate_ = sr; }
     double getSampleRate() const noexcept { return sampleRate_; }
     void reset() noexcept {}
     void suppressClicks() noexcept {}
-    void setHissColour (float) noexcept {}
-    void setProfile (const JunoBbdProfile&) noexcept {}
+    void setHissColour(float) noexcept {}
+    void setProfile(const JunoBbdProfile&) noexcept {}
 
 private:
     double sampleRate_ = 44100.0;
@@ -451,7 +457,7 @@ class JunoBBD
 public:
     JunoBBD()
     {
-        prepare (44100.0);
+        prepare(44100.0);
     }
 
     /** Fija el sample rate, dimensiona las dos lineas y deja el motor listo. */
@@ -463,22 +469,22 @@ public:
         leia de su tabla antes de que existiera el motor, y por eso aqui
         cualquier `set...` posterior vale.
     */
-    void prepare (double sampleRate)
+    void prepare(double sampleRate)
     {
-        dspAssert (sampleRate > 0.0);
+        dspAssert(sampleRate > 0.0);
 
-        sampleRate_ = sampleRate;
+        sampleRate_             = sampleRate;
         const JunoBbdProfile& p = Profile::value;
 
-        lineL_.prepare (sampleRate, p.lineMinSeconds, p.biquadFc, p.biquadQ, p.poleFc);
-        lineR_.prepare (sampleRate, p.lineMinSeconds, p.biquadFc, p.biquadQ, p.poleFc);
+        lineL_.prepare(sampleRate, p.lineMinSeconds, p.biquadFc, p.biquadQ, p.poleFc);
+        lineR_.prepare(sampleRate, p.lineMinSeconds, p.biquadFc, p.biquadQ, p.poleFc);
 
-        ripple_.prepare (sampleRate, p.mainsHz, p.mainsA1, p.mainsA2, p.mainsA3);
-        clickRingL_.prepare (sampleRate, p.clickRingHz, p.clickRingQ);
-        clickRingR_.prepare (sampleRate, p.clickRingHz, p.clickRingQ);
+        ripple_.prepare(sampleRate, p.mainsHz, p.mainsA1, p.mainsA2, p.mainsA3);
+        clickRingL_.prepare(sampleRate, p.clickRingHz, p.clickRingQ);
+        clickRingR_.prepare(sampleRate, p.clickRingHz, p.clickRingQ);
 
-        stage_.setProfile (p);
-        stage_.prepareSampleRate (sampleRate);
+        stage_.setProfile(p);
+        stage_.prepareSampleRate(sampleRate);
 
         reset();
     }
@@ -494,11 +500,11 @@ public:
         stage_.reset();
         const JunoBbdProfile& p = Profile::value;
 
-        lfoPhase_ = 0.0;
-        wetMix_   = jlimit (0.0f, 1.0f, p.defaultMix);
-        depth_    = jlimit (0.0f, 1.0f, p.defaultDepth);
-        lfoRate_  = p.defaultRate;
-        hissLvlDb_ = p.hissLevelDb;
+        lfoPhase_       = 0.0;
+        wetMix_         = jlimit(0.0f, 1.0f, p.defaultMix);
+        depth_          = jlimit(0.0f, 1.0f, p.defaultDepth);
+        lfoRate_        = p.defaultRate;
+        hissLvlDb_      = p.hissLevelDb;
         hissMultiplier_ = p.hissMultiplier;
 
         // Y los mandos de CALIBRACION arrancan en los numeros de fabrica del
@@ -514,10 +520,10 @@ public:
         calGainDry_  = p.gainDry;
         calGainWet_  = p.gainWet;
 
-        setSaturation (p.satBoost);
+        setSaturation(p.satBoost);
     }
 
-    void setMode (JunoBbdMode m) noexcept
+    void setMode(JunoBbdMode m) noexcept
     {
         if (m != mode_)
         {
@@ -532,53 +538,53 @@ public:
 
     JunoBbdMode getMode() const noexcept { return mode_; }
 
-    void setRate (float hz)      noexcept { lfoRate_  = jlimit (0.1f, 15.0f, hz); }
-    void setDepth (float d)      noexcept { depth_    = jlimit (0.0f, 1.0f, d); }
-    void setMix (float w)        noexcept { wetMix_   = jlimit (0.0f, 1.0f, w); }
-    void setHissLevelDb (float db) noexcept { hissLvlDb_ = jlimit (-96.0f, -40.0f, db); }
-    void setHissMultiplier (float m) noexcept { hissMultiplier_ = jlimit (0.0f, 2.0f, m); }
+    void setRate(float hz) noexcept { lfoRate_ = jlimit(0.1f, 15.0f, hz); }
+    void setDepth(float d) noexcept { depth_ = jlimit(0.0f, 1.0f, d); }
+    void setMix(float w) noexcept { wetMix_ = jlimit(0.0f, 1.0f, w); }
+    void setHissLevelDb(float db) noexcept { hissLvlDb_ = jlimit(-96.0f, -40.0f, db); }
+    void setHissMultiplier(float m) noexcept { hissMultiplier_ = jlimit(0.0f, 2.0f, m); }
 
     /** 0 = siseo rosa, 1 = blanco. Lo consume la etapa, no el motor. */
-    void setHissColour (float c) noexcept { stage_.setHissColour (jlimit (0.0f, 1.0f, c)); }
+    void setHissColour(float c) noexcept { stage_.setHissColour(jlimit(0.0f, 1.0f, c)); }
 
     /** Ganancias del mezclador IC6. El consumidor las toma de su calibracion. */
-    void setMixerGains (float dry, float wet) noexcept
+    void setMixerGains(float dry, float wet) noexcept
     {
         calGainDry_ = dry;
         calGainWet_ = wet;
     }
 
     /** Retardos base de cada modo, en ms. Vienen de la calibracion del panel. */
-    void setBaseDelaysMs (float delayI, float delayII) noexcept
+    void setBaseDelaysMs(float delayI, float delayII) noexcept
     {
         calDelayI_  = delayI;
         calDelayII_ = delayII;
     }
 
     /** Barrido maximo en ms, y la frecuencia del modo I+II. */
-    void setModulation (float modDepthMs, float bothRateHz) noexcept
+    void setModulation(float modDepthMs, float bothRateHz) noexcept
     {
         calModDepth_ = modDepthMs;
         calBothRate_ = bothRateHz;
     }
 
     /** Saturacion de las lineas y corte del filtro de reconstruccion. */
-    void setSaturation (float satBoost) noexcept
+    void setSaturation(float satBoost) noexcept
     {
-        lineL_.setSatDrive (Profile::value.satDrive * satBoost);
-        lineR_.setSatDrive (Profile::value.satDrive * satBoost);
+        lineL_.setSatDrive(Profile::value.satDrive * satBoost);
+        lineR_.setSatDrive(Profile::value.satDrive * satBoost);
     }
 
-    void setReconstructionCutoff (float hz) noexcept
+    void setReconstructionCutoff(float hz) noexcept
     {
-        lineL_.prepare (sampleRate_, Profile::value.lineMinSeconds, hz,
-                        Profile::value.biquadQ, Profile::value.poleFc);
-        lineR_.prepare (sampleRate_, Profile::value.lineMinSeconds, hz,
-                        Profile::value.biquadQ, Profile::value.poleFc);
+        lineL_.prepare(sampleRate_, Profile::value.lineMinSeconds, hz,
+                       Profile::value.biquadQ, Profile::value.poleFc);
+        lineR_.prepare(sampleRate_, Profile::value.lineMinSeconds, hz,
+                       Profile::value.biquadQ, Profile::value.poleFc);
     }
 
     /** Procesa UN marco stereo. Ver el contrato en la cabecera. */
-    void process (float inL, float inR, float& outL, float& outR) noexcept
+    void process(float inL, float inR, float& outL, float& outR) noexcept
     {
         if (mode_ == JunoBbdMode::Off)
         {
@@ -588,12 +594,14 @@ public:
         }
 
         const JunoBbdProfile& p = Profile::value;
-        const float sr = static_cast<float> (sampleRate_);
+        const float sr          = static_cast<float>(sampleRate_);
 
         //--- Cuanto barre el LFO en este modo, y a que velocidad ----------//
         float baseDepthMs = p.depthI;
-        if (mode_ == JunoBbdMode::ChorusII)        baseDepthMs = p.depthII;
-        else if (mode_ == JunoBbdMode::ChorusBoth) baseDepthMs = p.depthBoth;
+        if (mode_ == JunoBbdMode::ChorusII)
+            baseDepthMs = p.depthII;
+        else if (mode_ == JunoBbdMode::ChorusBoth)
+            baseDepthMs = p.depthBoth;
 
         const float delayDepth = baseDepthMs * (calModDepth_ / p.modDepthScale) * depth_;
 
@@ -601,15 +609,15 @@ public:
         const float currentRate   = mode_ == JunoBbdMode::ChorusBoth ? calBothRate_ : lfoRate_;
         const double phaseInc     = kTwoPiDouble * currentRate / sampleRate_;
 
-        const float baseNoiseGain = pow (10.0f, hissLvlDb_ / 20.0f);
-        const float leakMin = p.leakMinFrac;
-        const float invDepth = delayDepth > 1.0e-9f ? 1.0f / delayDepth : 0.0f;
+        const float baseNoiseGain = pow(10.0f, hissLvlDb_ / 20.0f);
+        const float leakMin       = p.leakMinFrac;
+        const float invDepth      = delayDepth > 1.0e-9f ? 1.0f / delayDepth : 0.0f;
 
         //--- Estado del LFO, COMUMPARTIDO por los dos canales ---------------//
         float lfo;
         if (mode_ == JunoBbdMode::ChorusBoth)
         {
-            lfo = sin (static_cast<float> (lfoPhase_));
+            lfo = sin(static_cast<float>(lfoPhase_));
         }
         else
         {
@@ -622,15 +630,15 @@ public:
             // fase antes de restar, y el error se ve amostra 85 (la primera en la
             // que dispara un clic) y grows desde ahi. Es de los sitios donde la
             // paridad a 0 ulps se gana o se pierde.
-            const double norm = lfoPhase_ / kTwoPiDouble;
+            const double norm    = lfoPhase_ / kTwoPiDouble;
             const double centred = norm - 0.5;
-            lfo = 1.0f - 4.0f * static_cast<float> (centred < 0.0 ? -centred : centred);
+            lfo                  = 1.0f - 4.0f * static_cast<float>(centred < 0.0 ? -centred : centred);
         }
 
         //--- Retardo de cada linea, con la tolerancia de su reloj ----------//
         const float trim = p.clockTrim;
-        float delay0Ms = (centreDelayMs + delayDepth * lfo) * (1.0f - trim);
-        float delay1Ms = (centreDelayMs - delayDepth * lfo) * (1.0f + trim);
+        float delay0Ms   = (centreDelayMs + delayDepth * lfo) * (1.0f - trim);
+        float delay1Ms   = (centreDelayMs - delayDepth * lfo) * (1.0f + trim);
 
         if (delay0Ms < p.minDelayMs) delay0Ms = p.minDelayMs;
         if (delay1Ms < p.minDelayMs) delay1Ms = p.minDelayMs;
@@ -639,14 +647,14 @@ public:
         const float delay1samp = delay1Ms * 0.001f * sr;
 
         //--- Frecuencia de reloj de cada linea (256 etapas, vuelta completa) -//
-        float clock0 = static_cast<float> (kJunoBbdStages) / (2.0f * delay0Ms * 0.001f);
-        float clock1 = static_cast<float> (kJunoBbdStages) / (2.0f * delay1Ms * 0.001f);
+        float clock0 = static_cast<float>(kJunoBbdStages) / (2.0f * delay0Ms * 0.001f);
+        float clock1 = static_cast<float>(kJunoBbdStages) / (2.0f * delay1Ms * 0.001f);
         if (clock0 < p.minClockHz) clock0 = p.minClockHz;
         if (clock1 < p.minClockHz) clock1 = p.minClockHz;
 
         //--- Cuanta fuga hay en cada linea en ESTE punto del LFO -----------//
-        const float lfo0 = (delay0Ms - centreDelayMs) * invDepth;
-        const float lfo1 = (delay1Ms - centreDelayMs) * invDepth;
+        const float lfo0     = (delay0Ms - centreDelayMs) * invDepth;
+        const float lfo1     = (delay1Ms - centreDelayMs) * invDepth;
         const float lfoNorm0 = (lfo0 + 1.0f) * 0.5f;
         const float lfoNorm1 = (lfo1 + 1.0f) * 0.5f;
 
@@ -654,28 +662,26 @@ public:
         const float leak1 = delayDepth * (leakMin + (1.0f - leakMin) * lfoNorm1);
 
         //--- La etapa aporta el ruido, la fuga y los clics -----------------//
-        const float clickScale = delayDepth / p.depthI;
-        const BbdStageOutput stageL = stage_.processLeft  (leak0, lfo, clickScale,
-                                                           baseNoiseGain, hissMultiplier_);
-        const BbdStageOutput stageR = stage_.processRight (leak1, lfo, clickScale,
-                                                           baseNoiseGain, hissMultiplier_);
+        const float clickScale      = delayDepth / p.depthI;
+        const BbdStageOutput stageL = stage_.processLeft(leak0, lfo, clickScale,
+                                                         baseNoiseGain, hissMultiplier_);
+        const BbdStageOutput stageR = stage_.processRight(leak1, lfo, clickScale,
+                                                          baseNoiseGain, hissMultiplier_);
 
-        float wet0 = lineL_.processSample (inL, delay0samp, stageL.injected);
-        float wet1 = lineR_.processSample (inR, delay1samp, stageR.injected);
+        float wet0 = lineL_.processSample(inL, delay0samp, stageL.injected);
+        float wet1 = lineR_.processSample(inR, delay1samp, stageR.injected);
 
         //--- Perdida de transferencia de carga: el BBD pierde ganancia cuando
         //--- el reloj va mas rapido, y el trim compensa la asimetria L/R.
-        const float gain0 = (1.0f + p.gainTrim)
-                          * (1.0f - p.cteCoeff * (1.0f / clock0 - p.cteInvClockCentre));
-        const float gain1 = (1.0f - p.gainTrim)
-                          * (1.0f - p.cteCoeff * (1.0f / clock1 - p.cteInvClockCentre));
+        const float gain0 = (1.0f + p.gainTrim) * (1.0f - p.cteCoeff * (1.0f / clock0 - p.cteInvClockCentre));
+        const float gain1 = (1.0f - p.gainTrim) * (1.0f - p.cteCoeff * (1.0f / clock1 - p.cteInvClockCentre));
 
         wet0 *= gain0;
         wet1 *= gain1;
 
         //--- El anillo que despierta el clic, DESPUES de la linea -----------//
-        wet0 += clickRingL_.processSample (stageL.click) * p.clickRingGain * hissMultiplier_;
-        wet1 += clickRingR_.processSample (stageR.click) * p.clickRingGain * hissMultiplier_;
+        wet0 += clickRingL_.processSample(stageL.click) * p.clickRingGain * hissMultiplier_;
+        wet1 += clickRingR_.processSample(stageR.click) * p.clickRingGain * hissMultiplier_;
 
         //--- Zumbido de red, UNO por muestra, a los dos canales ------------//
         const float ripple = ripple_.processSample() * hissMultiplier_;
@@ -683,7 +689,7 @@ public:
         wet1 += ripple;
 
         //--- IC6: el mezclador con ganancias asimetricas -------------------//
-        const float dryMix      = 1.0f - wetMix_ * (1.0f - calGainDry_);
+        const float dryMix       = 1.0f - wetMix_ * (1.0f - calGainDry_);
         const float wetMixAmount = wetMix_ * calGainWet_;
 
         outL = dryMix * inL + wetMixAmount * wet0;
@@ -702,17 +708,16 @@ public:
         if (lfoPhase_ >= kTwoPiDouble) lfoPhase_ -= kTwoPiDouble;
     }
 
-    dspDeclareNonCopyableWithLeakDetector (JunoBBD)
+    dspDeclareNonCopyableWithLeakDetector(JunoBBD)
 
-private:
-    double sampleRate_ = 44100.0;
+        private : double sampleRate_ = 44100.0;
 
-    JunoBbdMode mode_ { JunoBbdMode::Off };
+    JunoBbdMode mode_{JunoBbdMode::Off};
 
-    junobbd_detail::BbdLine       lineL_, lineR_;
-    junobbd_detail::MainsRipple   ripple_;
-    junobbd_detail::ClickRing     clickRingL_, clickRingR_;
-    Stage                         stage_;
+    junobbd_detail::BbdLine lineL_, lineR_;
+    junobbd_detail::MainsRipple ripple_;
+    junobbd_detail::ClickRing clickRingL_, clickRingR_;
+    Stage stage_;
 
     double lfoPhase_ = 0.0;
 
@@ -722,10 +727,10 @@ private:
     // cambie. Los valores de calibracion que SI fija el consumidor (ganancias
     // del mezclador, retardos base) se quedan en 0 y los pone `set...` antes de
     // que suene nada.
-    float lfoRate_  = 0.0f;
-    float depth_    = 0.0f;
-    float wetMix_   = 0.0f;
-    float hissLvlDb_ = 0.0f;
+    float lfoRate_        = 0.0f;
+    float depth_          = 0.0f;
+    float wetMix_         = 0.0f;
+    float hissLvlDb_      = 0.0f;
     float hissMultiplier_ = 1.0f;
 
     float calDelayI_   = 0.0f;

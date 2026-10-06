@@ -69,39 +69,39 @@ struct StudioEchoProfile
     /** Una fila del perfil: que cabezales suenan y si entra el tanque. */
     struct Mode
     {
-        bool head[3];    // cabezales activos
-        bool reverb;     // el tanque entra en este modo
+        bool head[3]; // cabezales activos
+        bool reverb;  // el tanque entra en este modo
     };
 
     static constexpr int numModes = 3;
 
     static constexpr Mode modes[3] =
-    {
-        { { true,  false, false }, true },   // un cabezal
-        { { true,  true,  false }, true },   // dos
-        { { true,  true,  true  }, true }    // tres
+        {
+            {{true, false, false}, true}, // un cabezal
+            {{true, true, false}, true},  // dos
+            {{true, true, true}, true}    // tres
     };
 
     // Donde esta cada cabezal, como multiplicador del retardo base.
-    static constexpr float headRatio[3] = { 0.20f, 0.45f, 0.70f };
+    static constexpr float headRatio[3] = {0.20f, 0.45f, 0.70f};
 
     // Escala de ganancia del canal derecho por cabezal: un cabezal real no
     // envia lo mismo a L que a R.
-    static constexpr float headRightScale[3] = { 0.95f, 0.90f, 0.92f };
+    static constexpr float headRightScale[3] = {0.95f, 0.90f, 0.92f};
 
-    static constexpr float minDelaySeconds     = 0.05f;
-    static constexpr float maxDelaySeconds     = 1.20f;
-    static constexpr float dryGain             = 0.75f;
-    static constexpr float headOutputGain      = 0.40f;
-    static constexpr float toneFrequencyHz     = 800.0f;
-    static constexpr float tankTimeL           = 0.080f;   // linea del tanque
-    static constexpr float tankTimeR           = 0.110f;
-    static constexpr float wowHz               = 0.7f;     // deriva lenta
-    static constexpr float flutterHz           = 6.0f;     // aleteo rapido
-    static constexpr float wowAmount           = 0.015f;   // cuanto alarga
-    static constexpr float flutterAmount       = 0.005f;   // cuanto aletea
-    static constexpr float colourDrive         = 0.25f;
-    static constexpr float colourHiss          = 0.15f;
+    static constexpr float minDelaySeconds = 0.05f;
+    static constexpr float maxDelaySeconds = 1.20f;
+    static constexpr float dryGain         = 0.75f;
+    static constexpr float headOutputGain  = 0.40f;
+    static constexpr float toneFrequencyHz = 800.0f;
+    static constexpr float tankTimeL       = 0.080f; // linea del tanque
+    static constexpr float tankTimeR       = 0.110f;
+    static constexpr float wowHz           = 0.7f;   // deriva lenta
+    static constexpr float flutterHz       = 6.0f;   // aleteo rapido
+    static constexpr float wowAmount       = 0.015f; // cuanto alarga
+    static constexpr float flutterAmount   = 0.005f; // cuanto aletea
+    static constexpr float colourDrive     = 0.25f;
+    static constexpr float colourHiss      = 0.15f;
 };
 
 //==============================================================================
@@ -116,12 +116,12 @@ template <typename Profile, typename Colour = TapeColour>
 class MultiHeadEcho
 {
 public:
-    MultiHeadEcho() { prepare (44100.0); }
+    MultiHeadEcho() { prepare(44100.0); }
 
     /** Fija el sample rate y dimensiona la linea de cinta y el tanque. */
-    void prepare (double sampleRate)
+    void prepare(double sampleRate)
     {
-        dspAssert (sampleRate > 0.0);
+        dspAssert(sampleRate > 0.0);
 
         sampleRate_ = sampleRate;
 
@@ -134,23 +134,21 @@ public:
         float maxRatio = Profile::headRatio[0];
 
         for (int h = 1; h < 3; ++h)
-            maxRatio = jmax (maxRatio, Profile::headRatio[h]);
+            maxRatio = jmax(maxRatio, Profile::headRatio[h]);
 
-        delaySamples_ = static_cast<int> (sampleRate * Profile::maxDelaySeconds * maxRatio) + 2;
-        tankSamples_   = static_cast<int> (sampleRate * Profile::maxDelaySeconds) + 1;
+        delaySamples_ = static_cast<int>(sampleRate * Profile::maxDelaySeconds * maxRatio) + 2;
+        tankSamples_  = static_cast<int>(sampleRate * Profile::maxDelaySeconds) + 1;
 
-        tapeBuffer.setSize (2, delaySamples_, false, false, true);
-        tankBuffer.setSize (2, tankSamples_, false, false, true);
+        tapeBuffer.setSize(2, delaySamples_, false, false, true);
+        tankBuffer.setSize(2, tankSamples_, false, false, true);
 
-        colour.prepareSampleRate (sampleRate);
+        colour.prepareSampleRate(sampleRate);
 
         // Coeficiente del pasabajos de un polo del control de tono:
         // a = exp(-2*pi*f/sr), reescrito con exp2 porque dsp::exp2 es la
         // exponente que garantiza la paridad nativa <-> WASM (DspCore/DspMath.h)
         // y exp(-x) == exp2(log2(e) * -x).
-        toneCoeff_ = exp2 (-1.4426950408889634f * 6.283185307179586f
-                             * Profile::toneFrequencyHz
-                             / static_cast<float> (sampleRate));
+        toneCoeff_ = exp2(-1.4426950408889634f * 6.283185307179586f * Profile::toneFrequencyHz / static_cast<float>(sampleRate));
 
         reset();
     }
@@ -173,9 +171,9 @@ public:
     }
 
     /** Elige la fila de la tabla del perfil. Por bloque, no por muestra. */
-    void setMode (int mode) noexcept
+    void setMode(int mode) noexcept
     {
-        mode_ = jlimit (0, Profile::numModes - 1, mode);
+        mode_ = jlimit(0, Profile::numModes - 1, mode);
     }
 
     /** Modo activo. */
@@ -190,24 +188,23 @@ public:
         bass/treble   0..1, los dos controles de tono.
         tankMix       0..1, cuanto sale el tanque.
     */
-    float processSample (int channel, float input,
-                         float delaySeconds, float feedback,
-                         float bass, float treble, float tankMix) noexcept
+    float processSample(int channel, float input,
+                        float delaySeconds, float feedback,
+                        float bass, float treble, float tankMix) noexcept
     {
         const int chan = channel & 1;
 
         // El retardo pedido, recortado al rango de MAQUINA. Es un recorte de
         // la maquina y no de politica: por eso va aqui y no en el consumidor.
-        const float clampedDelay = jlimit (Profile::minDelaySeconds,
+        const float clampedDelay = jlimit(Profile::minDelaySeconds,
                                           Profile::maxDelaySeconds,
                                           delaySeconds);
-        const int delaySamples = jlimit (1, delaySamples_,
-                                         static_cast<int> (clampedDelay * sampleRate_));
+        const int delaySamples   = jlimit(1, delaySamples_,
+                                          static_cast<int>(clampedDelay * sampleRate_));
 
         // Deriva de la cinta: la lectura se alarga o se acorta con ella. Las
         // dos senales son del motor, no de la etapa de color (ver TapeColour.h).
-        const float wowMod = 1.0f + wow_ * Profile::wowAmount
-                                + flutter_ * Profile::flutterAmount;
+        const float wowMod = 1.0f + wow_ * Profile::wowAmount + flutter_ * Profile::flutterAmount;
 
         const auto& mode = Profile::modes[mode_];
 
@@ -226,7 +223,7 @@ public:
         for (int h = 0; h < 3; ++h)
             if (mode.head[h]) ++activeCount;
 
-        const float gainPerHead = activeCount > 0 ? 1.0f / static_cast<float> (activeCount) : 0.0f;
+        const float gainPerHead = activeCount > 0 ? 1.0f / static_cast<float>(activeCount) : 0.0f;
 
         // Suma de los cabezales. Solo lee los que estan encendidos.
         float headL = 0.0f, headR = 0.0f;
@@ -259,17 +256,15 @@ public:
                 // segunda es que `readTape` ya envuelve con un cociente como red
                 // de ultimo recurso, y un envolverse es un salto de fase: mejor
                 // saturar en el tope que dar un salto.
-                const float wanted = Profile::headRatio[h]
-                                   * static_cast<float> (delaySamples) * wowMod;
-                const float distance = jmin (static_cast<float> (delaySamples_ - 1), wanted);
+                const float wanted   = Profile::headRatio[h] * static_cast<float>(delaySamples) * wowMod;
+                const float distance = jmin(static_cast<float>(delaySamples_ - 1), wanted);
 
-                headL += readTape (chan, distance) * gainPerHead;
-                headR += readTape (chan, distance) * gainPerHead
-                                               * Profile::headRightScale[h];
+                headL += readTape(chan, distance) * gainPerHead;
+                headR += readTape(chan, distance) * gainPerHead * Profile::headRightScale[h];
             }
         }
 
-        const float heads = (chan == 0 ? headL : headR);
+        const float heads  = (chan == 0 ? headL : headR);
         const float tankIn = (headL + headR) * 0.5f;
 
         // La realimentacion pasa por el color de cinta ANTES de volverse a
@@ -277,23 +272,23 @@ public:
         // El color de cinta solo se aplica al camino de REALIMENTACION, que es
         // donde una cinta satura y sisea. La entrada entra limpia: el
         // preamplificador del cabezal de grabacion no es el de reproduccion.
-        const float fed = colour.processSample (heads * feedback,
-                                                Profile::colourDrive,
-                                                Profile::colourHiss);
+        const float fed = colour.processSample(heads * feedback,
+                                               Profile::colourDrive,
+                                               Profile::colourHiss);
 
         // Control de tono: un pasabajos de un polo, no dos estantes. El
         // original hacia lo mismo por el signo de la muestra, que es por donde
         // se distingue el graves del agudo sin un filtro de verdad.
         const float toneGain = (chan == 0) ? (0.5f + bass * 0.5f)
                                            : (0.5f + treble * 0.5f);
-        const float toned = fed * toneGain;
+        const float toned    = fed * toneGain;
 
-        tapeBuffer.setSample (chan, writePos_, input + toned);
+        tapeBuffer.setSample(chan, writePos_, input + toned);
 
         // Tanque diferido: dos lineas cruzadas que se restan entre si. Es lo
         // que da el "cantito" de muelle sin un resonador de muelles entero.
-        const float tankReadL = readTank (0, static_cast<int> (sampleRate_ * Profile::tankTimeL));
-        const float tankReadR = readTank (1, static_cast<int> (sampleRate_ * Profile::tankTimeR));
+        const float tankReadL = readTank(0, static_cast<int>(sampleRate_ * Profile::tankTimeL));
+        const float tankReadR = readTank(1, static_cast<int>(sampleRate_ * Profile::tankTimeR));
         const float tankDiff  = (tankReadL + tankReadR) * 0.5f;
 
         // El filtro de tono y la escritura al tanque son POR MUESTRA, no por
@@ -313,9 +308,7 @@ public:
         // El flag del modo gobierna el tanque: en los cuatro primeros modos del
         // selector la reverb NO entra, y sin esto el modo "solo eco" seguiria
         // soltando con el tanque abierto.
-        return input  * Profile::dryGain
-             + heads  * Profile::headOutputGain
-             + tankOut * tankMix * (mode.reverb ? 1.0f : 0.0f);
+        return input * Profile::dryGain + heads * Profile::headOutputGain + tankOut * tankMix * (mode.reverb ? 1.0f : 0.0f);
     }
 
     /** Avanza los punteros de escritura y la deriva del transporte.
@@ -323,8 +316,8 @@ public:
         UNA vez por muestra, tras recorrer los canales. */
     void advance() noexcept
     {
-        if (++writePos_ >= delaySamples_)     writePos_ = 0;
-        if (++tankWritePos_ >= tankSamples_)  tankWritePos_ = 0;
+        if (++writePos_ >= delaySamples_) writePos_ = 0;
+        if (++tankWritePos_ >= tankSamples_) tankWritePos_ = 0;
 
         // Una vez por MUESTRA, con la media de los canales que han entrado: el
         // pasabajos de tono y la entrada del tanque son de la maquina, no de un
@@ -332,28 +325,28 @@ public:
         // propio valor, asi que el caso mono queda BIT A BIT como era.
         if (tankChannels_ > 0)
         {
-            const float tankMean = tankAccum_ / static_cast<float> (tankChannels_);
+            const float tankMean = tankAccum_ / static_cast<float>(tankChannels_);
 
             toneState_ += (1.0f - toneCoeff_) * (tankMean - toneState_);
 
-            tankBuffer.setSample (0, tankWritePos_, toneState_);
-            tankBuffer.setSample (1, tankWritePos_, toneState_ * 0.97f);
+            tankBuffer.setSample(0, tankWritePos_, toneState_);
+            tankBuffer.setSample(1, tankWritePos_, toneState_ * 0.97f);
 
-            tankAccum_   = 0.0f;
+            tankAccum_    = 0.0f;
             tankChannels_ = 0;
         }
 
         const float twoPi = MathConstants<float>::twoPi;
-        const float sr    = static_cast<float> (sampleRate_);
+        const float sr    = static_cast<float>(sampleRate_);
 
-        wowPhase_     += twoPi * Profile::wowHz     / sr;
+        wowPhase_ += twoPi * Profile::wowHz / sr;
         flutterPhase_ += twoPi * Profile::flutterHz / sr;
 
-        if (wowPhase_     > twoPi) wowPhase_     -= twoPi;
+        if (wowPhase_ > twoPi) wowPhase_ -= twoPi;
         if (flutterPhase_ > twoPi) flutterPhase_ -= twoPi;
 
-        wow_     = sin (wowPhase_);
-        flutter_ = sin (flutterPhase_);
+        wow_     = sin(wowPhase_);
+        flutter_ = sin(flutterPhase_);
     }
 
     /** Sample rate de la ultima llamada a `prepare`. */
@@ -365,7 +358,7 @@ public:
 private:
     //==========================================================================
     /** Lectura interpolada lineal de la linea de cinta a `distance` muestras. */
-    float readTape (int channel, float distance) const noexcept
+    float readTape(int channel, float distance) const noexcept
     {
         const int size = delaySamples_;
 
@@ -380,54 +373,52 @@ private:
         // esto no deberia dispararse nunca; es la red por si un perfil futuro se
         // queda corto o si alguien llama a `processSample` con un retardo fuera
         // de rango.
-        const float fsize = static_cast<float> (size);
-        const float raw   = static_cast<float> (writePos_) - distance;
-        const long long q = static_cast<long long> (raw / fsize);
+        const float fsize = static_cast<float>(size);
+        const float raw   = static_cast<float>(writePos_) - distance;
+        const long long q = static_cast<long long>(raw / fsize);
 
-        float readPos = raw - fsize * static_cast<float> (q);
+        float readPos = raw - fsize * static_cast<float>(q);
 
         if (readPos < 0.0f)
             readPos += fsize;
 
-        const int index0 = static_cast<int> (readPos) % size;
+        const int index0 = static_cast<int>(readPos) % size;
         const int index1 = (index0 + 1) % size;
-        const float frac = readPos - static_cast<int> (readPos);
+        const float frac = readPos - static_cast<int>(readPos);
 
-        return tapeBuffer.getSample (channel, index0)
-             + frac * (tapeBuffer.getSample (channel, index1)
-                     - tapeBuffer.getSample (channel, index0));
+        return tapeBuffer.getSample(channel, index0) + frac * (tapeBuffer.getSample(channel, index1) - tapeBuffer.getSample(channel, index0));
     }
 
-    float readTank (int channel, int distance) const noexcept
+    float readTank(int channel, int distance) const noexcept
     {
         int readPos = tankWritePos_ - distance;
 
-        while (readPos < 0)          readPos += tankSamples_;
+        while (readPos < 0) readPos += tankSamples_;
         while (readPos >= tankSamples_) readPos -= tankSamples_;
 
-        return tankBuffer.getSample (channel, readPos);
+        return tankBuffer.getSample(channel, readPos);
     }
 
     AudioBuffer<float> tapeBuffer;
     AudioBuffer<float> tankBuffer;
     Colour colour;
 
-    double sampleRate_   = 44100.0;
-    int    delaySamples_ = 1;
-    int    tankSamples_  = 1;
-    int    writePos_     = 0;
-    int    tankWritePos_ = 0;
-    int    mode_         = 0;
-    float  toneState_    = 0.0f;
-    float  tankAccum_    = 0.0f;
-    int    tankChannels_ = 0;
-    float  toneCoeff_    = 0.5f;
-    float  wowPhase_     = 0.0f;
-    float  flutterPhase_ = 0.0f;
-    float  wow_          = 0.0f;
-    float  flutter_      = 0.0f;
+    double sampleRate_  = 44100.0;
+    int delaySamples_   = 1;
+    int tankSamples_    = 1;
+    int writePos_       = 0;
+    int tankWritePos_   = 0;
+    int mode_           = 0;
+    float toneState_    = 0.0f;
+    float tankAccum_    = 0.0f;
+    int tankChannels_   = 0;
+    float toneCoeff_    = 0.5f;
+    float wowPhase_     = 0.0f;
+    float flutterPhase_ = 0.0f;
+    float wow_          = 0.0f;
+    float flutter_      = 0.0f;
 
-    dspDeclareNonCopyableWithLeakDetector (MultiHeadEcho)
+    dspDeclareNonCopyableWithLeakDetector(MultiHeadEcho)
 };
 
 } // namespace abd::dsp

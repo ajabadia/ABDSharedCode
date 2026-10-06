@@ -72,19 +72,19 @@ public:
 
         El recorrido util es 0 (recorte puro) a 0.9 (casi transparente), y 1 es
         el extremo de recorte duro. */
-    float processSample (float x, float drive = 1.0f, float threshold = 0.3f) noexcept
+    float processSample(float x, float drive = 1.0f, float threshold = 0.3f) noexcept
     {
         const float driven = x * drive;
         const float sign   = driven >= 0.0f ? 1.0f : -1.0f;
         const float mag    = driven >= 0.0f ? driven : -driven;
 
-        const float lim    = jlimit (0.0f, 1.0f, threshold);
+        const float lim = jlimit(0.0f, 1.0f, threshold);
 
         if (mag < lim)
-            return driven;               // todavia lineal: la senal pasa
+            return driven; // todavia lineal: la senal pasa
 
-        const float excess = mag - lim;
-        const float compressed = lim + tanh (excess * 2.0f) * (1.0f - lim);
+        const float excess     = mag - lim;
+        const float compressed = lim + tanh(excess * 2.0f) * (1.0f - lim);
 
         return sign * compressed;
     }

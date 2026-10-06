@@ -65,26 +65,26 @@ struct Re201Profile
     */
     struct Mode
     {
-        bool head[3];    // cabezales 1, 2 y 3 activos
-        bool reverb;     // el tanque entra en este modo
+        bool head[3]; // cabezales 1, 2 y 3 activos
+        bool reverb;  // el tanque entra en este modo
     };
 
     static constexpr int numModes = 12;
 
     static constexpr Mode modes[12] =
-    {
-        { { true,  false, false }, false },   //  1  cabezal 1
-        { { false, true,  false }, false },   //  2  cabezal 2
-        { { false, false, true  }, false },   //  3  cabezal 3
-        { { true,  true,  false }, false },   //  4  cabezales 1 + 2
-        { { true,  false, false }, true  },   //  5  cabezal 1 + reverb
-        { { false, true,  false }, true  },   //  6  cabezal 2 + reverb
-        { { false, false, true  }, true  },   //  7  cabezal 3 + reverb
-        { { true,  true,  false }, true  },   //  8  cabezales 1 + 2 + reverb
-        { { true,  false, true  }, true  },   //  9  cabezales 1 + 3 + reverb
-        { { false, true,  true  }, true  },   // 10  cabezales 2 + 3 + reverb
-        { { true,  true,  true  }, true  },   // 11  los tres + reverb
-        { { false, false, false }, true  }    // 12  solo reverb (sin eco)
+        {
+            {{true, false, false}, false}, //  1  cabezal 1
+            {{false, true, false}, false}, //  2  cabezal 2
+            {{false, false, true}, false}, //  3  cabezal 3
+            {{true, true, false}, false},  //  4  cabezales 1 + 2
+            {{true, false, false}, true},  //  5  cabezal 1 + reverb
+            {{false, true, false}, true},  //  6  cabezal 2 + reverb
+            {{false, false, true}, true},  //  7  cabezal 3 + reverb
+            {{true, true, false}, true},   //  8  cabezales 1 + 2 + reverb
+            {{true, false, true}, true},   //  9  cabezales 1 + 3 + reverb
+            {{false, true, true}, true},   // 10  cabezales 2 + 3 + reverb
+            {{true, true, true}, true},    // 11  los tres + reverb
+            {{false, false, false}, true}  // 12  solo reverb (sin eco)
     };
 
     /**
@@ -98,26 +98,26 @@ struct Re201Profile
         un sintetizador que calibrase su maquina pasa otros, y por eso estan
         aqui como constantes de perfil y no escritas en el motor.
     */
-    static constexpr float headRatio[3] = { 1.0f, 2.0f, 3.0f };
+    static constexpr float headRatio[3] = {1.0f, 2.0f, 3.0f};
 
     // Un cabezal de cinta real no envia lo mismo a L que a R.
-    static constexpr float headRightScale[3] = { 0.95f, 0.90f, 0.92f };
+    static constexpr float headRightScale[3] = {0.95f, 0.90f, 0.92f};
 
     // El recorrido del selector de velocidad: con los tres cabezales encendidos
     // el retardo mayor es 3 veces el base, y el buffer se dimensiona para eso.
-    static constexpr float minDelaySeconds     = 0.050f;
-    static constexpr float maxDelaySeconds     = 0.500f;
-    static constexpr float dryGain             = 0.75f;
-    static constexpr float headOutputGain      = 0.40f;
-    static constexpr float toneFrequencyHz     = 800.0f;
-    static constexpr float tankTimeL           = 0.080f;   // linea del tanque
-    static constexpr float tankTimeR           = 0.110f;
-    static constexpr float wowHz               = 0.5f;     // deriva lenta
-    static constexpr float flutterHz           = 8.0f;     // aleteo rapido
-    static constexpr float wowAmount           = 0.003f;
-    static constexpr float flutterAmount       = 0.001f;
-    static constexpr float colourDrive         = 0.25f;
-    static constexpr float colourHiss          = 0.15f;
+    static constexpr float minDelaySeconds = 0.050f;
+    static constexpr float maxDelaySeconds = 0.500f;
+    static constexpr float dryGain         = 0.75f;
+    static constexpr float headOutputGain  = 0.40f;
+    static constexpr float toneFrequencyHz = 800.0f;
+    static constexpr float tankTimeL       = 0.080f; // linea del tanque
+    static constexpr float tankTimeR       = 0.110f;
+    static constexpr float wowHz           = 0.5f; // deriva lenta
+    static constexpr float flutterHz       = 8.0f; // aleteo rapido
+    static constexpr float wowAmount       = 0.003f;
+    static constexpr float flutterAmount   = 0.001f;
+    static constexpr float colourDrive     = 0.25f;
+    static constexpr float colourHiss      = 0.15f;
 };
 
 } // namespace abd::dsp

@@ -82,13 +82,12 @@ public:
                 igual, no habria forma de apagar el color sin cambiar de etapa.
         `hiss`  amplitud del siseo de fondo (0.15 tipico en una cinta de
                 consumo, 0 en un digital). */
-    float processSample (float x, float drive = 0.0f, float hiss = 0.0f) noexcept
+    float processSample(float x, float drive = 0.0f, float hiss = 0.0f) noexcept
     {
-        const float amount = jlimit (0.0f, 1.0f, drive);
-        const float shaped = tapeCurve (x * (1.0f + 3.0f * amount));
+        const float amount = jlimit(0.0f, 1.0f, drive);
+        const float shaped = tapeCurve(x * (1.0f + 3.0f * amount));
 
-        return x + (shaped - x) * amount
-             + hiss * noiseSample();
+        return x + (shaped - x) * amount + hiss * noiseSample();
     }
 
     /** La curva de transferencia de la cinta, sin el siseo.
@@ -97,12 +96,12 @@ public:
         antes que la negativa, y esa asimetria es buena parte de por que una
         cinta no suena como un limitador. Los dos lados salen de la misma
         funcion para que la curva sea continua en el origen. */
-    static float tapeCurve (float x) noexcept
+    static float tapeCurve(float x) noexcept
     {
         if (x > 0.0f)
-            return tanh (x);              // saturacion mas temprana
+            return tanh(x); // saturacion mas temprana
         else
-            return 0.85f * tanh (x);      // la negativa aguanta algo mas
+            return 0.85f * tanh(x); // la negativa aguanta algo mas
     }
 
     /**
@@ -118,7 +117,7 @@ public:
     {
         seed_ = seed_ * 1664525u + 1013904223u;
 
-        return static_cast<float> (static_cast<int32_t> (seed_)) * kNoiseScale;
+        return static_cast<float>(static_cast<int32_t>(seed_)) * kNoiseScale;
     }
 
     /** El wow: la deriva lenta. Se evalua en la posicion de escritura.
@@ -136,16 +135,16 @@ public:
         extension para un consumidor que quiera la deriva atada a la posicion de
         escritura. Si se borran, esto es lo que hay que decir en su lugar: que
         la deriva es del motor y la etapa no la evalua. */
-    float wowAt (float writePosition, float rate, float amplitude) const noexcept
+    float wowAt(float writePosition, float rate, float amplitude) const noexcept
     {
-        return amplitude * sin (writePosition * rate);
+        return amplitude * sin(writePosition * rate);
     }
 
     /** El flutter: el aleteo rapido. Mismo cuerpo que `wowAt`; ver la nota de
         arriba, que es la misma. */
-    float flutterAt (float writePosition, float rate, float amplitude) const noexcept
+    float flutterAt(float writePosition, float rate, float amplitude) const noexcept
     {
-        return amplitude * sin (writePosition * rate);
+        return amplitude * sin(writePosition * rate);
     }
 
     /** Devuelve la etapa al estado inicial (la semilla del siseo). */
@@ -155,16 +154,16 @@ public:
     }
 
     /** Cambia la semilla del siseo (varias instancias, o diagnostico). */
-    void setNoiseSeed (uint32_t seed) noexcept
+    void setNoiseSeed(uint32_t seed) noexcept
     {
         seed_ = seed;
     }
 
-    dspDeclareNonCopyableWithLeakDetector (TapeColour)
+    dspDeclareNonCopyableWithLeakDetector(TapeColour)
 
-private:
-    /** 1/2^31: lleva los 32 bits con signo a aproximadamente [-1, 1). */
-    static constexpr float kNoiseScale = 1.0f / 2147483648.0f;
+        private :
+        /** 1/2^31: lleva los 32 bits con signo a aproximadamente [-1, 1). */
+        static constexpr float kNoiseScale = 1.0f / 2147483648.0f;
 
     static constexpr uint32_t kNoiseSeed = 0x12345678u;
 

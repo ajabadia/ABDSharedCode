@@ -76,12 +76,12 @@ public:
     RingMod() = default;
 
     /** Fija el sample rate. */
-    void prepare (double sampleRate)
+    void prepare(double sampleRate)
     {
-        dspAssert (sampleRate > 0.0);
+        dspAssert(sampleRate > 0.0);
 
         sampleRate_ = sampleRate;
-        colour.prepareSampleRate (sampleRate);
+        colour.prepareSampleRate(sampleRate);
         reset();
     }
 
@@ -105,17 +105,17 @@ public:
 
         waveformNorm 0..1, selecciona la forma de onda del perfil.
     */
-    float processSample (int channel, float input, float waveformNorm) noexcept
+    float processSample(int channel, float input, float waveformNorm) noexcept
     {
-        ignoreUnused (channel);   // el modulador es mono: un anillo tiene uno
+        ignoreUnused(channel); // el modulador es mono: un anillo tiene uno
 
-        const float modulator = oscillator (oscPhase_, waveformNorm);
+        const float modulator = oscillator(oscPhase_, waveformNorm);
 
         // El producto de dos senales es una campana de lados infinita; el
         // puente de diodos es lo que la hace sonar a modulacion y no a
         // multiplicacion. Con NullStage sale el producto limpio, que es lo
         // que quiere un producto digital.
-        return colour.processSample (input * modulator, drive_, threshold_);
+        return colour.processSample(input * modulator, drive_, threshold_);
     }
 
     /**
@@ -127,12 +127,12 @@ public:
         los barridos utiles (el "duck" grave) quedan todos apretados al
         principio.
     */
-    void advance (float frequencyNorm, float lfoRateNorm, float lfoDepthNorm) noexcept
+    void advance(float frequencyNorm, float lfoRateNorm, float lfoDepthNorm) noexcept
     {
         const float twoPi = MathConstants<float>::twoPi;
-        const float sr    = static_cast<float> (sampleRate_);
+        const float sr    = static_cast<float>(sampleRate_);
 
-        oscPhase_ += twoPi * modulatedFrequency (frequencyNorm, lfoDepthNorm) / sr;
+        oscPhase_ += twoPi * modulatedFrequency(frequencyNorm, lfoDepthNorm) / sr;
 
         // La fase se deja correr y se dobla cada 1000 vueltas: es un
         // acumulador, no un indice, y a partir de 2^13 vueltas el redondeo de
@@ -141,11 +141,9 @@ public:
         // modular por encima de 1000 veces el sample rate (o con un
         // `frequencyNorm` roto) la fase se iba sin limite. `wrapPhase` lo
         // envuelve en un paso, se comporte igual en el caso normal.
-        oscPhase_ = dsp::wrapPhase (oscPhase_, twoPi * 1000.0f);
+        oscPhase_ = dsp::wrapPhase(oscPhase_, twoPi * 1000.0f);
 
-        const float lfoHz = Profile::lfoMinHz
-                          + (Profile::lfoMaxHz - Profile::lfoMinHz)
-                            * jlimit (0.0f, 1.0f, lfoRateNorm);
+        const float lfoHz = Profile::lfoMinHz + (Profile::lfoMaxHz - Profile::lfoMinHz) * jlimit(0.0f, 1.0f, lfoRateNorm);
 
         lfoPhase_ += twoPi * lfoHz / sr;
 
@@ -156,19 +154,19 @@ public:
         // en la senal de audio. `wrapPhase` envuelve en un paso y ademas
         // reinicia el acumulador si algun parametro llega en NaN, que con el
         // `if` se quedaba envenenado para siempre.
-        lfoPhase_ = dsp::wrapPhase (lfoPhase_, twoPi);
+        lfoPhase_ = dsp::wrapPhase(lfoPhase_, twoPi);
     }
 
     /** Ganancia del puente de diodos (0 lo apaga). */
-    void setDrive (float drive) noexcept { drive_ = drive; }
+    void setDrive(float drive) noexcept { drive_ = drive; }
 
     /** Umbral del puente de diodos. */
-    void setThreshold (float threshold) noexcept { threshold_ = threshold; }
+    void setThreshold(float threshold) noexcept { threshold_ = threshold; }
 
     /** La frecuencia del modulador SIN LFO, en Hz (para la interfaz). */
-    float getFrequencyHz (float frequencyNorm) const noexcept
+    float getFrequencyHz(float frequencyNorm) const noexcept
     {
-        return baseFrequency (frequencyNorm);
+        return baseFrequency(frequencyNorm);
     }
 
     /** Sample rate de la ultima llamada a `prepare`. */
@@ -178,43 +176,42 @@ private:
     //==========================================================================
     /** La frecuencia del mando, mapeada al rango del perfil con escala
         exponencial (ver la nota del `processSample`). */
-    static float baseFrequency (float normalised) noexcept
+    static float baseFrequency(float normalised) noexcept
     {
-        return Profile::minFrequencyHz
-             * pow (Profile::maxFrequencyHz / Profile::minFrequencyHz,
-                    jlimit (0.0f, 1.0f, normalised));
+        return Profile::minFrequencyHz * pow(Profile::maxFrequencyHz / Profile::minFrequencyHz,
+                                             jlimit(0.0f, 1.0f, normalised));
     }
 
     /** La frecuencia de ESTA muestra: la del mando, ya modulada por el LFO. */
-    float modulatedFrequency (float frequencyNorm, float lfoDepthNorm) const noexcept
+    float modulatedFrequency(float frequencyNorm, float lfoDepthNorm) const noexcept
     {
-        const float depth = jmax (0.0f, sin (lfoPhase_) * jlimit (0.0f, 1.0f, lfoDepthNorm));
-        return baseFrequency (frequencyNorm) * (1.0f + depth);
+        const float depth = jmax(0.0f, sin(lfoPhase_) * jlimit(0.0f, 1.0f, lfoDepthNorm));
+        return baseFrequency(frequencyNorm) * (1.0f + depth);
     }
 
     /** Las tres formas del perfil, sobre una fase en radianes. */
-    static float oscillator (float phase, float waveform) noexcept
+    static float oscillator(float phase, float waveform) noexcept
     {
         if (waveform < Profile::sineUpper)
-            return sin (phase);
+            return sin(phase);
 
-        const float normalised = phase - static_cast<float> (floorToInt (phase));
+        const float normalised = phase - static_cast<float>(floorToInt(phase));
 
         if (waveform < Profile::sawUpper)
-            return normalised * 2.0f - 1.0f;                 // sierra
+            return normalised * 2.0f - 1.0f; // sierra
 
-        return normalised < 0.5f ? 1.0f : -1.0f;            // cuadrada
+        return normalised < 0.5f ? 1.0f : -1.0f; // cuadrada
     }
 
     Colour colour;
 
     double sampleRate_ = 44100.0;
-    float  oscPhase_   = 0.0f;
-    float  lfoPhase_   = 0.0f;
-    float  drive_      = 0.8f;
-    float  threshold_  = 0.3f;
+    float oscPhase_    = 0.0f;
+    float lfoPhase_    = 0.0f;
+    float drive_       = 0.8f;
+    float threshold_   = 0.3f;
 
-    dspDeclareNonCopyableWithLeakDetector (RingMod)
+    dspDeclareNonCopyableWithLeakDetector(RingMod)
 };
 
 } // namespace abd::dsp

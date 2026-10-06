@@ -86,7 +86,7 @@ class SchroederReverb
 public:
     SchroederReverb()
     {
-        prepare (44100.0);
+        prepare(44100.0);
     }
 
     /** Fija el sample rate y redimensiona linea de conbs, allpass y pre-retardo.
@@ -96,14 +96,14 @@ public:
         redondeo a un numero entero de muestras se come el filtro entero: es
         el mismo limite que tiene el original,    aqui solo documentado, porque la maquina no puede hacer otra cosa sin
         redimensionar, que es justo lo que borra la cola. */
-    void prepare (double sampleRate, double maxCombSeconds = 0.25)
+    void prepare(double sampleRate, double maxCombSeconds = 0.25)
     {
-        dspAssert (sampleRate > 0.0);
+        dspAssert(sampleRate > 0.0);
 
-        sampleRate_  = sampleRate;
+        sampleRate_     = sampleRate;
         maxCombSeconds_ = maxCombSeconds;
 
-        preDelayCapacity_ = jmax (1, static_cast<int> (sampleRate_ * 0.2));
+        preDelayCapacity_ = jmax(1, static_cast<int>(sampleRate_ * 0.2));
 
         rebuild();
 
@@ -113,7 +113,7 @@ public:
         // conbs) solo recalcula cuantas muestras se retrasan. Si el pre-retardo
         // se redimensionase con cada giro del mando de tamano, al original se le
         // borraria la cola del pre-retardo y aqui no, y la paridad se iria.
-        preDelayBuffer.setSize (1, preDelayCapacity_, false, false, true);
+        preDelayBuffer.setSize(1, preDelayCapacity_, false, false, true);
 
         reset();
     }
@@ -131,9 +131,9 @@ public:
 
         for (int i = 0; i < kNumCombs; ++i)
         {
-            combsL_[i].writePos   = 0;
+            combsL_[i].writePos    = 0;
             combsL_[i].filterState = 0.0f;
-            combsR_[i].writePos   = 0;
+            combsR_[i].writePos    = 0;
             combsR_[i].filterState = 0.0f;
         }
 
@@ -146,52 +146,77 @@ public:
 
     /** Decaimiento 0..1. NEGATIVO es la variante "Reverse" (cola corta).
 
-        EL RECORTE DE ARRIBA ES NUEVO, y no cambia ni una muestra de ningun
-        consumidor actual: el tope documentado es 1 y el valor mas alto que pasa
-        cualquiera de ellos es 0.85 (`ReverbProfile`), asi que el recorte no se
-        toma nunca. Lo que evita es que un mando mal mapeado en un host convierta
-        la reverb en un divergente. MEDIDO, sin el recorte, con un impulso y un
-        segundo de silencio:
+        SIN RECORTE, Y POR QUE. Estuvo `jmin (decay, 1.0f)` hasta que se midio que
+        no se tomaba NUNCA: los diez perfiles de `ReverbProfile` van de -0.30 a
+        0.85, y el mando del panel es normalizado 0..1, asi que el tope no lo
+        toca nadie. Un recorte que no recorta es ruido en el hilo de audio: se
+        lee como si protegiera algo y no protege nada.
 
-            decay 0.8  (en rango)  pico 3.2e-01
-            decay 1.0  (documentado)  pico 3.7e-01
-            decay 1.2  (fuera)     pico 4.2e-01
-            decay 2.0  (muy fuera)  pico 7.9e+06      <- se dispara
+        LO QUE PASA SI ALGUIEN MANDA UN VALOR FUERA DE RANGO. Aqui no hay red. El
+        coeficiente del conb es `decay * 0.9`, asi que con `decay` por encima de
+        1.111 la realimentacion pasa de 1 y la cola crece sin limite. MEDIDO con
+        un impulso y un segundo de silencio:
 
-        El coeficiente del conb es `decay * 0.9`, o sea que con `decay` por encima
-        de 1.111 la realimentacion pasa de 1 y la cola crece sin limite. */
-    void setDecay (float decay) noexcept
+            decay 0.8  (lo que usa el panel)  pico 3.2e-01
+            decay 1.0  (documentado)        pico 3.7e-01
+            decay 1.2  (fuera)               pico 4.2e-01
+            decay 2.0  (muy fuera)           pico 7.9e+06      <- se dispara
+
+        Quien lo vigila ya no es un `if`: es
+        `DspEffectsTests.cpp::testMandosDelBarridoSinRecorte`, que mira el valor
+        QUE HA ENTRADO y no el que sale. Si alguien reintroduce el recorte, ese
+        test se pone rojo. */
+    void setDecay(float decay) noexcept
     {
-        decay_ = jmin (decay, 1.0f);
+        decay_ = decay;
         updateCombParams();
     }
 
     /** Amortiguamiento de alta frecuencia en la realimentacion, 0..1.
 
-        Se recorta por el mismo motivo que `setDecay`. MEDIDO sin recorte, con
-        `damping = 2.0`: pico de **1.0e+30** en un segundo, o sea que el pasabajos
-        `damp1 = 2, damp2 = -1` tiene el polo en -1 y crece. */
-    void setDamping (float damping) noexcept
+        Sin recorte por el mismo motivo que `setDecay`: los perfiles van de 0.20
+        a 0.90 y el mando es 0..1, asi que el `jlimit` no se tomaba nunca. Con un
+        valor fuera de rango el pasabajos `damp1 = 2, damp2 = -1` tiene el polo
+        en -1 y crece: MEDIDO con `damping = 2.0`, pico de **1.0e+30** en un
+        segundo. Mismo vigilante: el test de los mandos del barrido. */
+    void setDamping(float damping) noexcept
     {
-        damping_ = jlimit (0.0f, 1.0f, damping);
+        damping_ = damping;
         updateCombParams();
     }
 
     /** Ganancia de los allpass, 0..1.
 
-        Se recorta por el mismo motivo. MEDIDO sin recorte, con `diffusion = 2.0`:
+        Sin recorte por el mismo motivo: los perfiles van de 0.20 a 0.90. Con un
+        valor fuera de rango la cola se dispara: MEDIDO con `diffusion = 2.0`,
         pico de **3.3e+28** en un segundo. */
-    void setDiffusion (float diffusion) noexcept
+    void setDiffusion(float diffusion) noexcept
     {
-        diffusion_ = jlimit (0.0f, 1.0f, diffusion);
+        diffusion_ = diffusion;
         updateCombParams();
     }
+
+    //==============================================================================
+    // Los tres mandos del barrido, LEIDOS.
+    //
+    // Y POR QUE EXISTEN. Para que un test pueda fijar que el valor ENTRA tal
+    // cual y no recortado: sin una puerta de lectura, "no hay recorte" es una
+    // afirmacion que nadie puede comprobar, porque lo unico que se ve es la
+    // salida, y la salida no cambia cuando el recorte no muerde. Con estos tres
+    // getters la asercion mira el numero, no el efecto.
+    //
+    // Son `inline` de una lectura: no meten trabajo ni una rama en el hilo de
+    // audio, y no forman parte de la superficie de audio (el hilo de audio
+    // escribe con los `set` y no lee).
+    float getDecay() const noexcept { return decay_; }
+    float getDamping() const noexcept { return damping_; }
+    float getDiffusion() const noexcept { return diffusion_; }
 
     /**
         Tamano de la sala, 0..1. ESCALA LAS LONGITUDES, y por tanto
         redimensiona: moving este mando BORRA la cola (ver la cabecera).
     */
-    void setRoomSize (float roomSize) noexcept
+    void setRoomSize(float roomSize) noexcept
     {
         roomSize_ = roomSize;
         rebuild();
@@ -207,9 +232,9 @@ public:
         mismo estado), pero es trabajo de sobra en un camino que se ejecuta cada
         vez que se mueve un mando.
     */
-    void setGeometry (float roomSize, float preDelaySeconds) noexcept
+    void setGeometry(float roomSize, float preDelaySeconds) noexcept
     {
-        roomSize_       = roomSize;
+        roomSize_        = roomSize;
         preDelaySeconds_ = preDelaySeconds;
         rebuild();
     }
@@ -219,14 +244,14 @@ public:
         lo pedido, porque el original escala por 0.2 (ver la cabecera). Tambien
         redimensiona los conbs, con el efecto de borrar la cola (ver la cabecera).
     */
-    void setPreDelaySeconds (float seconds) noexcept
+    void setPreDelaySeconds(float seconds) noexcept
     {
         preDelaySeconds_ = seconds;
         rebuild();
     }
 
     /** Niega solo el canal izquierdo. Es lo que hace la variante "Reverse". */
-    void setInvertLeft (bool invert) noexcept { invertLeft_ = invert; }
+    void setInvertLeft(bool invert) noexcept { invertLeft_ = invert; }
 
     /** Pre-retardo efectivo, en muestras. OJO: incluye el factor 0.2 del original. */
     int getPreDelaySamples() const noexcept { return preDelaySamples_; }
@@ -239,13 +264,13 @@ public:
         (ver `rebuild`). Es la misma razon por la que existe
         `getPreDelaySamples`.
     */
-    int getCombLength (int index) const noexcept
+    int getCombLength(int index) const noexcept
     {
-        return combsL_[jlimit (0, kNumCombs - 1, index)].bufferSize;
+        return combsL_[jlimit(0, kNumCombs - 1, index)].bufferSize;
     }
 
     /** Procesa UN marco stereo. Ver el contrato de llamada en la cabecera. */
-    void processFrame (float inL, float inR, float& outL, float& outR) noexcept
+    void processFrame(float inL, float inR, float& outL, float& outR) noexcept
     {
         float wetL = inL;
         float wetR = inR;
@@ -254,13 +279,13 @@ public:
         // sola vez, antes de abrir los conbs.
         if (preDelaySamples_ > 0)
         {
-            const int readPos = wrapPreDelay (preDelayWritePos_ - preDelaySamples_);
+            const int readPos = wrapPreDelay(preDelayWritePos_ - preDelaySamples_);
 
-            wetL = preDelayBuffer.getSample (0, readPos);
-            wetR = preDelayBuffer.getSample (0, readPos);
+            wetL = preDelayBuffer.getSample(0, readPos);
+            wetR = preDelayBuffer.getSample(0, readPos);
 
-            preDelayBuffer.setSample (0, preDelayWritePos_, (inL + inR) * 0.5f);
-            preDelayWritePos_ = wrapPreDelay (preDelayWritePos_ + 1);
+            preDelayBuffer.setSample(0, preDelayWritePos_, (inL + inR) * 0.5f);
+            preDelayWritePos_ = wrapPreDelay(preDelayWritePos_ + 1);
         }
 
         if (invertLeft_)
@@ -271,8 +296,8 @@ public:
 
         for (int i = 0; i < kNumCombs; ++i)
         {
-            sumL += processComb (combsL_[i], wetL);
-            sumR += processComb (combsR_[i], wetR);
+            sumL += processComb(combsL_[i], wetL);
+            sumR += processComb(combsR_[i], wetR);
         }
 
         sumL *= 0.25f;
@@ -281,8 +306,8 @@ public:
         // Allpass en serie.
         for (int i = 0; i < kNumAllPass; ++i)
         {
-            sumL = processAllPass (allpassL_[i], sumL);
-            sumR = processAllPass (allpassR_[i], sumR);
+            sumL = processAllPass(allpassL_[i], sumL);
+            sumR = processAllPass(allpassR_[i], sumR);
         }
 
         // El decaimiento negativo (variante "gated") da una escala distinta.
@@ -295,39 +320,39 @@ public:
     /** Sample rate de la ultima llamada a `prepare`. */
     double getSampleRate() const noexcept { return sampleRate_; }
 
-    dspDeclareNonCopyableWithLeakDetector (SchroederReverb)
+    dspDeclareNonCopyableWithLeakDetector(SchroederReverb)
 
-private:
-    //==========================================================================
-    static constexpr int kNumCombs   = 4;
-    static constexpr int kNumAllPass = 3;
+        private :
+        //==========================================================================
+        static constexpr int kNumCombs = 4;
+    static constexpr int kNumAllPass   = 3;
 
     struct Comb
     {
         float* buffer     = nullptr;
-        int    bufferSize = 1;
-        int    writePos   = 0;
-        float  feedback   = 0.5f;
-        float  damp1      = 0.5f;
-        float  damp2      = 0.5f;
-        float  filterState = 0.0f;
+        int bufferSize    = 1;
+        int writePos      = 0;
+        float feedback    = 0.5f;
+        float damp1       = 0.5f;
+        float damp2       = 0.5f;
+        float filterState = 0.0f;
     };
 
     struct AllPass
     {
-        float* buffer     = nullptr;
-        int    bufferSize = 1;
-        int    writePos   = 0;
-        float  gain       = 0.5f;
+        float* buffer  = nullptr;
+        int bufferSize = 1;
+        int writePos   = 0;
+        float gain     = 0.5f;
     };
 
     //==========================================================================
     /** Un conb con pasabajos de un polo en la realimentacion. */
-    static float processComb (Comb& comb, float input) noexcept
+    static float processComb(Comb& comb, float input) noexcept
     {
         const float output = comb.buffer[comb.writePos];
 
-        comb.filterState = output * comb.damp1 + comb.filterState * comb.damp2;
+        comb.filterState           = output * comb.damp1 + comb.filterState * comb.damp2;
         comb.buffer[comb.writePos] = input + comb.filterState * comb.feedback;
 
         if (++comb.writePos >= comb.bufferSize)
@@ -337,7 +362,7 @@ private:
     }
 
     /** Un allpass de primer orden. */
-    static float processAllPass (AllPass& ap, float input) noexcept
+    static float processAllPass(AllPass& ap, float input) noexcept
     {
         const float buffered = ap.buffer[ap.writePos];
         const float output   = -input + buffered;
@@ -350,9 +375,9 @@ private:
         return output;
     }
 
-    int wrapPreDelay (int pos) const noexcept
+    int wrapPreDelay(int pos) const noexcept
     {
-        while (pos < 0)                pos += preDelayCapacity_;
+        while (pos < 0) pos += preDelayCapacity_;
         while (pos >= preDelayCapacity_) pos -= preDelayCapacity_;
 
         return pos;
@@ -442,18 +467,18 @@ private:
         for (int i = 0; i < kNumCombs; ++i)
         {
             static constexpr double kCombSeconds[kNumCombs] =
-                { 0.0297, 0.0331, 0.0378, 0.0411 };
+                {0.0297, 0.0331, 0.0378, 0.0411};
 
-            int length = static_cast<int> (sampleRate_ * kCombSeconds[i] * sizeScale);
+            int length = static_cast<int>(sampleRate_ * kCombSeconds[i] * sizeScale);
 
             // Techo defensivo: con un roomSize absurdo el conb podria pedir mas
             // de lo que el buffer declarado puede dar. El original no lo tiene;
             // aqui no puede haber un desbordamiento en silencio. Va ANTES del
             // desplazamiento, y por el motivo medido que explica `rebuild`.
-            length = jmin (jmax (1, length),
-                           jmax (1, static_cast<int> (maxCombSeconds_ * sampleRate_)));
+            length = jmin(jmax(1, length),
+                          jmax(1, static_cast<int>(maxCombSeconds_ * sampleRate_)));
 
-            length += i * 7;                    // desplazamiento anti-periodicidad
+            length += i * 7; // desplazamiento anti-periodicidad
 
             combLen[i] = length;
         }
@@ -469,22 +494,22 @@ private:
         // separados y `testSchroederReverb` lo vigila con el caso "misma
         // entrada, L y R deben coincidir", que es el que se delata si alguien
         // vuelve a compartir.
-        combBufferL.setSize (1, combTotal, false, false, true);
+        combBufferL.setSize(1, combTotal, false, false, true);
         combBufferL.clear();
-        combBufferR.setSize (1, combTotal, false, false, true);
+        combBufferR.setSize(1, combTotal, false, false, true);
         combBufferR.clear();
 
         int offset = 0;
         for (int i = 0; i < kNumCombs; ++i)
         {
-            combsL_[i].buffer     = combBufferL.getWritePointer (0) + offset;
-            combsL_[i].bufferSize = combLen[i];
-            combsL_[i].writePos   = 0;
+            combsL_[i].buffer      = combBufferL.getWritePointer(0) + offset;
+            combsL_[i].bufferSize  = combLen[i];
+            combsL_[i].writePos    = 0;
             combsL_[i].filterState = 0.0f;
 
-            combsR_[i].buffer     = combBufferR.getWritePointer (0) + offset;
-            combsR_[i].bufferSize = combLen[i];
-            combsR_[i].writePos   = 0;
+            combsR_[i].buffer      = combBufferR.getWritePointer(0) + offset;
+            combsR_[i].bufferSize  = combLen[i];
+            combsR_[i].writePos    = 0;
             combsR_[i].filterState = 0.0f;
 
             offset += combLen[i];
@@ -496,25 +521,25 @@ private:
         for (int i = 0; i < kNumAllPass; ++i)
         {
             static constexpr double kAllPassSeconds[kNumAllPass] =
-                { 0.0051, 0.0068, 0.0083 };
+                {0.0051, 0.0068, 0.0083};
 
-            apLen[i]  = jmax (1, static_cast<int> (sampleRate_ * kAllPassSeconds[i] * sizeScale));
-            apTotal  += apLen[i];
+            apLen[i] = jmax(1, static_cast<int>(sampleRate_ * kAllPassSeconds[i] * sizeScale));
+            apTotal += apLen[i];
         }
 
-        allpassBufferL.setSize (1, apTotal, false, false, true);
+        allpassBufferL.setSize(1, apTotal, false, false, true);
         allpassBufferL.clear();
-        allpassBufferR.setSize (1, apTotal, false, false, true);
+        allpassBufferR.setSize(1, apTotal, false, false, true);
         allpassBufferR.clear();
 
         offset = 0;
         for (int i = 0; i < kNumAllPass; ++i)
         {
-            allpassL_[i].buffer     = allpassBufferL.getWritePointer (0) + offset;
+            allpassL_[i].buffer     = allpassBufferL.getWritePointer(0) + offset;
             allpassL_[i].bufferSize = apLen[i];
             allpassL_[i].writePos   = 0;
 
-            allpassR_[i].buffer     = allpassBufferR.getWritePointer (0) + offset;
+            allpassR_[i].buffer     = allpassBufferR.getWritePointer(0) + offset;
             allpassR_[i].bufferSize = apLen[i];
             allpassR_[i].writePos   = 0;
 
@@ -528,8 +553,8 @@ private:
         // maximo es 200 ms" y se le colo el factor en la escala), pero cambiarlo
         // seria cambiar el sonido de nueve efectos ya publicados, asi que se
         // reproduce tal cual y se documenta.
-        preDelaySamples_ = jlimit (0, preDelayCapacity_,
-                                   static_cast<int> (preDelaySeconds_ * sampleRate_ * 0.2));
+        preDelaySamples_ = jlimit(0, preDelayCapacity_,
+                                  static_cast<int>(preDelaySeconds_ * sampleRate_ * 0.2));
 
         // Los coeficientes se recalculan aqui tambien, para que un `rebuild`
         // desde `prepare` deje el motor con los valores actuales y no con los de
@@ -543,23 +568,23 @@ private:
     AudioBuffer<float> allpassBufferR;
     AudioBuffer<float> preDelayBuffer;
 
-    Comb     combsL_[kNumCombs];
-    Comb     combsR_[kNumCombs];
-    AllPass  allpassL_[kNumAllPass];
-    AllPass  allpassR_[kNumAllPass];
+    Comb combsL_[kNumCombs];
+    Comb combsR_[kNumCombs];
+    AllPass allpassL_[kNumAllPass];
+    AllPass allpassR_[kNumAllPass];
 
-    double sampleRate_      = 44100.0;
-    double maxCombSeconds_  = 0.25;
-    int    preDelayCapacity_ = 1;
-    int    preDelaySamples_   = 0;
-    int    preDelayWritePos_   = 0;
+    double sampleRate_     = 44100.0;
+    double maxCombSeconds_ = 0.25;
+    int preDelayCapacity_  = 1;
+    int preDelaySamples_   = 0;
+    int preDelayWritePos_  = 0;
 
-    float decay_       = 0.5f;
-    float damping_     = 0.5f;
-    float diffusion_   = 0.5f;
-    float roomSize_    = 0.5f;
+    float decay_           = 0.5f;
+    float damping_         = 0.5f;
+    float diffusion_       = 0.5f;
+    float roomSize_        = 0.5f;
     float preDelaySeconds_ = 0.0f;
-    bool  invertLeft_  = false;
+    bool invertLeft_       = false;
 };
 
 } // namespace abd::dsp

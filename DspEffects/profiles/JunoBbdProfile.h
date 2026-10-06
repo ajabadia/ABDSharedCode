@@ -59,65 +59,65 @@ namespace abd::dsp
 struct JunoBbdProfile
 {
     //--- Retardo y modulacion ---------------------------------------------
-    float delayI;               // ms, retardo base del modo I      (3.2)
-    float delayII;              // ms, retardo base del modo II     (3.3)
-    float depthI;               // ms, barrido del modo I           (2.13)
-    float depthII;              // ms, barrido del modo II          (1.71)
-    float depthBoth;            // ms, barrido del modo I+II        (0.236)
-    float modDepthScale;        // multiplica el barrido             (1.5)
-    float rateI;                // Hz, LFO del modo I               (0.513)
-    float rateII;               // Hz, LFO del modo II              (0.78)
-    float rateBoth;             // Hz, LFO acelerado I+II           (7.7)
+    float delayI;        // ms, retardo base del modo I      (3.2)
+    float delayII;       // ms, retardo base del modo II     (3.3)
+    float depthI;        // ms, barrido del modo I           (2.13)
+    float depthII;       // ms, barrido del modo II          (1.71)
+    float depthBoth;     // ms, barrido del modo I+II        (0.236)
+    float modDepthScale; // multiplica el barrido             (1.5)
+    float rateI;         // Hz, LFO del modo I               (0.513)
+    float rateII;        // Hz, LFO del modo II              (0.78)
+    float rateBoth;      // Hz, LFO acelerado I+II           (7.7)
 
     //--- Reloj del BBD -----------------------------------------------------
-    float clockTrim;            // tolerancia de reloj por linea     (0.015)
-    float minDelayMs;           // suelo del retardo                 (0.1)
-    float minClockHz;           // techo del reloj antes de recortar(5000)
-    float cteCoeff;             // perdida de transferencia de carga (4468)
-    float cteInvClockCentre;    // centro de esa perdida (1/40000)   (2.5e-5)
-    float gainTrim;             // asimetria L/R                     (0.04)
+    float clockTrim;         // tolerancia de reloj por linea     (0.015)
+    float minDelayMs;        // suelo del retardo                 (0.1)
+    float minClockHz;        // techo del reloj antes de recortar(5000)
+    float cteCoeff;          // perdida de transferencia de carga (4468)
+    float cteInvClockCentre; // centro de esa perdida (1/40000)   (2.5e-5)
+    float gainTrim;          // asimetria L/R                     (0.04)
 
     //--- Mezclador IC6 -----------------------------------------------------
-    float gainDry;              // ganancia de seco                  (0.863)
-    float gainWet;              // ganancia de mojado                (1.257)
+    float gainDry; // ganancia de seco                  (0.863)
+    float gainWet; // ganancia de mojado                (1.257)
 
     //--- Saturacion de la linea -------------------------------------------
-    float satDrive;             // base del drive, ANTES del boost  (0.1)
-    float satBoost;             // calibracion de saturacion         (1.2)
-    float satSlew;              // constante de suavizado del drive  (0.001)
+    float satDrive; // base del drive, ANTES del boost  (0.1)
+    float satBoost; // calibracion de saturacion         (1.2)
+    float satSlew;  // constante de suavizado del drive  (0.001)
 
     //--- Filtros de reconstruccion ----------------------------------------
-    float biquadFc;             // Hz, pasabajos TPT de 2º orden     (8000)
-    float biquadQ;              // Butterworth                       (0.7071)
-    float poleFc;               // Hz, inclinacion de agudas        (20000)
-    float lineMinSeconds;       // longitud minima de la linea       (0.020)
+    float biquadFc;       // Hz, pasabajos TPT de 2º orden     (8000)
+    float biquadQ;        // Butterworth                       (0.7071)
+    float poleFc;         // Hz, inclinacion de agudas        (20000)
+    float lineMinSeconds; // longitud minima de la linea       (0.020)
 
     //--- Siseo y degradacion ----------------------------------------------
-    float hissLevelDb;          // dB, siseo base                     (-68)
-    float hissMultiplier;       // desgaste (1.0 = nuevo)            (1.0)
-    float leakGain;             // ganancia del siseo de fuga         (8.8e-3)
-    float leakMinFrac;          // fuga minima en el fondo del LFO   (0.0126)
-    float clickGain;            // clic primario                     (0.11)
-    float slowClickGain;        // clic secundario                   (0.022)
-    float clickThreshold;       // umbral de disparo del clic        (0.95)
-    float clickDurationMs;      // duracion del clic                 (180)
-    float clickRingHz;          // resonancia del anillo de clic      (30)
-    float clickRingQ;           // Q del anillo                      (18)
-    float clickRingGain;        // ganancia del anillo               (0.06)
-    float mainsHz;              // Hz, zumbido de red                 (60)
-    float mainsA1;              // armonico 1                         (7.9e-5)
-    float mainsA2;              // armonico 2                         (2.2e-5)
-    float mainsA3;              // armonico 3                         (9.8e-6)
-    float noiseLpCutoffHz;      // Hz, LP del siseo blanco           (20000)
-    float hissColor;            // 0 = rosa, 1 = blanco del siseo    (0.4)
-    float noiseShelfHz;         // Hz, shelf del siseo rosa           (3000)
-    float noiseShelfDb;         // dB, elevacion del shelf            (6)
-    float leakHpHz;             // Hz, HP del siseo de fuga           (800)
+    float hissLevelDb;     // dB, siseo base                     (-68)
+    float hissMultiplier;  // desgaste (1.0 = nuevo)            (1.0)
+    float leakGain;        // ganancia del siseo de fuga         (8.8e-3)
+    float leakMinFrac;     // fuga minima en el fondo del LFO   (0.0126)
+    float clickGain;       // clic primario                     (0.11)
+    float slowClickGain;   // clic secundario                   (0.022)
+    float clickThreshold;  // umbral de disparo del clic        (0.95)
+    float clickDurationMs; // duracion del clic                 (180)
+    float clickRingHz;     // resonancia del anillo de clic      (30)
+    float clickRingQ;      // Q del anillo                      (18)
+    float clickRingGain;   // ganancia del anillo               (0.06)
+    float mainsHz;         // Hz, zumbido de red                 (60)
+    float mainsA1;         // armonico 1                         (7.9e-5)
+    float mainsA2;         // armonico 2                         (2.2e-5)
+    float mainsA3;         // armonico 3                         (9.8e-6)
+    float noiseLpCutoffHz; // Hz, LP del siseo blanco           (20000)
+    float hissColor;       // 0 = rosa, 1 = blanco del siseo    (0.4)
+    float noiseShelfHz;    // Hz, shelf del siseo rosa           (3000)
+    float noiseShelfDb;    // dB, elevacion del shelf            (6)
+    float leakHpHz;        // Hz, HP del siseo de fuga           (800)
 
     //--- Valores por defecto de los mandos --------------------------------
-    float defaultRate;          // Hz                                 (0.513)
-    float defaultDepth;                                             // (0.65)
-    float defaultMix;                                                // (0.50)
+    float defaultRate;  // Hz                                 (0.513)
+    float defaultDepth; // (0.65)
+    float defaultMix;   // (0.50)
 };
 
 //==============================================================================
@@ -125,55 +125,54 @@ struct JunoBbdProfile
 struct JunoBbdJ106Profile
 {
     static constexpr JunoBbdProfile value =
-    {
-        /* delayI        */ 3.2f,
-        /* delayII       */ 3.3f,
-        /* depthI        */ 2.13f,
-        /* depthII       */ 1.71f,
-        /* depthBoth     */ 0.236f,
-        /* modDepthScale */ 1.5f,
-        /* rateI         */ 0.513f,
-        /* rateII        */ 0.78f,
-        /* rateBoth      */ 7.7f,
-        /* clockTrim     */ 0.015f,
-        /* minDelayMs    */ 0.1f,
-        /* minClockHz    */ 5000.0f,
-        /* cteCoeff      */ 4468.0f,
-        /* cteInvClockCentre */ 1.0f / 40000.0f,
-        /* gainTrim      */ 0.04f,
-        /* gainDry       */ 0.863f,
-        /* gainWet       */ 1.257f,
-        /* satDrive      */ 0.1f,
-        /* satBoost      */ 1.2f,
-        /* satSlew       */ 0.001f,
-        /* biquadFc      */ 8000.0f,
-        /* biquadQ       */ 0.7071f,
-        /* poleFc        */ 20000.0f,
-        /* lineMinSeconds */ 0.020f,
-        /* hissLevelDb   */ -68.0f,
-        /* hissMultiplier */ 1.0f,
-        /* leakGain      */ 8.8e-3f,
-        /* leakMinFrac   */ 0.0126f,
-        /* clickGain     */ 0.11f,
-        /* slowClickGain */ 0.022f,
-        /* clickThreshold */ 0.95f,
-        /* clickDurationMs */ 180.0f,
-        /* clickRingHz   */ 30.0f,
-        /* clickRingQ    */ 18.0f,
-        /* clickRingGain */ 0.06f,
-        /* mainsHz       */ 60.0f,
-        /* mainsA1       */ 7.9e-5f,
-        /* mainsA2       */ 2.2e-5f,
-        /* mainsA3       */ 9.8e-6f,
-        /* noiseLpCutoffHz */ 20000.0f,
-        /* hissColor       */ 0.4f,
-        /* noiseShelfHz  */ 3000.0f,
-        /* noiseShelfDb  */ 6.0f,
-        /* leakHpHz      */ 800.0f,
-        /* defaultRate   */ 0.513f,
-        /* defaultDepth  */ 0.65f,
-        /* defaultMix    */ 0.50f
-    };
+        {
+            /* delayI        */ 3.2f,
+            /* delayII       */ 3.3f,
+            /* depthI        */ 2.13f,
+            /* depthII       */ 1.71f,
+            /* depthBoth     */ 0.236f,
+            /* modDepthScale */ 1.5f,
+            /* rateI         */ 0.513f,
+            /* rateII        */ 0.78f,
+            /* rateBoth      */ 7.7f,
+            /* clockTrim     */ 0.015f,
+            /* minDelayMs    */ 0.1f,
+            /* minClockHz    */ 5000.0f,
+            /* cteCoeff      */ 4468.0f,
+            /* cteInvClockCentre */ 1.0f / 40000.0f,
+            /* gainTrim      */ 0.04f,
+            /* gainDry       */ 0.863f,
+            /* gainWet       */ 1.257f,
+            /* satDrive      */ 0.1f,
+            /* satBoost      */ 1.2f,
+            /* satSlew       */ 0.001f,
+            /* biquadFc      */ 8000.0f,
+            /* biquadQ       */ 0.7071f,
+            /* poleFc        */ 20000.0f,
+            /* lineMinSeconds */ 0.020f,
+            /* hissLevelDb   */ -68.0f,
+            /* hissMultiplier */ 1.0f,
+            /* leakGain      */ 8.8e-3f,
+            /* leakMinFrac   */ 0.0126f,
+            /* clickGain     */ 0.11f,
+            /* slowClickGain */ 0.022f,
+            /* clickThreshold */ 0.95f,
+            /* clickDurationMs */ 180.0f,
+            /* clickRingHz   */ 30.0f,
+            /* clickRingQ    */ 18.0f,
+            /* clickRingGain */ 0.06f,
+            /* mainsHz       */ 60.0f,
+            /* mainsA1       */ 7.9e-5f,
+            /* mainsA2       */ 2.2e-5f,
+            /* mainsA3       */ 9.8e-6f,
+            /* noiseLpCutoffHz */ 20000.0f,
+            /* hissColor       */ 0.4f,
+            /* noiseShelfHz  */ 3000.0f,
+            /* noiseShelfDb  */ 6.0f,
+            /* leakHpHz      */ 800.0f,
+            /* defaultRate   */ 0.513f,
+            /* defaultDepth  */ 0.65f,
+            /* defaultMix    */ 0.50f};
 };
 
 //==============================================================================

@@ -68,16 +68,16 @@ namespace abd::dsp
 /** Los modos de ruteo, con nombre, porque un numero en un panel no se aprende. */
 enum class FxRouting : int
 {
-    Series                 = 0,   // 1 -> 2 -> 3 -> 4
-    ParallelFront          = 1,   // (1 || 2) -> 3 -> 4
-    ParallelPairs          = 2,   // (1 || 2) || (3 || 4)
-    FullParallel           = 3,   // 1 || 2 || 3 || 4
-    DualSeriesParallel     = 4,   // (1 -> 2) || (3 -> 4)
-    SeriesSplitMiddle      = 5,   // 1 -> (2 || 3) -> 4
-    ParallelPairsSeries    = 6,   // (1 || 2) -> (3 || 4)
-    SeriesChainPlusOne     = 7,   // (1 -> 2 -> 3) || 4
-    ParallelFrontSeries    = 8,   // (1 || 2) -> 3 -> 4   (igual que 1)
-    SeriesWithFeedback     = 9    // 1 -> 2 -> 3 -> 4 + realimentacion
+    Series              = 0, // 1 -> 2 -> 3 -> 4
+    ParallelFront       = 1, // (1 || 2) -> 3 -> 4
+    ParallelPairs       = 2, // (1 || 2) || (3 || 4)
+    FullParallel        = 3, // 1 || 2 || 3 || 4
+    DualSeriesParallel  = 4, // (1 -> 2) || (3 -> 4)
+    SeriesSplitMiddle   = 5, // 1 -> (2 || 3) -> 4
+    ParallelPairsSeries = 6, // (1 || 2) -> (3 || 4)
+    SeriesChainPlusOne  = 7, // (1 -> 2 -> 3) || 4
+    ParallelFrontSeries = 8, // (1 || 2) -> 3 -> 4   (igual que 1)
+    SeriesWithFeedback  = 9  // 1 -> 2 -> 3 -> 4 + realimentacion
 };
 
 /** Modo de insercion del motor entero. */
@@ -97,17 +97,17 @@ public:
     //==============================================================================
     /** Prepara los cuatro slots. El catalogo es del producto: aqui solo se
         guarda el puntero, no se copia, y el producto vive mas que el motor. */
-    void prepare (double sampleRate, int numChannels, int maxBlockSize) noexcept
+    void prepare(double sampleRate, int numChannels, int maxBlockSize) noexcept
     {
         sampleRate_   = sampleRate > 0.0 ? sampleRate : 44100.0;
         maxBlockSize_ = maxBlockSize > 0 ? maxBlockSize : 512;
-        (void) numChannels;
+        (void)numChannels;
 
-        ensureScratch (maxBlockSize_);
+        ensureScratch(maxBlockSize_);
 
         for (int i = 0; i < kFxNumSlots; ++i)
-            slots_[i].prepare (sampleRate_, 2, maxBlockSize_,
-                               catalogue_, catalogueSize_);
+            slots_[i].prepare(sampleRate_, 2, maxBlockSize_,
+                              catalogue_, catalogueSize_);
     }
 
     /** Cambia el catalogo y reaplica el tipo de cada slot. Un producto con
@@ -117,48 +117,54 @@ public:
         tabla nueva, asi que despues hay que VOLVER a poner el tipo que tenia.
         Sin ese `setType` de vuelta, cambiar de catalogo sacaria de todos los
         slots el efecto que el usuario habia elegido. */
-    void setCatalogue (const FxEffectInfo* catalogue, int size) noexcept
+    void setCatalogue(const FxEffectInfo* catalogue, int size) noexcept
     {
         catalogue_     = catalogue;
         catalogueSize_ = size;
 
         if (sampleRate_ <= 0.0)
-            return;   // todavia no preparado: `prepare` cogera la tabla
+            return; // todavia no preparado: `prepare` cogera la tabla
 
         for (int i = 0; i < kFxNumSlots; ++i)
         {
             const int type = slots_[i].getType();
-            slots_[i].prepare (sampleRate_, 2, maxBlockSize_, catalogue_, catalogueSize_);
-            slots_[i].setType (type);
+            slots_[i].prepare(sampleRate_, 2, maxBlockSize_, catalogue_, catalogueSize_);
+            slots_[i].setType(type);
         }
     }
 
-    FxSlot& getSlot (int index) noexcept
+    FxSlot& getSlot(int index) noexcept
     {
-        dspAssert (index >= 0 && index < kFxNumSlots);
-        return slots_[jlimit (0, kFxNumSlots - 1, index)];
+        dspAssert(index >= 0 && index < kFxNumSlots);
+        return slots_[jlimit(0, kFxNumSlots - 1, index)];
     }
 
-    const FxSlot& getSlot (int index) const noexcept
+    const FxSlot& getSlot(int index) const noexcept
     {
-        return slots_[jlimit (0, kFxNumSlots - 1, index)];
+        return slots_[jlimit(0, kFxNumSlots - 1, index)];
     }
 
-    void setRouting (FxRouting r) noexcept { routing_ = r; }
+    void setRouting(FxRouting r) noexcept { routing_ = r; }
     FxRouting getRouting() const noexcept { return routing_; }
 
-    void setMode (FxMode m) noexcept { mode_ = m; }
+    void setMode(FxMode m) noexcept { mode_ = m; }
     FxMode getMode() const noexcept { return mode_; }
 
     /** Nivel de envio, para `FxMode::Send`. Un valor que no es un numero se
         ignora: en el 9 la realimentacion se queda en un buffer y ahi un NaN no
         se va nunca. */
-    void setSendLevel (float level) noexcept { if (std::isfinite (level)) sendLevel_ = jlimit (0.0f, 1.0f, level); }
-    float getSendLevel() const noexcept     { return sendLevel_; }
+    void setSendLevel(float level) noexcept
+    {
+        if (std::isfinite(level)) sendLevel_ = jlimit(0.0f, 1.0f, level);
+    }
+    float getSendLevel() const noexcept { return sendLevel_; }
 
     /** Ganancia de la realimentacion global del ruteo 9. */
-    void setFeedbackGain (float gain) noexcept { if (std::isfinite (gain)) feedbackGain_ = jlimit (0.0f, 0.95f, gain); }
-    float getFeedbackGain() const noexcept    { return feedbackGain_; }
+    void setFeedbackGain(float gain) noexcept
+    {
+        if (std::isfinite(gain)) feedbackGain_ = jlimit(0.0f, 0.95f, gain);
+    }
+    float getFeedbackGain() const noexcept { return feedbackGain_; }
 
     void reset() noexcept
     {
@@ -190,19 +196,19 @@ public:
         motores de este modulo son todos POR MUESTRA y trocear no cambia ni un
         bit de lo que suena.
     */
-    void process (AudioBuffer<float>& buffer, int numSamples) noexcept
+    void process(AudioBuffer<float>& buffer, int numSamples) noexcept
     {
         if (mode_ == FxMode::Bypass)
             return;
 
-        const int channels = buffer.getNumChannels();
-        const int available = jmin (numSamples, buffer.getNumSamples());
+        const int channels  = buffer.getNumChannels();
+        const int available = jmin(numSamples, buffer.getNumSamples());
         if (available <= 0 || maxBlockSize_ <= 0)
             return;
 
         if (channels >= 2)
         {
-            processStereoPath (buffer, available);
+            processStereoPath(buffer, available);
             return;
         }
 
@@ -214,7 +220,7 @@ public:
         if (channels < 1)
             return;
 
-        processMonoPath (buffer, available);
+        processMonoPath(buffer, available);
     }
 
 private:
@@ -226,32 +232,32 @@ private:
     /** Stereo: si el bloque cabe, se procesa donde esta, sin copiar ni una
         muestra. Si no cabe, se trocea — y ahi si hay copia, porque el motor
         trabaja siempre con un bloque entero en su propio buffer. */
-    void processStereoPath (AudioBuffer<float>& buffer, int available) noexcept
+    void processStereoPath(AudioBuffer<float>& buffer, int available) noexcept
     {
         if (available <= maxBlockSize_)
         {
-            processInPlace (buffer, 2, available);
+            processInPlace(buffer, 2, available);
             return;
         }
 
         for (int offset = 0; offset < available; offset += maxBlockSize_)
         {
-            const int n = jmin (maxBlockSize_, available - offset);
+            const int n = jmin(maxBlockSize_, available - offset);
 
             for (int ch = 0; ch < 2; ++ch)
             {
-                const float* src = buffer.getReadPointer (ch) + offset;
-                float* dst = slice_.getWritePointer (ch);
+                const float* src = buffer.getReadPointer(ch) + offset;
+                float* dst       = slice_.getWritePointer(ch);
                 for (int i = 0; i < n; ++i)
                     dst[i] = src[i];
             }
 
-            processInPlace (slice_, 2, n);
+            processInPlace(slice_, 2, n);
 
             for (int ch = 0; ch < 2; ++ch)
             {
-                float* dst = buffer.getWritePointer (ch) + offset;
-                const float* src = slice_.getReadPointer (ch);
+                float* dst       = buffer.getWritePointer(ch) + offset;
+                const float* src = slice_.getReadPointer(ch);
                 for (int i = 0; i < n; ++i)
                     dst[i] = src[i];
             }
@@ -259,54 +265,76 @@ private:
     }
 
     /** Mono: el mismo troceado, con la entrada replicada en los dos canales. */
-    void processMonoPath (AudioBuffer<float>& buffer, int available) noexcept
+    void processMonoPath(AudioBuffer<float>& buffer, int available) noexcept
     {
         for (int offset = 0; offset < available; offset += maxBlockSize_)
         {
-            const int n = jmin (maxBlockSize_, available - offset);
+            const int n = jmin(maxBlockSize_, available - offset);
 
-            const float* mono = buffer.getReadPointer (0) + offset;
-            float* l = slice_.getWritePointer (0);
-            float* r = slice_.getWritePointer (1);
-            for (int i = 0; i < n; ++i) { l[i] = mono[i]; r[i] = mono[i]; }
+            const float* mono = buffer.getReadPointer(0) + offset;
+            float* l          = slice_.getWritePointer(0);
+            float* r          = slice_.getWritePointer(1);
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] = mono[i];
+                r[i] = mono[i];
+            }
 
-            processInPlace (slice_, 2, n);
+            processInPlace(slice_, 2, n);
 
-            float* dst = buffer.getWritePointer (0) + offset;
+            float* dst = buffer.getWritePointer(0) + offset;
             for (int i = 0; i < n; ++i)
                 dst[i] = l[i];
         }
     }
 
-    void processInPlace (AudioBuffer<float>& buffer, int channels, int n) noexcept
+    void processInPlace(AudioBuffer<float>& buffer, int channels, int n) noexcept
     {
         // Sin ningun efecto en la cadena no se toca el buffer. En el modo de
         // envio tambien: si no hay nada que enviar, la mezcla final es
         // `seca·(1−nivel) + mojada·nivel` con las dos cosas iguales, que es la
         // seca; devolverla sin tocar es exactamente ese numero y sin gastar el
         // paso de copia.
-        if (! hayEfectoEnLaCadena())
+        if (!hayEfectoEnLaCadena())
             return;
 
         if (mode_ == FxMode::Send)
         {
-            processSend (buffer, channels, n);
+            processSend(buffer, channels, n);
             return;
         }
 
         switch (routing_)
         {
-            case FxRouting::FullParallel:         routeFullParallel (buffer, n); break;
-            case FxRouting::ParallelPairs:        routeParallelPairs (buffer, n); break;
-            case FxRouting::DualSeriesParallel:   routeDualSeriesParallel (buffer, n); break;
-            case FxRouting::SeriesSplitMiddle:    routeSeriesSplitMiddle (buffer, n); break;
-            case FxRouting::ParallelPairsSeries:  routeParallelPairsSeries (buffer, n); break;
+            case FxRouting::FullParallel:
+                routeFullParallel(buffer, n);
+                break;
+            case FxRouting::ParallelPairs:
+                routeParallelPairs(buffer, n);
+                break;
+            case FxRouting::DualSeriesParallel:
+                routeDualSeriesParallel(buffer, n);
+                break;
+            case FxRouting::SeriesSplitMiddle:
+                routeSeriesSplitMiddle(buffer, n);
+                break;
+            case FxRouting::ParallelPairsSeries:
+                routeParallelPairsSeries(buffer, n);
+                break;
             case FxRouting::ParallelFront:
-            case FxRouting::ParallelFrontSeries:  routeParallelFrontSeries (buffer, n); break;
-            case FxRouting::SeriesChainPlusOne:   routeSeriesChainPlusOne (buffer, n); break;
-            case FxRouting::SeriesWithFeedback:   routeSeriesWithFeedback (buffer, n); break;
+            case FxRouting::ParallelFrontSeries:
+                routeParallelFrontSeries(buffer, n);
+                break;
+            case FxRouting::SeriesChainPlusOne:
+                routeSeriesChainPlusOne(buffer, n);
+                break;
+            case FxRouting::SeriesWithFeedback:
+                routeSeriesWithFeedback(buffer, n);
+                break;
             case FxRouting::Series:
-            default:                              routeSeries (buffer, n); break;
+            default:
+                routeSeries(buffer, n);
+                break;
         }
     }
 
@@ -360,42 +388,60 @@ private:
         final es `seca·(1−nivel) + procesado·nivel`. El envio es una mezcla del
         BUS, no un cambio de un mando de un efecto.
     */
-    void processSend (AudioBuffer<float>& buffer, int channels, int n) noexcept
+    void processSend(AudioBuffer<float>& buffer, int channels, int n) noexcept
     {
-        copyTo (buffer, dry_, n, channels);
+        copyTo(buffer, dry_, n, channels);
 
         switch (routing_)
         {
-            case FxRouting::FullParallel:         routeFullParallel (buffer, n); break;
-            case FxRouting::ParallelPairs:        routeParallelPairs (buffer, n); break;
-            case FxRouting::DualSeriesParallel:   routeDualSeriesParallel (buffer, n); break;
-            case FxRouting::SeriesSplitMiddle:    routeSeriesSplitMiddle (buffer, n); break;
-            case FxRouting::ParallelPairsSeries:  routeParallelPairsSeries (buffer, n); break;
+            case FxRouting::FullParallel:
+                routeFullParallel(buffer, n);
+                break;
+            case FxRouting::ParallelPairs:
+                routeParallelPairs(buffer, n);
+                break;
+            case FxRouting::DualSeriesParallel:
+                routeDualSeriesParallel(buffer, n);
+                break;
+            case FxRouting::SeriesSplitMiddle:
+                routeSeriesSplitMiddle(buffer, n);
+                break;
+            case FxRouting::ParallelPairsSeries:
+                routeParallelPairsSeries(buffer, n);
+                break;
             case FxRouting::ParallelFront:
-            case FxRouting::ParallelFrontSeries:  routeParallelFrontSeries (buffer, n); break;
-            case FxRouting::SeriesChainPlusOne:   routeSeriesChainPlusOne (buffer, n); break;
-            case FxRouting::SeriesWithFeedback:   routeSeriesWithFeedback (buffer, n); break;
+            case FxRouting::ParallelFrontSeries:
+                routeParallelFrontSeries(buffer, n);
+                break;
+            case FxRouting::SeriesChainPlusOne:
+                routeSeriesChainPlusOne(buffer, n);
+                break;
+            case FxRouting::SeriesWithFeedback:
+                routeSeriesWithFeedback(buffer, n);
+                break;
             case FxRouting::Series:
-            default:                              routeSeries (buffer, n); break;
+            default:
+                routeSeries(buffer, n);
+                break;
         }
 
         const float level = sendLevel_;
-        const float seca = 1.0f - level;
+        const float seca  = 1.0f - level;
 
         for (int ch = 0; ch < channels; ++ch)
         {
-            float* out = buffer.getWritePointer (ch);
-            const float* dry = dry_.getReadPointer (ch);
+            float* out       = buffer.getWritePointer(ch);
+            const float* dry = dry_.getReadPointer(ch);
             for (int i = 0; i < n; ++i)
                 out[i] = dry[i] * seca + out[i] * level;
         }
     }
 
     /** 1 -> 2 -> 3 -> 4. El mas simple y el de referencia. */
-    void routeSeries (AudioBuffer<float>& buffer, int n) noexcept
+    void routeSeries(AudioBuffer<float>& buffer, int n) noexcept
     {
         for (int i = 0; i < kFxNumSlots; ++i)
-            slots_[i].process (buffer, n);
+            slots_[i].process(buffer, n);
     }
 
     /** (1 || 2) -> 3 -> 4: pareja en paralelo delante, y los dos de atras en
@@ -414,102 +460,102 @@ private:
         Que la suma de la pareja sea una suma y no una media es decision de este
         modulo y no se cambia aqui: ver la nota sobre ABDEep al final de la
         cabecera, que reparte los numeros de otra manera. */
-    void routeParallelFrontSeries (AudioBuffer<float>& buffer, int n) noexcept
+    void routeParallelFrontSeries(AudioBuffer<float>& buffer, int n) noexcept
     {
-        runParallel (buffer, accum_, 0, 1, n);
-        copyTo (accum_, buffer, n);
+        runParallel(buffer, accum_, 0, 1, n);
+        copyTo(accum_, buffer, n);
 
-        slots_[2].process (buffer, n);
-        slots_[3].process (buffer, n);
+        slots_[2].process(buffer, n);
+        slots_[3].process(buffer, n);
     }
 
     /** (1 || 2) || (3 || 4): dos parejas en paralelo. */
-    void routeParallelPairs (AudioBuffer<float>& buffer, int n) noexcept
+    void routeParallelPairs(AudioBuffer<float>& buffer, int n) noexcept
     {
-        runParallel (buffer, accum_, 0, 1, n);
-        runParallel (buffer, parallel_, 2, 3, n);
-        addTo (accum_, parallel_, n);
-        copyTo (accum_, buffer, n);
+        runParallel(buffer, accum_, 0, 1, n);
+        runParallel(buffer, parallel_, 2, 3, n);
+        addTo(accum_, parallel_, n);
+        copyTo(accum_, buffer, n);
     }
 
     /** 1 || 2 || 3 || 4: cada slot con la misma entrada, y todo junto. */
-    void routeFullParallel (AudioBuffer<float>& buffer, int n) noexcept
+    void routeFullParallel(AudioBuffer<float>& buffer, int n) noexcept
     {
-        copyTo (buffer, accum_, n);
+        copyTo(buffer, accum_, n);
         for (int i = 0; i < kFxNumSlots; ++i)
         {
             if (!slots_[i].isActive())
                 continue;
-            runOne (buffer, scratch_, i, n);
-            addTo (accum_, scratch_, n);
+            runOne(buffer, scratch_, i, n);
+            addTo(accum_, scratch_, n);
         }
-        copyTo (accum_, buffer, n);
+        copyTo(accum_, buffer, n);
     }
 
     /** (1 -> 2) || (3 -> 4): dos cadenas completas en paralelo. */
-    void routeDualSeriesParallel (AudioBuffer<float>& buffer, int n) noexcept
+    void routeDualSeriesParallel(AudioBuffer<float>& buffer, int n) noexcept
     {
-        copyTo (buffer, accum_, n);
+        copyTo(buffer, accum_, n);
 
-        copyTo (buffer, parallel_, n);
-        slots_[0].process (parallel_, n);
-        slots_[1].process (parallel_, n);
-        addTo (accum_, parallel_, n);
+        copyTo(buffer, parallel_, n);
+        slots_[0].process(parallel_, n);
+        slots_[1].process(parallel_, n);
+        addTo(accum_, parallel_, n);
 
-        copyTo (buffer, parallel_, n);
-        slots_[2].process (parallel_, n);
-        slots_[3].process (parallel_, n);
-        addTo (accum_, parallel_, n);
+        copyTo(buffer, parallel_, n);
+        slots_[2].process(parallel_, n);
+        slots_[3].process(parallel_, n);
+        addTo(accum_, parallel_, n);
 
-        copyTo (accum_, buffer, n);
+        copyTo(accum_, buffer, n);
     }
 
     /** 1 -> (2 || 3) -> 4: serie con el centro partido. */
-    void routeSeriesSplitMiddle (AudioBuffer<float>& buffer, int n) noexcept
+    void routeSeriesSplitMiddle(AudioBuffer<float>& buffer, int n) noexcept
     {
-        copyTo (buffer, scratch_, n);
-        slots_[0].process (scratch_, n);
+        copyTo(buffer, scratch_, n);
+        slots_[0].process(scratch_, n);
 
         // Los dos del medio en paralelo, cada uno con la MISMA entrada (la
         // salida del slot 1), y sus resultados sumados.
-        copyTo (scratch_, parallel_, n);
-        slots_[1].process (parallel_, n);
-        copyTo (scratch_, accum_, n);
+        copyTo(scratch_, parallel_, n);
+        slots_[1].process(parallel_, n);
+        copyTo(scratch_, accum_, n);
 
-        copyTo (scratch_, parallel_, n);
-        slots_[2].process (parallel_, n);
-        addTo (accum_, parallel_, n);
+        copyTo(scratch_, parallel_, n);
+        slots_[2].process(parallel_, n);
+        addTo(accum_, parallel_, n);
 
-        copyTo (accum_, scratch_, n);
-        slots_[3].process (scratch_, n);
-        copyTo (scratch_, buffer, n);
+        copyTo(accum_, scratch_, n);
+        slots_[3].process(scratch_, n);
+        copyTo(scratch_, buffer, n);
     }
 
     /** (1 || 2) -> (3 || 4): mojado y seco en paralelo, y luego en serie. */
-    void routeParallelPairsSeries (AudioBuffer<float>& buffer, int n) noexcept
+    void routeParallelPairsSeries(AudioBuffer<float>& buffer, int n) noexcept
     {
-        runParallel (buffer, accum_, 0, 1, n);
-        runParallel (accum_, parallel_, 2, 3, n);
-        addTo (accum_, parallel_, n);
-        copyTo (accum_, buffer, n);
+        runParallel(buffer, accum_, 0, 1, n);
+        runParallel(accum_, parallel_, 2, 3, n);
+        addTo(accum_, parallel_, n);
+        copyTo(accum_, buffer, n);
     }
 
     /** (1 -> 2 -> 3) || 4: cadena en serie y una adicion. */
-    void routeSeriesChainPlusOne (AudioBuffer<float>& buffer, int n) noexcept
+    void routeSeriesChainPlusOne(AudioBuffer<float>& buffer, int n) noexcept
     {
-        copyTo (buffer, accum_, n);
+        copyTo(buffer, accum_, n);
 
-        copyTo (buffer, scratch_, n);
-        slots_[0].process (scratch_, n);
-        slots_[1].process (scratch_, n);
-        slots_[2].process (scratch_, n);
-        addTo (accum_, scratch_, n);
+        copyTo(buffer, scratch_, n);
+        slots_[0].process(scratch_, n);
+        slots_[1].process(scratch_, n);
+        slots_[2].process(scratch_, n);
+        addTo(accum_, scratch_, n);
 
-        copyTo (buffer, scratch_, n);
-        slots_[3].process (scratch_, n);
-        addTo (accum_, scratch_, n);
+        copyTo(buffer, scratch_, n);
+        slots_[3].process(scratch_, n);
+        addTo(accum_, scratch_, n);
 
-        copyTo (accum_, buffer, n);
+        copyTo(accum_, buffer, n);
     }
 
     /**
@@ -528,20 +574,20 @@ private:
         al "mejorar" un codigo que ya funciona: el cambio parecia mas correcto y
         era otro.
     */
-    void routeSeriesWithFeedback (AudioBuffer<float>& buffer, int n) noexcept
+    void routeSeriesWithFeedback(AudioBuffer<float>& buffer, int n) noexcept
     {
         if (feedbackGain_ <= 0.0f)
         {
-            routeSeries (buffer, n);
+            routeSeries(buffer, n);
             return;
         }
 
         if (feedback_.getNumSamples() >= n)
         {
-            const float* fbL = feedback_.getReadPointer (0);
-            const float* fbR = feedback_.getReadPointer (1);
-            float* outL = buffer.getWritePointer (0);
-            float* outR = buffer.getWritePointer (1);
+            const float* fbL = feedback_.getReadPointer(0);
+            const float* fbR = feedback_.getReadPointer(1);
+            float* outL      = buffer.getWritePointer(0);
+            float* outR      = buffer.getWritePointer(1);
             for (int i = 0; i < n; ++i)
             {
                 outL[i] += fbL[i] * feedbackGain_;
@@ -550,32 +596,32 @@ private:
         }
 
         for (int i = 0; i < kFxNumSlots; ++i)
-            slots_[i].process (buffer, n);
+            slots_[i].process(buffer, n);
 
         // Y la salida de este bloque es la realimentacion del siguiente.
         if (feedback_.getNumSamples() >= n)
-            copyTo (buffer, feedback_, n);
+            copyTo(buffer, feedback_, n);
     }
 
     /** Procesa dos slots en paralelo sobre `buffer` y suma el resultado. */
-    void runParallel (AudioBuffer<float>& buffer, AudioBuffer<float>& sum,
-                      int a, int b, int n) noexcept
+    void runParallel(AudioBuffer<float>& buffer, AudioBuffer<float>& sum,
+                     int a, int b, int n) noexcept
     {
         sum.clear();
         for (int s = a; s <= b; ++s)
         {
             if (!slots_[s].isActive())
                 continue;
-            runOne (buffer, scratch_, s, n);
-            addTo (sum, scratch_, n);
+            runOne(buffer, scratch_, s, n);
+            addTo(sum, scratch_, n);
         }
     }
 
     /** Un slot suelto sobre una copia de `buffer`, escribiendo en `dst`. */
-    void runOne (AudioBuffer<float>& buffer, AudioBuffer<float>& dst, int slot, int n) noexcept
+    void runOne(AudioBuffer<float>& buffer, AudioBuffer<float>& dst, int slot, int n) noexcept
     {
-        copyTo (buffer, dst, n);
-        slots_[slot].process (dst, n);
+        copyTo(buffer, dst, n);
+        slots_[slot].process(dst, n);
     }
 
     //==============================================================================
@@ -583,25 +629,25 @@ private:
     //  que el motor procesa; un host con mas canales los deja intactos.
     //==============================================================================
 
-    void copyTo (AudioBuffer<float>& from, AudioBuffer<float>& to, int n, int channels = 2) noexcept
+    void copyTo(AudioBuffer<float>& from, AudioBuffer<float>& to, int n, int channels = 2) noexcept
     {
-        const int nch = jmin (channels, from.getNumChannels());
+        const int nch = jmin(channels, from.getNumChannels());
         for (int ch = 0; ch < nch; ++ch)
         {
-            const float* src = from.getReadPointer (ch);
-            float* dst = to.getWritePointer (ch);
+            const float* src = from.getReadPointer(ch);
+            float* dst       = to.getWritePointer(ch);
             for (int i = 0; i < n; ++i)
                 dst[i] = src[i];
         }
     }
 
-    void addTo (AudioBuffer<float>& dst, AudioBuffer<float>& src, int n) noexcept
+    void addTo(AudioBuffer<float>& dst, AudioBuffer<float>& src, int n) noexcept
     {
-        const int nch = jmin (2, jmin (dst.getNumChannels(), src.getNumChannels()));
+        const int nch = jmin(2, jmin(dst.getNumChannels(), src.getNumChannels()));
         for (int ch = 0; ch < nch; ++ch)
         {
-            float* d = dst.getWritePointer (ch);
-            const float* s = src.getReadPointer (ch);
+            float* d       = dst.getWritePointer(ch);
+            const float* s = src.getReadPointer(ch);
             for (int i = 0; i < n; ++i)
                 d[i] += s[i];
         }
@@ -611,17 +657,17 @@ private:
         despues: es justo el tamano que el motor nunca pasa de un troceo, y un
         `process` que reservase memoria seria una asignacion en el lazo de
         audio. Un bloque mayor del host se trocea, no se agranda. */
-    void ensureScratch (int blockSize) noexcept
+    void ensureScratch(int blockSize) noexcept
     {
         if (blockSize < 1)
             blockSize = 1;
 
-        parallel_.setSize (2, blockSize);
-        accum_.setSize (2, blockSize);
-        scratch_.setSize (2, blockSize);
-        feedback_.setSize (2, blockSize);
-        dry_.setSize (2, blockSize);
-        slice_.setSize (2, blockSize);
+        parallel_.setSize(2, blockSize);
+        accum_.setSize(2, blockSize);
+        scratch_.setSize(2, blockSize);
+        feedback_.setSize(2, blockSize);
+        dry_.setSize(2, blockSize);
+        slice_.setSize(2, blockSize);
 
         parallel_.clear();
         accum_.clear();
@@ -634,15 +680,15 @@ private:
     FxSlot slots_[kFxNumSlots];
 
     const FxEffectInfo* catalogue_ = nullptr;
-    int catalogueSize_ = 0;
+    int catalogueSize_             = 0;
 
     FxRouting routing_ = FxRouting::Series;
-    FxMode    mode_ = FxMode::Insert;
+    FxMode mode_       = FxMode::Insert;
 
     double sampleRate_ = 0.0;
-    int maxBlockSize_ = 512;
+    int maxBlockSize_  = 512;
 
-    float sendLevel_ = 0.5f;
+    float sendLevel_    = 0.5f;
     float feedbackGain_ = 0.0f;
 
     AudioBuffer<float> parallel_;

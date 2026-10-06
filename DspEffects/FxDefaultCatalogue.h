@@ -71,53 +71,53 @@ namespace abd::dsp
     menos usuales. Insertar uno nuevo en medio cambia los numeros de todos los de
     despues, que es lo que haria que "el 4" significara una cosa el lunes y otra
     el martes. Si se inserta, se inserta al final. */
-inline const FxEffectInfo* fxDefaultCatalogue (int& count) noexcept
+inline const FxEffectInfo* fxDefaultCatalogue(int& count) noexcept
 {
     static const FxEffectInfo table[] = {
-        { "chorus",      "Chorus",         adapters::ChorusFx::kNumParams,
-          adapters::ChorusFx::specs(),
-          adapters::ChorusFx::create,  adapters::ChorusFx::process,
-          adapters::ChorusFx::setParam, adapters::ChorusFx::setAll,
-          adapters::ChorusFx::reset,  adapters::ChorusFx::destroy },
+        {"chorus", "Chorus", adapters::ChorusFx::kNumParams,
+         adapters::ChorusFx::specs(),
+         adapters::ChorusFx::create, adapters::ChorusFx::process,
+         adapters::ChorusFx::setParam, adapters::ChorusFx::setAll,
+         adapters::ChorusFx::reset, adapters::ChorusFx::destroy},
 
-        { "delay",       "Delay",          adapters::DelayFx::kNumParams,
-          adapters::DelayFx::specs(),
-          adapters::DelayFx::create,   adapters::DelayFx::process,
-          adapters::DelayFx::setParam, adapters::DelayFx::setAll,
-          adapters::DelayFx::reset,    adapters::DelayFx::destroy },
+        {"delay", "Delay", adapters::DelayFx::kNumParams,
+         adapters::DelayFx::specs(),
+         adapters::DelayFx::create, adapters::DelayFx::process,
+         adapters::DelayFx::setParam, adapters::DelayFx::setAll,
+         adapters::DelayFx::reset, adapters::DelayFx::destroy},
 
-        { "reverb",      "Reverb",         adapters::ReverbFx::kNumParams,
-          adapters::ReverbFx::specs(),
-          adapters::ReverbFx::create,  adapters::ReverbFx::process,
-          adapters::ReverbFx::setParam, adapters::ReverbFx::setAll,
-          adapters::ReverbFx::reset,   adapters::ReverbFx::destroy },
+        {"reverb", "Reverb", adapters::ReverbFx::kNumParams,
+         adapters::ReverbFx::specs(),
+         adapters::ReverbFx::create, adapters::ReverbFx::process,
+         adapters::ReverbFx::setParam, adapters::ReverbFx::setAll,
+         adapters::ReverbFx::reset, adapters::ReverbFx::destroy},
 
-        { "saturation",  "Saturation",     adapters::SaturationFx::kNumParams,
-          adapters::SaturationFx::specs(),
-          adapters::SaturationFx::create,  adapters::SaturationFx::process,
-          adapters::SaturationFx::setParam, adapters::SaturationFx::setAll,
-          adapters::SaturationFx::reset,   adapters::SaturationFx::destroy },
+        {"saturation", "Saturation", adapters::SaturationFx::kNumParams,
+         adapters::SaturationFx::specs(),
+         adapters::SaturationFx::create, adapters::SaturationFx::process,
+         adapters::SaturationFx::setParam, adapters::SaturationFx::setAll,
+         adapters::SaturationFx::reset, adapters::SaturationFx::destroy},
 
-        { "schroeder",   "Schroeder",      adapters::SchroederFx::kNumParams,
-          adapters::SchroederFx::specs(),
-          adapters::SchroederFx::create,  adapters::SchroederFx::process,
-          adapters::SchroederFx::setParam, adapters::SchroederFx::setAll,
-          adapters::SchroederFx::reset,   adapters::SchroederFx::destroy },
+        {"schroeder", "Schroeder", adapters::SchroederFx::kNumParams,
+         adapters::SchroederFx::specs(),
+         adapters::SchroederFx::create, adapters::SchroederFx::process,
+         adapters::SchroederFx::setParam, adapters::SchroederFx::setAll,
+         adapters::SchroederFx::reset, adapters::SchroederFx::destroy},
 
-        { "bbd",         "Juno BBD Chorus", adapters::BbdChorusFx::kNumParams,
-          adapters::BbdChorusFx::specs(),
-          adapters::BbdChorusFx::create, adapters::BbdChorusFx::process,
-          adapters::BbdChorusFx::setParam, adapters::BbdChorusFx::setAll,
-          adapters::BbdChorusFx::reset,  adapters::BbdChorusFx::destroy },
+        {"bbd", "Juno BBD Chorus", adapters::BbdChorusFx::kNumParams,
+         adapters::BbdChorusFx::specs(),
+         adapters::BbdChorusFx::create, adapters::BbdChorusFx::process,
+         adapters::BbdChorusFx::setParam, adapters::BbdChorusFx::setAll,
+         adapters::BbdChorusFx::reset, adapters::BbdChorusFx::destroy},
 
         // Al final, por la regla del orden de este fichero. Y es la septima
         // fila, con lo que el "indice del ultimo efecto existe" del test del
         // catalogo pasa a valer para la repisa y no para el BBD.
-        { "shelf",       "Shelf EQ",       adapters::ShelfEqFx::kNumParams,
-          adapters::ShelfEqFx::specs(),
-          adapters::ShelfEqFx::create, adapters::ShelfEqFx::process,
-          adapters::ShelfEqFx::setParam, adapters::ShelfEqFx::setAll,
-          adapters::ShelfEqFx::reset,  adapters::ShelfEqFx::destroy },
+        {"shelf", "Shelf EQ", adapters::ShelfEqFx::kNumParams,
+         adapters::ShelfEqFx::specs(),
+         adapters::ShelfEqFx::create, adapters::ShelfEqFx::process,
+         adapters::ShelfEqFx::setParam, adapters::ShelfEqFx::setAll,
+         adapters::ShelfEqFx::reset, adapters::ShelfEqFx::destroy},
 
         // El phaser es la octava fila, y la ultima, y por la misma razon que la
         // repisa: es un efecto que no todo el mundo usa y se anade al final.
@@ -126,14 +126,13 @@ inline const FxEffectInfo* fxDefaultCatalogue (int& count) noexcept
         // fila no emula a ninguna maquina, y el numero de etapas es un
         // parametro de plantilla del motor. Un producto que quiera seis etapas
         // monta su propia fila con `Phaser4<6>`; esta es la de cuatro.
-        { "phaser",      "Phaser",         adapters::PhaserFx::kNumParams,
-          adapters::PhaserFx::specs(),
-          adapters::PhaserFx::create, adapters::PhaserFx::process,
-          adapters::PhaserFx::setParam, adapters::PhaserFx::setAll,
-          adapters::PhaserFx::reset,  adapters::PhaserFx::destroy }
-    };
+        {"phaser", "Phaser", adapters::PhaserFx::kNumParams,
+         adapters::PhaserFx::specs(),
+         adapters::PhaserFx::create, adapters::PhaserFx::process,
+         adapters::PhaserFx::setParam, adapters::PhaserFx::setAll,
+         adapters::PhaserFx::reset, adapters::PhaserFx::destroy}};
 
-    count = static_cast<int> (sizeof (table) / sizeof (table[0]));
+    count = static_cast<int>(sizeof(table) / sizeof(table[0]));
     return table;
 }
 
@@ -141,14 +140,14 @@ inline const FxEffectInfo* fxDefaultCatalogue (int& count) noexcept
 inline const FxEffectInfo* fxDefaultCatalogue() noexcept
 {
     int count = 0;
-    return fxDefaultCatalogue (count);
+    return fxDefaultCatalogue(count);
 }
 
 /** Cuantas filas tiene el catalogo por defecto. */
 inline int fxDefaultCatalogueSize() noexcept
 {
     int count = 0;
-    (void) fxDefaultCatalogue (count);
+    (void)fxDefaultCatalogue(count);
     return count;
 }
 

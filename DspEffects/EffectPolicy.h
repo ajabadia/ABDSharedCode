@@ -136,11 +136,11 @@ namespace abd::dsp
 class CharacterStage
 {
 public:
-    CharacterStage() = default;
+    CharacterStage()  = default;
     ~CharacterStage() = default;
 
     /** Fija el sample rate de la etapa. Se llama una vez por `prepare`. */
-    void prepareSampleRate (double sampleRate) noexcept
+    void prepareSampleRate(double sampleRate) noexcept
     {
         sampleRate_ = sampleRate > 0.0 ? sampleRate : 44100.0;
     }
@@ -169,7 +169,7 @@ private:
 class NullStage : public CharacterStage
 {
 public:
-    float processSample (float x, float = 0.0f, float = 0.0f) noexcept { return x; }
+    float processSample(float x, float = 0.0f, float = 0.0f) noexcept { return x; }
     void reset() noexcept {}
 };
 
