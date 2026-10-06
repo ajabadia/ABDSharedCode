@@ -1,0 +1,90 @@
+---
+# .clang-format — ABDSharedCode C++ style
+#
+# Single source of truth for formatting all C++ source files in this repository
+# (DspCore, DspEffects, SynthCore, HardwareMidiDetect, LutDSP, etc.).
+#
+# Requires clang-format 18 or later (see Standard: c++20).
+# The pre-commit hook (`.githooks/pre-commit`) and the CI workflow both enforce
+# this file.  Run the installers below to get clang-format 18+:
+#
+#   Ubuntu/Debian:  sudo apt install clang-format-18
+#   macOS (brew):   brew install xcode-clang          # or: brew install llvm@18
+#   Windows (MSYS2): pacman -S mingw-w64-x86_64-clang-format
+#   Any (pip):      pip install clang-format==18.*
+#
+
+Language:            Cpp
+BasedOnStyle:        LLVM
+Standard:            c++20
+
+# ── Indentation ──────────────────────────────────────────────────────────────
+IndentWidth:         4
+TabWidth:            4
+UseTab:              Never
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+AccessModifierOffset: -4
+IndentAccessModifiers: false
+IndentCaseLabels:    true
+NamespaceIndentation: None
+
+# ── Braces ───────────────────────────────────────────────────────────────────
+# Opening brace on its own line for *every* construct (JUCE / Elca style).
+# Short inline functions/lambdas/if-statements may still be single-line.
+BreakBeforeBraces:   Custom
+BraceWrapping:
+  AfterClass:          true
+  AfterControlStatement: Always
+  AfterEnum:           true
+  AfterFunction:       true
+  AfterNamespace:      true
+  AfterStruct:         true
+  AfterUnion:          true
+  BeforeCatch:         true
+  BeforeElse:          true
+  IndentBraces:        false
+  SplitEmptyFunction:  false
+  SplitEmptyRecord:    false
+  SplitEmptyNamespace: false
+
+# ── Line length ──────────────────────────────────────────────────────────────
+# 0 = no line wrapping; long lines are preserved as-is.
+ColumnLimit:         0
+
+# ── Pointers / references attach to the type ───────────────────────────────
+PointerAlignment:    Left
+DerivePointerAlignment: false
+
+# ── Spaces before parentheses ────────────────────────────────────────────────
+# Space only after control-statement keywords (if, for, while, switch).
+# No space before function call / declaration parentheses.
+SpaceBeforeParens:   ControlStatements
+
+# ── Alignment ───────────────────────────────────────────────────────────────
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: Consecutive
+AlignEscapedNewlines: Left
+AlignOperands:       Align
+AlignTrailingComments: true
+
+# ── Short constructs on a single line ────────────────────────────────────────
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine:  Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine:    true
+AllowShortBlocksOnASingleLine:  Empty
+AllowShortCaseLabelsOnASingleLine: false
+
+# ── Includes ───────────────────────────────────────────────────────────────
+# Preserve the three-block structure (JUCE / stdlib / project), sort within.
+IncludeBlocks:       Preserve
+SortIncludes:        CaseSensitive
+
+# ── Miscellaneous ────────────────────────────────────────────────────────────
+SpaceBeforeAssignmentOperators: true
+SpaceAfterCStyleCast:  false
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyParentheses: false
+SpaceInEmptyBlock:     false
+AlwaysBreakTemplateDeclarations: Yes

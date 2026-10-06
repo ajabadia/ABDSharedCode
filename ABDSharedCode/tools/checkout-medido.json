@@ -1,0 +1,75 @@
+{
+  "_que_es_esto": [
+    "La tabla del README de `pnpm-workspace-bootstrap`, en JSON. La tabla del",
+    "README es para gente y este fichero es para el guard: un `actions/checkout`",
+    "puede cambiar de comportamiento al subir de version sin que nada en este",
+    "repo se entere, porque la regla no esta escrita en ningun codigo que se",
+    "ejecute, esta medida. El test `la tabla de casos medidos de",
+    "actions/checkout` (en guard_atributos.test.mjs) falla en cuanto el repo usa",
+    "una version que no esta en `versiones_medidas`, y el README explica que",
+    "hay que volver a medir.",
+    "",
+    "Si se edita este fichero, se edita el README en el mismo commit: hay un",
+    "test que compara las dos cosas y sale con 1 si divergen."
+  ],
+
+  "accion": "actions/checkout",
+
+  "versiones_medidas": ["v4"],
+
+  "medido_contra": {
+    "runner": "ubuntu-latest",
+    "rama": "experimento-checkout-path (borrada en local y en el remoto)",
+    "run": "37050175171",
+    "forma": "un workflow de un solo uso, un job por caso, y el resultado leido del log de cada job"
+  },
+
+  "casos": [
+    {
+      "caso": "A",
+      "paths": "el mismo",
+      "repos": "ABDSharedCode, luego ABDSharedAssets",
+      "resultado": "el segundo borra el primero",
+      "borra": true
+    },
+    {
+      "caso": "B",
+      "paths": "distintos",
+      "repos": "los dos que sean",
+      "resultado": "conviven, los dos intactos",
+      "borra": false
+    },
+    {
+      "caso": "C",
+      "paths": "el mismo",
+      "repos": "ABDSharedAssets dos veces, mismo ref",
+      "resultado": "idempotente, no borra",
+      "borra": false
+    },
+    {
+      "caso": "D",
+      "paths": "el mismo",
+      "repos": "ABDSharedAssets con ref distinto",
+      "resultado": "cambia al ref nuevo, no borra",
+      "borra": false
+    },
+    {
+      "caso": "E",
+      "paths": "el mismo",
+      "repos": "el llamante y luego ABDSharedCode",
+      "resultado": "no borra: el llamante ya era ABDSharedCode",
+      "borra": false,
+      "nota": "el caso salio de medir la consecuencia practica (llamar a la accion con project: ABDSharedCode) y resulto degenerado, porque los dos remotos coincidian"
+    }
+  ],
+
+  "del_log": "Deleting the contents of '/home/runner/work/ABDSharedCode/ABDSharedCode/dup'",
+
+  "regla": "Dos checkouts con el mismo path se limpian entre si si y solo si apuntan a repos distintos. Con el mismo repo, el segundo es idempotente o cambia de ref, pero nunca borra.",
+
+  "de_donde_sale": "src/git-directory-helper.ts, prepareExistingDirectory(): si el fetch-url del directorio no es el que pide el checkout, remove = true, y al final borra el contenido del directorio.",
+
+  "por_que_esta_accion_no_puede_sufrirla": "Sus tres checkouts usan path: <project>, ABDSharedCode y ABDSharedAssets. Si <project> fuera uno de los otros dos, dos checkouts caerian en el mismo directorio con repos distintos, y por el caso A el segundo borraria el primero.",
+
+  "paths_fijos": ["ABDSharedCode", "ABDSharedAssets"]
+}

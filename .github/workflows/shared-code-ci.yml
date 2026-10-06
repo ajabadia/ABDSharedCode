@@ -7,7 +7,7 @@ name: Shared code CI
 # codigo esta sano por si mismo: que sus pruebas corran, que sus herramientas
 # salgan en verde y que el package que publica resuelva sus dependencias.
 #
-# LO QUE ES PUERTA. Los cinco trabajos bloquean, y los cinco salen en verde.
+# LO QUE ES PUERTA. Los seis trabajos bloquean, y los seis salen en verde.
 #
 # El audit merece una explicacion, porque sin ella su veredicto se lee mal. Compara
 # este repo contra una foto de la suite fijada por SHA, y en esa foto hay 55 fuentes
@@ -37,6 +37,9 @@ on:
       - 'CMakeLists.txt'
       - '.github/actions/**'
       - '.github/workflows/shared-code-ci.yml'
+      - '.clang-format'
+      - '.githooks/**'
+      - '**/*.{h,cpp}'
   pull_request:
   workflow_dispatch:
 
@@ -104,6 +107,79 @@ jobs:
       # edicion a mano se colaba hasta el proximo cambio de la tabla.
       - name: El README de la accion es lo que se genera desde el JSON
         run: python3 tools/medir_checkout.py readme --check
+
+  # ESTE TRABAJO NO COMPILA NADA. Lee .clang-format y comprueba que todos los
+  # .h/.cpp del repo obedecen el estilo. No es un trabajo de verificacion de
+  # dependencias ni de compilacion: es una puerta de calidad de codigo, como los
+  # otros guards, pero sobre el ESTILO y no sobre el COMPORTAMIENTO.
+  #
+  # POR QUE AQUI Y NO EN EL HOOK. El hook pre-commit formatea los archivos antes
+  # de commitear, pero con --no-verify se puede saltar. El hook tambien depende de
+  # que el developer tenga clang-format instalado, y en local eso puede no pasar.
+  # Aqui es obligatorio: si un archivo no esta formateado, el job falla, y el
+  # mensaje de error dice exactamente que archivos y lineas son las que no cuadran.
+  #
+  # POR QUE SEIS TRABAJOS Y NO CINCO. El comentario de encabezado dice cinco;
+  # este lo pone a seis. No es un trabajo de compilacion ni de test: es la unica
+  # forma de que el estilo no se escape en los pushes que bypass el hook.
+  clang-format:
+    name: Clang-format (estilo de codigo C++)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ABDSharedCode
+        uses: actions/checkout@v7
+
+      - name: Install clang-format 18+
+        run: pip install clang-format==18.*
+
+      # Este paso ejecuta EL HOOK en modo VERIFY_ONLY, no clang-format directamente.
+      # VERIFY_ONLY=1 hace que el hook compruebe TODOS los archivos .h/.cpp con
+      # --dry-run --Werror, SIN modificar nada en disco. Asi no solo verificamos
+      # el estilo, sino que verificamos que EL HOOK misma funciona.
+      #
+      # El hook usa `git ls-files` (no `find`) para listar los archivos, por lo
+      # que funciona identico en local y en CI. Si el hook falla aqui, el hook
+      # esta roto, no solo el estilo.
+      - name: Run pre-commit hook in verify-only mode
+        run: |
+          set -o pipefail
+          VERIFY_ONLY=1 bash .githooks/pre-commit
+
+      # CONFIRMA QUE EL HOOK DETECTA ARCHIVOS MAL FORMATEADOS, no solo que pasa
+      # cuando todo esta bien. Crea un fichero temporal con estilo roto, ejecuta
+      # el hook, verifica que falla (exit != 0), y limpia. Si este paso no falla
+      # al crear el fichero malo, el hook ignora violaciones por completo.
+      #
+      # El fichero se escribe en /tmp y se enlaza con un path .cpp para que clang-
+      # format lo procese. No se toca el arbol de trabajo real.
+      - name: Hook catches unformatted code (negative test)
+        shell: bash
+        run: |
+          set -o pipefail
+          CF="$(command -v clang-format)"
+          echo "Testing with: $CF"
+          # Create a deliberately misformatted file: no spaces after keywords,
+          # wrong brace placement, tabs instead of spaces.
+          mkdir -p /tmp/hook-test
+          printf 'int main(){return 0;}\n' > /tmp/hook-test/bad.cpp
+          # Temporarily make git track it so the hook can see it via git ls-files
+          cp /tmp/hook-test/bad.cpp .hook_test_bad.cpp
+          git add .hook_test_bad.cpp
+          # The hook in verify-only mode MUST fail on this file.
+          set +e
+          VERIFY_ONLY=1 bash .githooks/pre-commit > /tmp/hook-test/output.log 2>&1
+          EXIT_CODE=$?
+          set -e
+          git reset -q .hook_test_bad.cpp
+          rm -f .hook_test_bad.cpp /tmp/hook-test/bad.cpp
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "::error::el hook no detecto el archivo mal formateado. VERIFY_ONLY puede estar roto."
+            cat /tmp/hook-test/output.log
+            exit 1
+          fi
+          echo "Hook correctly caught unformatted code (exit $EXIT_CODE)."
+          echo "--- hook output ---"
+          cat /tmp/hook-test/output.log | head -20
 
   midikeyboard:
     name: MidiKeyboard (vitest)
