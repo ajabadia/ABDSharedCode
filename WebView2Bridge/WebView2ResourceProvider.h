@@ -27,9 +27,9 @@ namespace abd::webview2
  */
 struct BinaryAssetsCatalog
 {
-    int namedResourceListSize = 0;
-    const char* const* namedResourceList = nullptr;
-    const char* const* originalFilenames = nullptr;
+    int namedResourceListSize                          = 0;
+    const char* const* namedResourceList               = nullptr;
+    const char* const* originalFilenames               = nullptr;
     const char* (*getNamedResource)(const char*, int&) = nullptr;
 };
 

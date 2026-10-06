@@ -6,9 +6,9 @@
  */
 
 #include "WebView2ResourceProvider.h"
-#include <juce_core/juce_core.h>
 #include <cstddef>
 #include <cstring>
+#include <juce_core/juce_core.h>
 #include <vector>
 
 namespace abd::webview2
@@ -17,13 +17,13 @@ namespace abd::webview2
 juce::String getMimeTypeForFilename(const juce::String& filename)
 {
     if (filename.endsWithIgnoreCase(".html")) return "text/html";
-    if (filename.endsWithIgnoreCase(".css"))  return "text/css";
+    if (filename.endsWithIgnoreCase(".css")) return "text/css";
     if (filename.endsWithIgnoreCase(".js") || filename.endsWithIgnoreCase(".mjs")) return "application/javascript";
-    if (filename.endsWithIgnoreCase(".png"))  return "image/png";
+    if (filename.endsWithIgnoreCase(".png")) return "image/png";
     if (filename.endsWithIgnoreCase(".jpg") || filename.endsWithIgnoreCase(".jpeg")) return "image/jpeg";
     if (filename.endsWithIgnoreCase(".webp")) return "image/webp";
-    if (filename.endsWithIgnoreCase(".svg"))  return "image/svg+xml";
-    if (filename.endsWithIgnoreCase(".ttf"))  return "font/ttf";
+    if (filename.endsWithIgnoreCase(".svg")) return "image/svg+xml";
+    if (filename.endsWithIgnoreCase(".ttf")) return "font/ttf";
     if (filename.endsWithIgnoreCase(".woff")) return "font/woff";
     if (filename.endsWithIgnoreCase(".woff2")) return "font/woff2";
     if (filename.endsWithIgnoreCase(".json")) return "application/json";
@@ -47,11 +47,14 @@ juce::String normalizeResourcePath(const juce::String& url)
     if (path.startsWith("juce://"))
     {
         const int hostEndIndex = path.indexOf(7, "/");
-        path = (hostEndIndex != -1) ? path.substring(hostEndIndex) : "/";
+        path                   = (hostEndIndex != -1) ? path.substring(hostEndIndex) : "/";
     }
-    else if (path.startsWith("https://juce.backend")) path = path.substring(20);
-    else if (path.startsWith("http://localhost"))     path = path.substring(16);
-    else if (path.startsWith("https://localhost"))    path = path.substring(17);
+    else if (path.startsWith("https://juce.backend"))
+        path = path.substring(20);
+    else if (path.startsWith("http://localhost"))
+        path = path.substring(16);
+    else if (path.startsWith("https://localhost"))
+        path = path.substring(17);
 
     if (path == "/" || path.isEmpty()) path = "/index.html";
     if (path.startsWith("/")) path = path.substring(1);
@@ -72,7 +75,7 @@ std::optional<juce::WebBrowserComponent::Resource> resolveEmbeddedAsset(const ju
     if (filename.isEmpty())
         filename = decodedPath;
 
-    int binSize = 0;
+    int binSize         = 0;
     const char* binData = nullptr;
 
     // Pass 1: Direct match by filename against originalFilenames
@@ -100,7 +103,7 @@ std::optional<juce::WebBrowserComponent::Resource> resolveEmbeddedAsset(const ju
     {
         std::vector<std::byte> bytes(static_cast<size_t>(binSize));
         std::memcpy(bytes.data(), binData, static_cast<size_t>(binSize));
-        return juce::WebBrowserComponent::Resource { std::move(bytes), getMimeTypeForFilename(filename).toStdString() };
+        return juce::WebBrowserComponent::Resource{std::move(bytes), getMimeTypeForFilename(filename).toStdString()};
     }
 
     return std::nullopt;
@@ -110,7 +113,7 @@ static juce::File findSharedAssetsRoot()
 {
     // Try to locate ABDSharedAssets relative to the current executable
     juce::File exeFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
-    juce::File dir = exeFile.getParentDirectory();
+    juce::File dir     = exeFile.getParentDirectory();
 
     // Walk up to find ABDSharedAssets (monorepo root is typically 4-6 levels up from build artefacts)
     for (int i = 0; i < 8 && dir.exists(); ++i)
@@ -132,9 +135,8 @@ static juce::File findSharedAssetsRoot()
     }
 
     // Fallback: try the known monorepo root
-    const juce::File projectRoot = exeFile.getParentDirectory().getParentDirectory()
-                                        .getParentDirectory().getParentDirectory();
-    const juce::File candidate = projectRoot.getChildFile("ABDSharedAssets");
+    const juce::File projectRoot = exeFile.getParentDirectory().getParentDirectory().getParentDirectory().getParentDirectory();
+    const juce::File candidate   = projectRoot.getChildFile("ABDSharedAssets");
     if (candidate.isDirectory())
         return candidate;
 
@@ -157,7 +159,7 @@ std::optional<juce::WebBrowserComponent::Resource> resolveSharedAssetFile(const 
 
     std::vector<std::byte> bytes(static_cast<size_t>(data.getSize()));
     std::memcpy(bytes.data(), data.getData(), static_cast<size_t>(data.getSize()));
-    return juce::WebBrowserComponent::Resource { std::move(bytes), getMimeTypeForFilename(file.getFileName()).toStdString() };
+    return juce::WebBrowserComponent::Resource{std::move(bytes), getMimeTypeForFilename(file.getFileName()).toStdString()};
 }
 
 std::optional<juce::WebBrowserComponent::Resource> webView2ResourceProvider(const juce::String& url,

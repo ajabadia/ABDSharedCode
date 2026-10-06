@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
 #include <functional>
+#include <juce_gui_extra/juce_gui_extra.h>
 #include <map>
 #include <optional>
 #include <string>
@@ -35,11 +35,11 @@ class JuceWebView2Component : public juce::Component
 {
 public:
     using ResourceProvider = std::function<std::optional<juce::WebBrowserComponent::Resource>(const juce::String&)>;
-    using EventListener = std::function<void(const juce::var&)>;
-    using EventListeners = std::map<juce::String, EventListener>;
+    using EventListener    = std::function<void(const juce::var&)>;
+    using EventListeners   = std::map<juce::String, EventListener>;
 
     explicit JuceWebView2Component(ResourceProvider provider,
-                                   EventListeners extraListeners = {},
+                                   EventListeners extraListeners    = {},
                                    const juce::String& initialTheme = "audiolab-light")
         : webBrowser(buildOptions(std::move(provider), std::move(extraListeners),
                                   [this]() { onPageLoaded(); })),
@@ -65,19 +65,20 @@ public:
         const juce::String theme(currentTheme);
         const juce::String js =
             "(() => {"
-            "  const t = '" + theme + "';"
-            "  document.documentElement.setAttribute('data-theme', t);"
-            "  if (document.body) {"
-            "    document.body.setAttribute('data-theme', t);"
-            "    document.body.dataset.theme = t;"
-            "    const classes = Array.from(document.body.classList).filter(c => !c.startsWith('theme-') && !c.startsWith('skin-'));"
-            "    classes.push('theme-' + t, 'skin-' + t);"
-            "    document.body.className = classes.join(' ');"
-            "  }"
-            "  if (typeof window.setTheme === 'function') {"
-            "    window.setTheme(t);"
-            "  }"
-            "})();";
+            "  const t = '" +
+            theme + "';"
+                    "  document.documentElement.setAttribute('data-theme', t);"
+                    "  if (document.body) {"
+                    "    document.body.setAttribute('data-theme', t);"
+                    "    document.body.dataset.theme = t;"
+                    "    const classes = Array.from(document.body.classList).filter(c => !c.startsWith('theme-') && !c.startsWith('skin-'));"
+                    "    classes.push('theme-' + t, 'skin-' + t);"
+                    "    document.body.className = classes.join(' ');"
+                    "  }"
+                    "  if (typeof window.setTheme === 'function') {"
+                    "    window.setTheme(t);"
+                    "  }"
+                    "})();";
         juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
     }
 
