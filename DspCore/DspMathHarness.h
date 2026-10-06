@@ -73,24 +73,24 @@ namespace abd::dsp::harness
 struct Entrada
 {
     const char* nombre;
-    float (*uno)  (float);
-    float (*dos)  (float, float);
+    float (*uno)(float);
+    float (*dos)(float, float);
 
     // En `dos`, el primer argumento es la x del caso y el segundo se toma de
     // `kCasosB`. La funcion `pow` es la unica de dos argumentos que tiene
     // sentido tratar asi; el resto de las adaptaciones lo ignoran.
-    bool          usaSegundoArgumento;
+    bool usaSegundoArgumento;
 
-    float         presupuestoX;    // en multiplos de la mediana
+    float presupuestoX; // en multiplos de la mediana
 };
 
 // Los segundos argumentos de los casos de dos entradas. Se eligen para que
 // `pow`  reciba un exponente que ESTIRE la asintota (0.5) y otro que la
 // acerque (3.0), y para que `wrapPhase` reciba un 2*PI con la precision que le
 // da el float, que es donde se concentra el error.
-inline constexpr float kSegundoArgumento   = 0.5f;
-inline constexpr float kSegundoArgumentoB  = 3.0f;
-inline constexpr float kDosPi              = 6.28318530718f;
+inline constexpr float kSegundoArgumento  = 0.5f;
+inline constexpr float kSegundoArgumentoB = 3.0f;
+inline constexpr float kDosPi             = 6.28318530718f;
 
 // Los valores de entrada. La lista está chosen a mano y NO es aleatoria, por
 // tres razones que se/learnen midiendo:
@@ -108,21 +108,19 @@ inline constexpr float kDosPi              = 6.28318530718f;
 inline constexpr int kNumCasos = 16;
 
 inline constexpr float kCasos[kNumCasos] =
-{
-    0.0f,  0.5f,  -0.5f,  1.0f,  -1.0f,
-    0.25f, 3.14159265f, 0.78539816f, 1000.0f,  -1000.0f,
-    0.999f, 0.9999f, 0.0001f, 12.5f,  6.28318531f, 0.125f
-};
+    {
+        0.0f, 0.5f, -0.5f, 1.0f, -1.0f,
+        0.25f, 3.14159265f, 0.78539816f, 1000.0f, -1000.0f,
+        0.999f, 0.9999f, 0.0001f, 12.5f, 6.28318531f, 0.125f};
 
 // Los mismos casos pero CON SEGUNDA COLUMNA, para no usar siempre 0.5: se
 // repite la lista cambiando el argumento, que es lo que hace falta para que
 // `pow` se mida en dosIOC regímenes distintos.
 inline constexpr float kCasosB[kNumCasos] =
-{
-    0.5f,  0.5f,  0.5f,  0.5f,  0.5f,
-    3.0f,  3.0f,  0.5f,  3.0f,  0.5f,
-    0.5f,  3.0f,  0.5f,  3.0f,  0.5f,  3.0f
-};
+    {
+        0.5f, 0.5f, 0.5f, 0.5f, 0.5f,
+        3.0f, 3.0f, 0.5f, 3.0f, 0.5f,
+        0.5f, 3.0f, 0.5f, 3.0f, 0.5f, 3.0f};
 
 //==============================================================================
 // Las once adaptaciones. Cada una es el ÚNICO sitio donde se llama a una
@@ -130,16 +128,43 @@ inline constexpr float kCasosB[kNumCasos] =
 // que se note: si `DspMath.h` declara una función nueva, esta tabla no la
 // menciona y la puerta de cobertura del runner lo dice por el fuente.
 
-inline float envolturaSin  (float x) noexcept { return sin (x); }
-inline float envolturaCos  (float x) noexcept { return cos (x); }
-inline float envolturaAtan (float x) noexcept { return atan (x); }
-inline float envolturaAtanh(float x) noexcept { return atanh (x); }
-inline float envolturaTanh (float x) noexcept { return tanh (x); }
-inline float envolturaLog2 (float x) noexcept { return log2 (x); }
-inline float envolturaExp2 (float x) noexcept { return exp2 (x); }
+inline float envolturaSin(float x) noexcept
+{
+    return sin(x);
+}
+inline float envolturaCos(float x) noexcept
+{
+    return cos(x);
+}
+inline float envolturaAtan(float x) noexcept
+{
+    return atan(x);
+}
+inline float envolturaAtanh(float x) noexcept
+{
+    return atanh(x);
+}
+inline float envolturaTanh(float x) noexcept
+{
+    return tanh(x);
+}
+inline float envolturaLog2(float x) noexcept
+{
+    return log2(x);
+}
+inline float envolturaExp2(float x) noexcept
+{
+    return exp2(x);
+}
 
-inline float envolturaPow      (float x, float y) noexcept { return pow (x, y); }
-inline float envolturaWrapPhase(float x, float y) noexcept { return wrapPhase (x, y); }
+inline float envolturaPow(float x, float y) noexcept
+{
+    return pow(x, y);
+}
+inline float envolturaWrapPhase(float x, float y) noexcept
+{
+    return wrapPhase(x, y);
+}
 
 // `pow2i` y `floorToInt` devuelven float e int y reciben int y float. El
 // `static_cast<int>` es el que hace la CONVERSIÓN, y aquí es donde se ve si esa
@@ -147,15 +172,15 @@ inline float envolturaWrapPhase(float x, float y) noexcept { return wrapPhase (x
 // digest de bits no coincide y la puerta de paridad salta. Por eso el arnés NO
 // las deja fuera por ser "de enteros": la parte interesante de esas dos es
 // justamente la conversión.
-inline float envolturaPow2i    (float x) noexcept
+inline float envolturaPow2i(float x) noexcept
 {
-    const int n = static_cast<int> (x);
-    return static_cast<float> (pow2i (n));
+    const int n = static_cast<int>(x);
+    return static_cast<float>(pow2i(n));
 }
 
 inline float envolturaFloorToInt(float x) noexcept
 {
-    return static_cast<float> (floorToInt (x));
+    return static_cast<float>(floorToInt(x));
 }
 
 //==============================================================================
@@ -181,21 +206,21 @@ inline float envolturaFloorToInt(float x) noexcept
     porque es la que mas varia entre corridas (33 a 38 ns medidos) y no por una
     duda de implementacion sino porque es la que de verdad hace mas trabajo. */
 inline constexpr Entrada kManifiesto[] =
-{
-    { "sin",        &envolturaSin,        nullptr,                  false, 1.6f },
-    { "cos",        &envolturaCos,        nullptr,                  false, 1.6f },
-    { "atan",       &envolturaAtan,       nullptr,                  false, 2.0f },
-    { "atanh",      &envolturaAtanh,      nullptr,                  false, 1.6f },
-    { "tanh",       &envolturaTanh,       nullptr,                  false, 1.8f },
-    { "log2",       &envolturaLog2,       nullptr,                  false, 1.6f },
-    { "exp2",       &envolturaExp2,       nullptr,                  false, 1.6f },
-    { "pow2i",      &envolturaPow2i,      nullptr,                  false, 0.6f },
-    { "floorToInt", &envolturaFloorToInt, nullptr,                  false, 0.8f },
-    { "pow",        nullptr,              &envolturaPow,           true,  6.0f },
-    { "wrapPhase",  nullptr,              &envolturaWrapPhase,      true,  1.4f },
+    {
+        {"sin", &envolturaSin, nullptr, false, 1.6f},
+        {"cos", &envolturaCos, nullptr, false, 1.6f},
+        {"atan", &envolturaAtan, nullptr, false, 2.0f},
+        {"atanh", &envolturaAtanh, nullptr, false, 1.6f},
+        {"tanh", &envolturaTanh, nullptr, false, 1.8f},
+        {"log2", &envolturaLog2, nullptr, false, 1.6f},
+        {"exp2", &envolturaExp2, nullptr, false, 1.6f},
+        {"pow2i", &envolturaPow2i, nullptr, false, 0.6f},
+        {"floorToInt", &envolturaFloorToInt, nullptr, false, 0.8f},
+        {"pow", nullptr, &envolturaPow, true, 6.0f},
+        {"wrapPhase", nullptr, &envolturaWrapPhase, true, 1.4f},
 };
 
-inline constexpr int kNumEntradas = (int) (sizeof (kManifiesto) / sizeof (kManifiesto[0]));
+inline constexpr int kNumEntradas = (int)(sizeof(kManifiesto) / sizeof(kManifiesto[0]));
 
 //==============================================================================
 /** El informe se escribe a mano en un buffer estático.
@@ -208,31 +233,31 @@ inline constexpr int kNumEntradas = (int) (sizeof (kManifiesto) / sizeof (kManif
 class Informe
 {
 public:
-    void anade (char c) noexcept
+    void anade(char c) noexcept
     {
         if (longitud_ < capacidad - 1)
             buffer_[longitud_++] = c;
     }
 
-    void texto (const char* s) noexcept
+    void texto(const char* s) noexcept
     {
-        while (*s != 0) anade (*s++);
+        while (*s != 0) anade(*s++);
     }
 
-    void entero (unsigned long v) noexcept
+    void entero(unsigned long v) noexcept
     {
         char digitos[24];
         int n = 0;
         if (v == 0ul) digitos[n++] = '0';
         while (v > 0ul)
         {
-            digitos[n++] = (char) ('0' + (v % 10ul));
+            digitos[n++] = (char)('0' + (v % 10ul));
             v /= 10ul;
         }
-        while (n > 0) anade (digitos[--n]);
+        while (n > 0) anade(digitos[--n]);
     }
 
-    void numero (float v) noexcept
+    void numero(float v) noexcept
     {
         // El informe es para personas y para diffs, no para parsear: con dos
         // decimales basta, y escribir un %f a mano evita `snprintf`.
@@ -243,52 +268,64 @@ public:
         // esta funcion imprimia "nan" para 0.00, que es exactamente el fallo que
         // hace que un informe de medicion no se pueda fiar: el numero mas
         // probable de todos, un coste redondito, salia marcado como invalido.
-        if (v != v)                       // NaN, y solo NaN: aqui si es != consigo mismo
+        if (v != v) // NaN, y solo NaN: aqui si es != consigo mismo
         {
-            texto ("nan");
+            texto("nan");
             return;
         }
-        if (v > 1.0e7f || v < -1.0e7f) { texto ("infinito"); return; }
+        if (v > 1.0e7f || v < -1.0e7f)
+        {
+            texto("infinito");
+            return;
+        }
 
-        if (v < 0.0f) { anade ('-'); v = -v; }
+        if (v < 0.0f)
+        {
+            anade('-');
+            v = -v;
+        }
 
-        unsigned long entera = (unsigned long) v;
+        unsigned long entera = (unsigned long)v;
 
         // Los centimas, redondeadas, CON la llevada. Sin ella, 1.999 redondea a
         // 100 centimas y hay que subir la parte entera: si no, sale "1.00" para
         // 1.999, que no es un redondeo feo, es un numero falso.
-        unsigned resto = (unsigned) ((v - (float) entera) * 100.0f + 0.5f);
-        if (resto >= 100ul) { ++entera; resto -= 100ul; }
+        unsigned resto = (unsigned)((v - (float)entera) * 100.0f + 0.5f);
+        if (resto >= 100ul)
+        {
+            ++entera;
+            resto -= 100ul;
+        }
 
-        entero (entera);
+        entero(entera);
         if (resto == 0ul) return;
 
-        anade ('.');
+        anade('.');
         // SIEMPRE dos decimales. La primera version imprimia un '0' de relleno
         // y despues los dos digitos, y un resto de 7 salia como ".007" y
         // rompia el formato que el lado de WASM parsea.
-        anade ((char) ('0' + (resto / 10ul) % 10ul));
-        anade ((char) ('0' + resto % 10ul));
+        anade((char)('0' + (resto / 10ul) % 10ul));
+        anade((char)('0' + resto % 10ul));
     }
 
-    void bits (float v) noexcept
+    void bits(float v) noexcept
     {
         // Los bits EN HEX, no el numero: la paridad que importa es bit a bit, y
         // un 0.70710677 impreso no distingue un ulp de una implementacion
         // distinta. Este es el campo que se compara entre nativo y WASM.
         unsigned u;
-        __builtin_memcpy (&u, &v, 4);
+        __builtin_memcpy(&u, &v, 4);
         for (int i = 7; i >= 0; --i)
         {
             const unsigned d = (u >> (i * 4)) & 0xFu;
-            anade ((char) (d < 10u ? ('0' + d) : ('a' + (d - 10u))));
+            anade((char)(d < 10u ? ('0' + d) : ('a' + (d - 10u))));
         }
     }
 
-    void linea (const char* nombre)
+    void linea(const char* nombre)
     {
-        texto (nombre);
-        anade ('\n');
+        texto(nombre);
+        anade('\n');
     }
 
     const char* datos() const noexcept { return buffer_; }
@@ -296,9 +333,9 @@ public:
     bool seHaLleno() const noexcept { return longitud_ >= capacidad - 1; }
 
 private:
-    static constexpr int capacidad = 1 << 17;   // 128 KiB
-    char buffer_[capacidad] = { 0 };
-    int longitud_ = 0;
+    static constexpr int capacidad = 1 << 17; // 128 KiB
+    char buffer_[capacidad]        = {0};
+    int longitud_                  = 0;
 };
 
 //==============================================================================
@@ -316,7 +353,7 @@ private:
 
     `ahoraMilis()` es el MISMO nombre y hace lo mismo en las dos patas, asi que
     el bucle de medicion es literalmente el mismo codigo compilado dos veces. */
-#if defined (DspMathHarnessWasm)
+#if defined(DspMathHarnessWasm)
 
 extern "C" double dspMathHarnessHostMilis();
 
@@ -327,11 +364,11 @@ inline double ahoraMilis() noexcept
 
 #else
 
- #include <time.h>
+#include <time.h>
 
 inline double ahoraMilis() noexcept
 {
-    return clock() * 1000.0 / (double) CLOCKS_PER_SEC;
+    return clock() * 1000.0 / (double)CLOCKS_PER_SEC;
 }
 
 #endif

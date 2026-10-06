@@ -104,11 +104,11 @@ public:
     /** La frecuencia de muestreo. Sin esto no hay nada que calcular: `g` sale
         de ella. Hay que llamar a `prepare()` otra vez si cambia.
     */
-    void prepare (double sampleRate) noexcept
+    void prepare(double sampleRate) noexcept
     {
         sampleRateHz = (sampleRate > 0.0) ? sampleRate : 44100.0;
-        cutoffHz = -1.0;   // fuerza el retune del primer processSample
-        setResonance (resonance);
+        cutoffHz     = -1.0; // fuerza el retune del primer processSample
+        setResonance(resonance);
     }
 
     //==========================================================================
@@ -119,7 +119,7 @@ public:
     {
         integrator1 = 0.0;
         integrator2 = 0.0;
-        bandPower = 0.0;
+        bandPower   = 0.0;
     }
 
     //==========================================================================
@@ -131,12 +131,12 @@ public:
                    limite al acercarse a Nyquist, y un `g` infinito no es un
                    filtro, es un NaN que se lleva por delante el estado.
     */
-    void setCutoff (double hz) noexcept
+    void setCutoff(double hz) noexcept
     {
         const auto nyquist = sampleRateHz * 0.5;
-        const auto limit = nyquist * maxCutoffFraction;
-        const auto wanted = hz < 10.0 ? 10.0
-                          : (hz > limit ? limit : hz);
+        const auto limit   = nyquist * maxCutoffFraction;
+        const auto wanted  = hz < 10.0 ? 10.0
+                                       : (hz > limit ? limit : hz);
 
         if (wanted == cutoffHz)
             return;
@@ -157,9 +157,9 @@ public:
         @param amount  0..1. Se recorta: fuera de rango es un valor de panel, y
                       un valor de panel no puede meter un NaN en el filtro.
     */
-    void setResonance (double amount) noexcept
+    void setResonance(double amount) noexcept
     {
-        resonance = std::min (1.0, std::max (0.0, amount));
+        resonance = std::min(1.0, std::max(0.0, amount));
         updateDamping();
     }
 
@@ -169,13 +169,13 @@ public:
         @param hz       frecuencia de corte en Hz.
         @param amount   resonancia 0..1.
     */
-    void setCutoffAndResonance (double hz, double amount) noexcept
+    void setCutoffAndResonance(double hz, double amount) noexcept
     {
         const auto was = resonance;
 
-        resonance = std::min (1.0, std::max (0.0, amount));
-        cutoffHz = -1.0;
-        setCutoff (hz);
+        resonance = std::min(1.0, std::max(0.0, amount));
+        cutoffHz  = -1.0;
+        setCutoff(hz);
 
         if (resonance != was)
             updateDamping();
@@ -191,10 +191,10 @@ public:
         @param input  la muestra de entrada.
         @returns      la salida de paso bajo de esta etapa.
     */
-    double processSample (double input) noexcept
+    double processSample(double input) noexcept
     {
         if (cutoffHz <= 0.0)
-            setCutoff (10.0);
+            setCutoff(10.0);
 
         // La potencia de la banda, promediada. El tiempo del promediado son dos
         // ciclos del corte, con suelo: por debajo de un suelo el suavizado se
@@ -202,15 +202,15 @@ public:
         // este promediado evita.
         bandPower += follow * (band * band - bandPower);
 
-        const auto k = std::min (maxDamping, k0 + beta * bandPower);
+        const auto k   = std::min(maxDamping, k0 + beta * bandPower);
         const auto inv = 1.0 / (1.0 + g * (g + k));
-        const auto a1 = inv;
-        const auto a2 = g * a1;
-        const auto a3 = g * a2;
+        const auto a1  = inv;
+        const auto a2  = g * a1;
+        const auto a3  = g * a2;
 
         const auto v3 = input - integrator2;
         const auto v1 = a1 * integrator1 + a2 * v3;
-        auto v2 = integrator2 + a2 * integrator1 + a3 * v3;
+        auto v2       = integrator2 + a2 * integrator1 + a3 * v3;
 
         integrator1 = 2.0 * v1 - integrator1;
         integrator2 = 2.0 * v2 - integrator2;
@@ -219,9 +219,9 @@ public:
 
         // Una voz que se apaga en silencio se va a denormales, que en x86 son
         // lentos. El suelo es donde ya no se oye nada.
-        if (std::abs (integrator1) < denormalFloor) integrator1 = 0.0;
-        if (std::abs (integrator2) < denormalFloor) integrator2 = 0.0;
-        if (bandPower < denormalFloor)               bandPower = 0.0;
+        if (std::abs(integrator1) < denormalFloor) integrator1 = 0.0;
+        if (std::abs(integrator2) < denormalFloor) integrator2 = 0.0;
+        if (bandPower < denormalFloor) bandPower = 0.0;
 
         return v2;
     }
@@ -239,12 +239,12 @@ public:
     //==========================================================================
     /** La potencia de banda promediada ahora mismo. Es la variable de la que
         depende el equilibrio, asi que un medidor la usa y un test la mide. */
-    double getBandPower() const noexcept  { return bandPower; }
+    double getBandPower() const noexcept { return bandPower; }
 
     /** El amortiguamiento de este momento, ya con el efecto de la AGC. */
     double getDamping() const noexcept
     {
-        return std::min (maxDamping, k0 + beta * bandPower);
+        return std::min(maxDamping, k0 + beta * bandPower);
     }
 
     /** El amortiguamiento SIN el efecto de la AGC, o sea el que decide si la
@@ -255,7 +255,7 @@ public:
     double getResonance() const noexcept { return resonance; }
 
     /** La frecuencia de corte actual, ya recortada, en Hz. */
-    double getCutoff() const noexcept    { return cutoffHz; }
+    double getCutoff() const noexcept { return cutoffHz; }
 
     //==========================================================================
     /** Cuanto manda la potencia de banda sobre el amortiguamiento, y por tanto
@@ -267,9 +267,9 @@ public:
                          valor con el que nace. Los valores mas altos asientan
                          antes y mas abajo.
     */
-    void setLevelControl (double strength) noexcept
+    void setLevelControl(double strength) noexcept
     {
-        beta = std::max (0.0, strength);
+        beta = std::max(0.0, strength);
     }
 
     /** El nivel al que se asienta la oscilacion con el amortiguamiento actual,
@@ -287,7 +287,7 @@ public:
         if (k0 >= 0.0)
             return 0.0;
 
-        return std::sqrt (-2.0 * k0 / beta);
+        return std::sqrt(-2.0 * k0 / beta);
     }
 
     //==========================================================================
@@ -305,7 +305,7 @@ public:
     static double selfOscillationStart() noexcept
     {
         const auto kAtMaxQ = 1.0 / defaultMaxQ;
-        const auto t = kAtMaxQ / (kAtMaxQ - dampingFloor);
+        const auto t       = kAtMaxQ / (kAtMaxQ - dampingFloor);
 
         return threshold + (1.0 - threshold) * t;
     }
@@ -358,23 +358,22 @@ private:
     */
     void updateCoefficients() noexcept
     {
-        const auto pi = static_cast<float> (MathConstants<double>::pi);
-        const auto angle = static_cast<float> (static_cast<double> (pi) * cutoffHz
-                                                    / sampleRateHz);
+        const auto pi    = static_cast<float>(MathConstants<double>::pi);
+        const auto angle = static_cast<float>(static_cast<double>(pi) * cutoffHz / sampleRateHz);
 
-        const auto s = static_cast<double> (sin (angle));
-        const auto c = static_cast<double> (cos (angle));
+        const auto s = static_cast<double>(sin(angle));
+        const auto c = static_cast<double>(cos(angle));
 
         // `cos` no llega a cero con el recorte de arriba, pero el corte minimo y
         // una frecuencia de muestreo absurda podrian acercarse. El suelo mantiene
         // la division finita sin cambiar el filtro en el rango de uso.
-        g = s / (std::abs (c) < 1.0e-6 ? 1.0e-6 : c);
+        g = s / (std::abs(c) < 1.0e-6 ? 1.0e-6 : c);
 
         // La compensacion de pasabanda no existe (ver la nota de la clase), asi
         // que aqui solo queda el tiempo del promediado de potencia, que si
         // depende del corte.
-        const auto seconds = std::max (minFollowSeconds, followCycles / cutoffHz);
-        const auto tau = static_cast<float> (-1.0 / (seconds * sampleRateHz));
+        const auto seconds = std::max(minFollowSeconds, followCycles / cutoffHz);
+        const auto tau     = static_cast<float>(-1.0 / (seconds * sampleRateHz));
 
         // El recorte va AQUI y escrito, no repartido. `log2e` es `double` y
         // `exp2` toma `float`, asi que el producto salia en `double` y se
@@ -384,7 +383,7 @@ private:
         // cambia ni un bit: el valor final es el mismo que salia de
         // recortar y ensanchar. El `double` de abajo sobra, porque `exp2` ya
         // devuelve `float`.
-        const auto target = exp2 (static_cast<float> (tau * log2e));
+        const auto target = exp2(static_cast<float>(tau * log2e));
 
         follow = 1.0 - target;
     }
@@ -393,7 +392,7 @@ private:
     /** El amortiguamiento base `k0`, el que no depende de la potencia. */
     void updateDamping() noexcept
     {
-        const auto kBase = 1.0 / baseQ;
+        const auto kBase   = 1.0 / baseQ;
         const auto kAtMaxQ = 1.0 / defaultMaxQ;
 
         if (resonance <= threshold)
@@ -401,8 +400,8 @@ private:
             // Exponencial de Q base a Q maxima, repartida en el tramo. El pow de
             // dos es el determinista de DspMath, no std::pow: mismo motivo que
             // antes, la paridad es la invariante del modulo.
-            const auto t = static_cast<float> (resonance / threshold);
-            const auto ratio = static_cast<double> (pow (static_cast<float> (kAtMaxQ / kBase), t));
+            const auto t     = static_cast<float>(resonance / threshold);
+            const auto ratio = static_cast<double>(pow(static_cast<float>(kAtMaxQ / kBase), t));
 
             k0 = kBase * ratio;
         }
@@ -419,19 +418,19 @@ private:
     //==========================================================================
     /** El Q del filtro sin realce. Publico porque el host lo elige: una seccion
         de una cascada de un filtro concreto tiene una Q que es de ESE filtro. */
-    double baseQ = 0.70710678118654752;   // 1/sqrt(2): Butterworth de segundo orden
+    double baseQ        = 0.70710678118654752; // 1/sqrt(2): Butterworth de segundo orden
     double sampleRateHz = 44100.0;
-    double cutoffHz = -1.0;
-    double resonance = 0.0;
+    double cutoffHz     = -1.0;
+    double resonance    = 0.0;
 
-    double g = 0.0;             // tan (pi * f / fs)
-    double k0 = 0.0;            // amortiguamiento sin AGC
-    double beta = agcStrength;  // cuanto manda la potencia (0 = AGC apagada)
-    double follow = 0.0;        // coeficiente del promediado de potencia
-    double integrator1 = 0.0;   // estado del TPT
+    double g           = 0.0;         // tan (pi * f / fs)
+    double k0          = 0.0;         // amortiguamiento sin AGC
+    double beta        = agcStrength; // cuanto manda la potencia (0 = AGC apagada)
+    double follow      = 0.0;         // coeficiente del promediado de potencia
+    double integrator1 = 0.0;         // estado del TPT
     double integrator2 = 0.0;
-    double band = 0.0;          // salida de banda de la ultima muestra
-    double bandPower = 0.0;     // potencia de banda promediada
+    double band        = 0.0; // salida de banda de la ultima muestra
+    double bandPower   = 0.0; // potencia de banda promediada
 
     /** Donde el amortiguamiento cruza cero, en resonancia 0..1. */
     static constexpr double threshold = 0.9;

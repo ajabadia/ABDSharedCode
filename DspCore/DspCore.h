@@ -41,13 +41,13 @@
 #include <type_traits>
 
 #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
-  #define DSP_HAS_SSE_INTRINSICS 1
+#define DSP_HAS_SSE_INTRINSICS 1
 #elif defined(__SSE2__)
-  #define DSP_HAS_SSE_INTRINSICS 1
+#define DSP_HAS_SSE_INTRINSICS 1
 #endif
 
 #if defined(DSP_HAS_SSE_INTRINSICS)
-  #include <xmmintrin.h>
+#include <xmmintrin.h>
 #endif
 
 namespace abd::dsp
@@ -57,7 +57,8 @@ namespace abd::dsp
 /** Handy function for avoiding unused variables warning.
     Port literal de dsp::ignoreUnused. */
 template <typename... Types>
-void ignoreUnused (Types&&...) noexcept {}
+void ignoreUnused(Types&&...) noexcept
+{}
 
 //==============================================================================
 /** Common constants.
@@ -66,19 +67,19 @@ template <typename FloatType>
 struct MathConstants
 {
     /** A predefined value for Pi */
-    static constexpr FloatType pi = static_cast<FloatType> (3.141592653589793238L);
+    static constexpr FloatType pi = static_cast<FloatType>(3.141592653589793238L);
 
     /** A predefined value for 2 * Pi */
-    static constexpr FloatType twoPi = static_cast<FloatType> (2 * 3.141592653589793238L);
+    static constexpr FloatType twoPi = static_cast<FloatType>(2 * 3.141592653589793238L);
 
     /** A predefined value for Pi / 2 */
-    static constexpr FloatType halfPi = static_cast<FloatType> (3.141592653589793238L / 2);
+    static constexpr FloatType halfPi = static_cast<FloatType>(3.141592653589793238L / 2);
 
     /** A predefined value for Euler's number */
-    static constexpr FloatType euler = static_cast<FloatType> (2.71828182845904523536L);
+    static constexpr FloatType euler = static_cast<FloatType>(2.71828182845904523536L);
 
     /** A predefined value for sqrt (2) */
-    static constexpr FloatType sqrt2 = static_cast<FloatType> (1.4142135623730950488L);
+    static constexpr FloatType sqrt2 = static_cast<FloatType>(1.4142135623730950488L);
 };
 
 //==============================================================================
@@ -87,7 +88,7 @@ struct MathConstants
     consumen las aserciones de JUCE (solo se usa dentro de dspAssert); la
     version con tolerancias de JUCE no aporta nada aqui y no cruza al audio. */
 template <typename Type>
-constexpr bool approximatelyEqual (Type a, Type b) noexcept
+constexpr bool approximatelyEqual(Type a, Type b) noexcept
 {
     return a == b;
 }
@@ -132,32 +133,38 @@ constexpr bool approximatelyEqual (Type a, Type b) noexcept
 // del port literal no probaria nada). Se replican las mismas arquitecturas que
 // hacen que JUCE_INTEL sea 1: x86 de 32/64 bits. wasm32 define __wasm__ y
 // ninguno de los macros de abajo, igual que en JUCE.
-#if defined (_M_IX86) || defined (_M_X64) || defined (__i386__) || defined (__x86_64__)
-  #define DSP_HOST_IS_X86 1
+#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
+#define DSP_HOST_IS_X86 1
 #else
-  #define DSP_HOST_IS_X86 0
+#define DSP_HOST_IS_X86 0
 #endif
 
-#if defined (DSP_UNDENORMALISE_JUCE_POLICY) && DSP_UNDENORMALISE_JUCE_POLICY
-  #if DSP_HOST_IS_X86
-    #define dspUndenormalise(x)     do { (x) += 0.1f; (x) -= 0.1f; } while (false)
-  #else
-    #define dspUndenormalise(x)     do { } while (false)
-  #endif
+#if defined(DSP_UNDENORMALISE_JUCE_POLICY) && DSP_UNDENORMALISE_JUCE_POLICY
+#if DSP_HOST_IS_X86
+#define dspUndenormalise(x) \
+    do {                    \
+        (x) += 0.1f;        \
+        (x) -= 0.1f;        \
+    } while (false)
 #else
-  /** No-op uniforme (ver arriba). Recibe la referencia para documentar el punto. */
-  inline void undenormalise (float&) noexcept {}
-  #define dspUndenormalise(x)         ::abd::dsp::undenormalise (x)
+#define dspUndenormalise(x) \
+    do {                    \
+    } while (false)
+#endif
+#else
+/** No-op uniforme (ver arriba). Recibe la referencia para documentar el punto. */
+inline void undenormalise(float&) noexcept {}
+#define dspUndenormalise(x) ::abd::dsp::undenormalise(x)
 #endif
 
 //==============================================================================
 // Asercion del port (sustituye a jassert): aborta en Debug, se compila fuera
 // en Release. Nunca afecta al resultado numerico.
 
-#if ! defined (NDEBUG)
-  #define dspAssert(expression)      assert (expression)
+#if !defined(NDEBUG)
+#define dspAssert(expression) assert(expression)
 #else
-  #define dspAssert(expression)      static_cast<void> (true && (expression))
+#define dspAssert(expression) static_cast<void>(true && (expression))
 #endif
 
 //==============================================================================
@@ -166,33 +173,51 @@ constexpr bool approximatelyEqual (Type a, Type b) noexcept
 
 /** Returns the larger of two values. */
 template <typename Type>
-constexpr Type jmax (Type a, Type b)                                   { return a < b ? b : a; }
+constexpr Type jmax(Type a, Type b)
+{
+    return a < b ? b : a;
+}
 
 /** Returns the larger of three values. */
 template <typename Type>
-constexpr Type jmax (Type a, Type b, Type c)                           { return a < b ? (b < c ? c : b) : (a < c ? c : a); }
+constexpr Type jmax(Type a, Type b, Type c)
+{
+    return a < b ? (b < c ? c : b) : (a < c ? c : a);
+}
 
 /** Returns the larger of four values. */
 template <typename Type>
-constexpr Type jmax (Type a, Type b, Type c, Type d)                   { return jmax (a, jmax (b, c, d)); }
+constexpr Type jmax(Type a, Type b, Type c, Type d)
+{
+    return jmax(a, jmax(b, c, d));
+}
 
 /** Returns the smaller of two values. */
 template <typename Type>
-constexpr Type jmin (Type a, Type b)                                   { return b < a ? b : a; }
+constexpr Type jmin(Type a, Type b)
+{
+    return b < a ? b : a;
+}
 
 /** Returns the smaller of three values. */
 template <typename Type>
-constexpr Type jmin (Type a, Type b, Type c)                           { return b < a ? (c < b ? c : b) : (c < a ? c : a); }
+constexpr Type jmin(Type a, Type b, Type c)
+{
+    return b < a ? (c < b ? c : b) : (c < a ? c : a);
+}
 
 /** Returns the smaller of four values. */
 template <typename Type>
-constexpr Type jmin (Type a, Type b, Type c, Type d)                   { return jmin (a, jmin (b, c, d)); }
+constexpr Type jmin(Type a, Type b, Type c, Type d)
+{
+    return jmin(a, jmin(b, c, d));
+}
 
 /** Remaps a normalised value (between 0 and 1) to a target range.
     This effectively returns (targetRangeMin + value0To1 * (targetRangeMax - targetRangeMin)).
     Port literal de dsp::jmap (3 argumentos). */
 template <typename Type>
-constexpr Type jmap (Type value0To1, Type targetRangeMin, Type targetRangeMax)
+constexpr Type jmap(Type value0To1, Type targetRangeMin, Type targetRangeMax)
 {
     return targetRangeMin + value0To1 * (targetRangeMax - targetRangeMin);
 }
@@ -200,20 +225,20 @@ constexpr Type jmap (Type value0To1, Type targetRangeMin, Type targetRangeMax)
 /** Remaps a value from a source range to a target range.
     Port literal de dsp::jmap (5 argumentos). */
 template <typename Type>
-Type jmap (Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type targetRangeMin, Type targetRangeMax)
+Type jmap(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type targetRangeMin, Type targetRangeMax)
 {
-    dspAssert (! approximatelyEqual (sourceRangeMax, sourceRangeMin)); // mapping from a range of zero will produce NaN!
+    dspAssert(!approximatelyEqual(sourceRangeMax, sourceRangeMin)); // mapping from a range of zero will produce NaN!
     return targetRangeMin + ((targetRangeMax - targetRangeMin) * (sourceValue - sourceRangeMin)) / (sourceRangeMax - sourceRangeMin);
 }
 
 /** Constrains a value to keep it within a given range.
     Port literal de dsp::jlimit (mismo orden de comparaciones). */
 template <typename Type>
-Type jlimit (Type lowerLimit,
-             Type upperLimit,
-             Type valueToConstrain) noexcept
+Type jlimit(Type lowerLimit,
+            Type upperLimit,
+            Type valueToConstrain) noexcept
 {
-    dspAssert (lowerLimit <= upperLimit); // if these are in the wrong order, results are unpredictable
+    dspAssert(lowerLimit <= upperLimit); // if these are in the wrong order, results are unpredictable
 
     return valueToConstrain < lowerLimit ? lowerLimit
                                          : (upperLimit < valueToConstrain ? upperLimit
@@ -233,12 +258,16 @@ Type jlimit (Type lowerLimit,
     es la rama que JUCE compila con JUCE_BIG_ENDIAN a 0.
 */
 template <typename FloatType>
-int roundToInt (const FloatType value) noexcept
+int roundToInt(const FloatType value) noexcept
 {
-    static_assert (sizeof (int) == 4, "roundToInt asume int de 32 bits");
+    static_assert(sizeof(int) == 4, "roundToInt asume int de 32 bits");
 
-    union { int asInt[2]; double asDouble; } n;
-    n.asDouble = ((double) value) + 6755399441055744.0;
+    union
+    {
+        int asInt[2];
+        double asDouble;
+    } n;
+    n.asDouble = ((double)value) + 6755399441055744.0;
 
     return n.asInt[0];
 }
@@ -253,25 +282,25 @@ class ScopedNoDenormals
 public:
     ScopedNoDenormals() noexcept
     {
-      #if defined (DSP_HAS_SSE_INTRINSICS)
+#if defined(DSP_HAS_SSE_INTRINSICS)
         intptr_t mask = 0x8040;
 
-        fpsr = (intptr_t) _mm_getcsr();
-        _mm_setcsr ((unsigned int) (fpsr | mask));
-      #endif
+        fpsr = (intptr_t)_mm_getcsr();
+        _mm_setcsr((unsigned int)(fpsr | mask));
+#endif
     }
 
     ~ScopedNoDenormals() noexcept
     {
-      #if defined (DSP_HAS_SSE_INTRINSICS)
-        _mm_setcsr ((unsigned int) fpsr);
-      #endif
+#if defined(DSP_HAS_SSE_INTRINSICS)
+        _mm_setcsr((unsigned int)fpsr);
+#endif
     }
 
 private:
-  #if defined (DSP_HAS_SSE_INTRINSICS)
+#if defined(DSP_HAS_SSE_INTRINSICS)
     intptr_t fpsr;
-  #endif
+#endif
 };
 
 //==============================================================================
@@ -284,17 +313,17 @@ class Range
 public:
     Range() = default;
 
-    Range (Type minValue, Type maxValue) noexcept
-       : startValue (minValue), endValue (maxValue)
+    Range(Type minValue, Type maxValue) noexcept
+        : startValue(minValue), endValue(maxValue)
     {
     }
 
-    Type getStart() const noexcept   { return startValue; }
-    Type getEnd() const noexcept     { return endValue; }
+    Type getStart() const noexcept { return startValue; }
+    Type getEnd() const noexcept { return endValue; }
 
 private:
-    Type startValue {};
-    Type endValue {};
+    Type startValue{};
+    Type endValue{};
 };
 
 //==============================================================================
@@ -302,9 +331,9 @@ private:
     juce_MathsFunctions.h): checks that a value is greater than or equal to
     zero, and less than a given upper limit. */
 template <typename Type>
-constexpr bool isPositiveAndBelow (Type value, Type upperLimit) noexcept
+constexpr bool isPositiveAndBelow(Type value, Type upperLimit) noexcept
 {
-    dspAssert (Type() <= upperLimit); // makes no sense to call this unless upper limit is >= 0
+    dspAssert(Type() <= upperLimit); // makes no sense to call this unless upper limit is >= 0
 
     return Type() <= value && value < upperLimit;
 }
@@ -335,325 +364,325 @@ struct FloatVectorOperations
 {
     //==========================================================================
     template <typename Size>
-    static void clear (float* dest, Size num) noexcept
+    static void clear(float* dest, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = 0.0f;
     }
 
     template <typename Size>
-    static void clear (double* dest, Size num) noexcept
+    static void clear(double* dest, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = 0.0;
     }
 
     template <typename Size>
-    static void fill (float* dest, float valueToFill, Size num) noexcept
+    static void fill(float* dest, float valueToFill, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = valueToFill;
     }
 
     template <typename Size>
-    static void fill (double* dest, double valueToFill, Size num) noexcept
+    static void fill(double* dest, double valueToFill, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = valueToFill;
     }
 
     template <typename Size>
-    static void copy (float* dest, const float* src, Size num) noexcept
+    static void copy(float* dest, const float* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = src[i];
     }
 
     template <typename Size>
-    static void copy (double* dest, const double* src, Size num) noexcept
+    static void copy(double* dest, const double* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = src[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void copyWithMultiply (float* dest, const float* src, float multiplier, Size num) noexcept
+    static void copyWithMultiply(float* dest, const float* src, float multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = src[i] * multiplier;
     }
 
     template <typename Size>
-    static void copyWithMultiply (double* dest, const double* src, double multiplier, Size num) noexcept
+    static void copyWithMultiply(double* dest, const double* src, double multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = src[i] * multiplier;
     }
 
     template <typename Size>
-    static void copyWithMultiply (float* dest, const float* src1, const float* src2, Size num) noexcept
+    static void copyWithMultiply(float* dest, const float* src1, const float* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = src1[i] * src2[i];
     }
 
     template <typename Size>
-    static void copyWithMultiply (double* dest, const double* src1, const double* src2, Size num) noexcept
+    static void copyWithMultiply(double* dest, const double* src1, const double* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = src1[i] * src2[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void add (float* dest, float amount, Size num) noexcept
+    static void add(float* dest, float amount, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += amount;
     }
 
     template <typename Size>
-    static void add (double* dest, double amount, Size num) noexcept
+    static void add(double* dest, double amount, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += amount;
     }
 
     template <typename Size>
-    static void add (float* dest, const float* src, float amount, Size num) noexcept
+    static void add(float* dest, const float* src, float amount, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += amount * src[i];
     }
 
     template <typename Size>
-    static void add (double* dest, const double* src, double amount, Size num) noexcept
+    static void add(double* dest, const double* src, double amount, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += amount * src[i];
     }
 
     template <typename Size>
-    static void add (float* dest, const float* src, Size num) noexcept
+    static void add(float* dest, const float* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += src[i];
     }
 
     template <typename Size>
-    static void add (double* dest, const double* src, Size num) noexcept
+    static void add(double* dest, const double* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += src[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void subtract (float* dest, const float* src, Size num) noexcept
+    static void subtract(float* dest, const float* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] -= src[i];
     }
 
     template <typename Size>
-    static void subtract (double* dest, const double* src, Size num) noexcept
+    static void subtract(double* dest, const double* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] -= src[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void addWithMultiply (float* dest, const float* src, float multiplier, Size num) noexcept
+    static void addWithMultiply(float* dest, const float* src, float multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += src[i] * multiplier;
     }
 
     template <typename Size>
-    static void addWithMultiply (double* dest, const double* src, double multiplier, Size num) noexcept
+    static void addWithMultiply(double* dest, const double* src, double multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += src[i] * multiplier;
     }
 
     template <typename Size>
-    static void addWithMultiply (float* dest, const float* src1, const float* src2, Size num) noexcept
+    static void addWithMultiply(float* dest, const float* src1, const float* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += src1[i] * src2[i];
     }
 
     template <typename Size>
-    static void addWithMultiply (double* dest, const double* src1, const double* src2, Size num) noexcept
+    static void addWithMultiply(double* dest, const double* src1, const double* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] += src1[i] * src2[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void multiply (float* dest, float multiplier, Size num) noexcept
+    static void multiply(float* dest, float multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] *= multiplier;
     }
 
     template <typename Size>
-    static void multiply (double* dest, double multiplier, Size num) noexcept
+    static void multiply(double* dest, double multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] *= multiplier;
     }
 
     template <typename Size>
-    static void multiply (float* dest, const float* src, float multiplier, Size num) noexcept
+    static void multiply(float* dest, const float* src, float multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] *= src[i] * multiplier;
     }
 
     template <typename Size>
-    static void multiply (double* dest, const double* src, double multiplier, Size num) noexcept
+    static void multiply(double* dest, const double* src, double multiplier, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] *= src[i] * multiplier;
     }
 
     template <typename Size>
-    static void multiply (float* dest, const float* src1, const float* src2, Size num) noexcept
+    static void multiply(float* dest, const float* src1, const float* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] *= src1[i] * src2[i];
     }
 
     template <typename Size>
-    static void multiply (double* dest, const double* src1, const double* src2, Size num) noexcept
+    static void multiply(double* dest, const double* src1, const double* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] *= src1[i] * src2[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void negate (float* dest, const float* src, Size num) noexcept
+    static void negate(float* dest, const float* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = -src[i];
     }
 
     template <typename Size>
-    static void negate (double* dest, const double* src, Size num) noexcept
+    static void negate(double* dest, const double* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
+        for (int i = 0; i < (int)num; ++i)
             dest[i] = -src[i];
     }
 
     //==========================================================================
     template <typename Size>
-    static void abs (float* dest, const float* src, Size num) noexcept
+    static void abs(float* dest, const float* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = std::abs (src[i]);
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = std::abs(src[i]);
     }
 
     template <typename Size>
-    static void abs (double* dest, const double* src, Size num) noexcept
+    static void abs(double* dest, const double* src, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = std::abs (src[i]);
-    }
-
-    //==========================================================================
-    template <typename Size>
-    static void min (float* dest, const float* src, float comp, Size num) noexcept
-    {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmin (src[i], comp);
-    }
-
-    template <typename Size>
-    static void min (double* dest, const double* src, double comp, Size num) noexcept
-    {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmin (src[i], comp);
-    }
-
-    template <typename Size>
-    static void min (float* dest, const float* src1, const float* src2, Size num) noexcept
-    {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmin (src1[i], src2[i]);
-    }
-
-    template <typename Size>
-    static void min (double* dest, const double* src1, const double* src2, Size num) noexcept
-    {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmin (src1[i], src2[i]);
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = std::abs(src[i]);
     }
 
     //==========================================================================
     template <typename Size>
-    static void max (float* dest, const float* src, float comp, Size num) noexcept
+    static void min(float* dest, const float* src, float comp, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmax (src[i], comp);
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmin(src[i], comp);
     }
 
     template <typename Size>
-    static void max (double* dest, const double* src, double comp, Size num) noexcept
+    static void min(double* dest, const double* src, double comp, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmax (src[i], comp);
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmin(src[i], comp);
     }
 
     template <typename Size>
-    static void max (float* dest, const float* src1, const float* src2, Size num) noexcept
+    static void min(float* dest, const float* src1, const float* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmax (src1[i], src2[i]);
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmin(src1[i], src2[i]);
     }
 
     template <typename Size>
-    static void max (double* dest, const double* src1, const double* src2, Size num) noexcept
+    static void min(double* dest, const double* src1, const double* src2, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jmax (src1[i], src2[i]);
-    }
-
-    //==========================================================================
-    template <typename Size>
-    static void clip (float* dest, const float* src, float lowLimit, float highLimit, Size num) noexcept
-    {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jlimit (lowLimit, highLimit, src[i]);
-    }
-
-    template <typename Size>
-    static void clip (double* dest, const double* src, double lowLimit, double highLimit, Size num) noexcept
-    {
-        for (int i = 0; i < (int) num; ++i)
-            dest[i] = jlimit (lowLimit, highLimit, src[i]);
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmin(src1[i], src2[i]);
     }
 
     //==========================================================================
     template <typename Size>
-    static bool areAlmostEqual (const float* a, const float* b, Size num, float tolerance) noexcept
+    static void max(float* dest, const float* src, float comp, Size num) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            if (! approximatelyEqual (a[i], b[i]) && std::abs (a[i] - b[i]) > tolerance)
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmax(src[i], comp);
+    }
+
+    template <typename Size>
+    static void max(double* dest, const double* src, double comp, Size num) noexcept
+    {
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmax(src[i], comp);
+    }
+
+    template <typename Size>
+    static void max(float* dest, const float* src1, const float* src2, Size num) noexcept
+    {
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmax(src1[i], src2[i]);
+    }
+
+    template <typename Size>
+    static void max(double* dest, const double* src1, const double* src2, Size num) noexcept
+    {
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jmax(src1[i], src2[i]);
+    }
+
+    //==========================================================================
+    template <typename Size>
+    static void clip(float* dest, const float* src, float lowLimit, float highLimit, Size num) noexcept
+    {
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jlimit(lowLimit, highLimit, src[i]);
+    }
+
+    template <typename Size>
+    static void clip(double* dest, const double* src, double lowLimit, double highLimit, Size num) noexcept
+    {
+        for (int i = 0; i < (int)num; ++i)
+            dest[i] = jlimit(lowLimit, highLimit, src[i]);
+    }
+
+    //==========================================================================
+    template <typename Size>
+    static bool areAlmostEqual(const float* a, const float* b, Size num, float tolerance) noexcept
+    {
+        for (int i = 0; i < (int)num; ++i)
+            if (!approximatelyEqual(a[i], b[i]) && std::abs(a[i] - b[i]) > tolerance)
                 return false;
 
         return true;
     }
 
     template <typename Size>
-    static bool areAlmostEqual (const double* a, const double* b, Size num, double tolerance) noexcept
+    static bool areAlmostEqual(const double* a, const double* b, Size num, double tolerance) noexcept
     {
-        for (int i = 0; i < (int) num; ++i)
-            if (! approximatelyEqual (a[i], b[i]) && std::abs (a[i] - b[i]) > tolerance)
+        for (int i = 0; i < (int)num; ++i)
+            if (!approximatelyEqual(a[i], b[i]) && std::abs(a[i] - b[i]) > tolerance)
                 return false;
 
         return true;
@@ -661,7 +690,7 @@ struct FloatVectorOperations
 
     //==========================================================================
     template <typename Size>
-    static Range<float> findMinAndMax (const float* src, Size num) noexcept
+    static Range<float> findMinAndMax(const float* src, Size num) noexcept
     {
         if (num <= 0)
             return {};
@@ -669,19 +698,19 @@ struct FloatVectorOperations
         auto mn = src[0];
         auto mx = mn;
 
-        for (int i = 1; i < (int) num; ++i)
+        for (int i = 1; i < (int)num; ++i)
         {
             const auto v = src[i];
 
-            if (mx < v)  mx = v;
-            if (v < mn)  mn = v;
+            if (mx < v) mx = v;
+            if (v < mn) mn = v;
         }
 
-        return { mn, mx };
+        return {mn, mx};
     }
 
     template <typename Size>
-    static Range<double> findMinAndMax (const double* src, Size num) noexcept
+    static Range<double> findMinAndMax(const double* src, Size num) noexcept
     {
         if (num <= 0)
             return {};
@@ -689,15 +718,15 @@ struct FloatVectorOperations
         auto mn = src[0];
         auto mx = mn;
 
-        for (int i = 1; i < (int) num; ++i)
+        for (int i = 1; i < (int)num; ++i)
         {
             const auto v = src[i];
 
-            if (mx < v)  mx = v;
-            if (v < mn)  mn = v;
+            if (mx < v) mx = v;
+            if (v < mn) mn = v;
         }
 
-        return { mn, mx };
+        return {mn, mx};
     }
 };
 
@@ -705,7 +734,8 @@ struct FloatVectorOperations
 // Declaracion adelantada: la sobrecarga applyGain(AudioBuffer&) de la base de
 // smoothers se instancia solo en punto de uso, cuando AudioBuffer ya esta
 // completa (se define mas abajo en este fichero).
-template <typename Type> class AudioBuffer;
+template <typename Type>
+class AudioBuffer;
 
 //==============================================================================
 /**
@@ -721,16 +751,17 @@ class SmoothedValueBase
 {
 private:
     //==============================================================================
-    template <typename T> struct FloatTypeHelper;
+    template <typename T>
+    struct FloatTypeHelper;
 
     template <template <typename> class SmoothedValueClass, typename FloatType>
-    struct FloatTypeHelper <SmoothedValueClass <FloatType>>
+    struct FloatTypeHelper<SmoothedValueClass<FloatType>>
     {
         using Type = FloatType;
     };
 
     template <template <typename, typename> class SmoothedValueClass, typename FloatType, typename SmoothingType>
-    struct FloatTypeHelper <SmoothedValueClass <FloatType, SmoothingType>>
+    struct FloatTypeHelper<SmoothedValueClass<FloatType, SmoothingType>>
     {
         using Type = FloatType;
     };
@@ -744,22 +775,22 @@ public:
 
     //==============================================================================
     /** Returns true if the current value is currently being interpolated. */
-    bool isSmoothing() const noexcept                    { return countdown > 0; }
+    bool isSmoothing() const noexcept { return countdown > 0; }
 
     /** Returns the current value of the ramp. */
-    FloatType getCurrentValue() const noexcept           { return currentValue; }
+    FloatType getCurrentValue() const noexcept { return currentValue; }
 
     //==============================================================================
     /** Returns the target value towards which the smoothed value is currently moving. */
-    FloatType getTargetValue() const noexcept            { return target; }
+    FloatType getTargetValue() const noexcept { return target; }
 
     /** Sets the current value and the target value.
         @param newValue    the new value to take
     */
-    void setCurrentAndTargetValue (FloatType newValue)
+    void setCurrentAndTargetValue(FloatType newValue)
     {
         target = currentValue = newValue;
-        countdown = 0;
+        countdown             = 0;
     }
 
     //==============================================================================
@@ -769,9 +800,9 @@ public:
         @param numSamples Length of array of samples
         Port literal de SmoothedValueBase::applyGain.
     */
-    void applyGain (FloatType* samples, int numSamples) noexcept
+    void applyGain(FloatType* samples, int numSamples) noexcept
     {
-        dspAssert (numSamples >= 0);
+        dspAssert(numSamples >= 0);
 
         if (isSmoothing())
         {
@@ -780,7 +811,7 @@ public:
         }
         else
         {
-            FloatVectorOperations::multiply (samples, target, numSamples);
+            FloatVectorOperations::multiply(samples, target, numSamples);
         }
     }
 
@@ -792,9 +823,9 @@ public:
         @param numSamples The length of the array of samples
         Port literal de SmoothedValueBase::applyGain.
     */
-    void applyGain (FloatType* samplesOut, const FloatType* samplesIn, int numSamples) noexcept
+    void applyGain(FloatType* samplesOut, const FloatType* samplesIn, int numSamples) noexcept
     {
-        dspAssert (numSamples >= 0);
+        dspAssert(numSamples >= 0);
 
         if (isSmoothing())
         {
@@ -803,7 +834,7 @@ public:
         }
         else
         {
-            FloatVectorOperations::multiply (samplesOut, samplesIn, target, numSamples);
+            FloatVectorOperations::multiply(samplesOut, samplesIn, target, numSamples);
         }
     }
 
@@ -811,15 +842,15 @@ public:
     /** Applies a smoothed gain to a buffer.
         Port literal de SmoothedValueBase::applyGain.
     */
-    void applyGain (AudioBuffer<FloatType>& buffer, int numSamples) noexcept
+    void applyGain(AudioBuffer<FloatType>& buffer, int numSamples) noexcept
     {
-        dspAssert (numSamples >= 0);
+        dspAssert(numSamples >= 0);
 
         if (isSmoothing())
         {
             if (buffer.getNumChannels() == 1)
             {
-                auto* samples = buffer.getWritePointer (0);
+                auto* samples = buffer.getWritePointer(0);
 
                 for (int i = 0; i < numSamples; ++i)
                     samples[i] *= getNextSmoothedValue();
@@ -831,13 +862,13 @@ public:
                     auto gain = getNextSmoothedValue();
 
                     for (int channel = 0; channel < buffer.getNumChannels(); channel++)
-                        buffer.setSample (channel, i, buffer.getSample (channel, i) * gain);
+                        buffer.setSample(channel, i, buffer.getSample(channel, i) * gain);
                 }
             }
         }
         else
         {
-            buffer.applyGain (0, numSamples, target);
+            buffer.applyGain(0, numSamples, target);
         }
     }
 
@@ -845,14 +876,14 @@ private:
     //==============================================================================
     FloatType getNextSmoothedValue() noexcept
     {
-        return static_cast <SmoothedValueType*> (this)->getNextValue();
+        return static_cast<SmoothedValueType*>(this)->getNextValue();
     }
 
 protected:
     //==============================================================================
     FloatType currentValue = 0;
-    FloatType target = currentValue;
-    int countdown = 0;
+    FloatType target       = currentValue;
+    int countdown          = 0;
 };
 
 //==============================================================================
@@ -864,16 +895,18 @@ protected:
 */
 namespace ValueSmoothingTypes
 {
-    /**
-        Used to indicate a linear smoothing between values.
-    */
-    struct Linear {};
+/**
+    Used to indicate a linear smoothing between values.
+*/
+struct Linear
+{};
 
-    /**
-        Used to indicate a smoothing between multiplicative values.
-    */
-    struct Multiplicative {};
-}
+/**
+    Used to indicate a smoothing between multiplicative values.
+*/
+struct Multiplicative
+{};
+} // namespace ValueSmoothingTypes
 
 //==============================================================================
 /**
@@ -887,26 +920,25 @@ namespace ValueSmoothingTypes
     puede ser 0) usa dspAssert en lugar de jassert.
 */
 template <typename FloatType, typename SmoothingType = ValueSmoothingTypes::Linear>
-class SmoothedValue   : public SmoothedValueBase <SmoothedValue <FloatType, SmoothingType>>
+class SmoothedValue : public SmoothedValueBase<SmoothedValue<FloatType, SmoothingType>>
 {
 public:
     //==============================================================================
     /** Constructor. */
     SmoothedValue() noexcept
-        : SmoothedValue ((FloatType) (std::is_same_v<SmoothingType, ValueSmoothingTypes::Linear> ? 0 : 1))
+        : SmoothedValue((FloatType)(std::is_same_v<SmoothingType, ValueSmoothingTypes::Linear> ? 0 : 1))
     {
     }
 
     /** Constructor. */
-    SmoothedValue (FloatType initialValue) noexcept
+    SmoothedValue(FloatType initialValue) noexcept
     {
         // Multiplicative smoothed values cannot ever reach 0!
-        dspAssert (! (std::is_same_v<SmoothingType, ValueSmoothingTypes::Multiplicative>
-                    && approximatelyEqual (initialValue, (FloatType) 0)));
+        dspAssert(!(std::is_same_v<SmoothingType, ValueSmoothingTypes::Multiplicative> && approximatelyEqual(initialValue, (FloatType)0)));
 
         // Visual Studio can't handle base class initialisation with CRTP
         this->currentValue = initialValue;
-        this->target = this->currentValue;
+        this->target       = this->currentValue;
     }
 
     //==============================================================================
@@ -914,41 +946,40 @@ public:
         @param sampleRate           The sample rate
         @param rampLengthInSeconds  The duration of the ramp in seconds
     */
-    void reset (double sampleRate, double rampLengthInSeconds) noexcept
+    void reset(double sampleRate, double rampLengthInSeconds) noexcept
     {
-        dspAssert (sampleRate > 0 && rampLengthInSeconds >= 0);
-        reset ((int) std::floor (rampLengthInSeconds * sampleRate));
+        dspAssert(sampleRate > 0 && rampLengthInSeconds >= 0);
+        reset((int)std::floor(rampLengthInSeconds * sampleRate));
     }
 
     /** Set a new ramp length directly in samples.
         @param numSteps     The number of samples over which the ramp should be active
     */
-    void reset (int numSteps) noexcept
+    void reset(int numSteps) noexcept
     {
         stepsToTarget = numSteps;
-        this->setCurrentAndTargetValue (this->target);
+        this->setCurrentAndTargetValue(this->target);
     }
 
     //==============================================================================
     /** Set the next value to ramp towards.
         @param newValue     The new target value
     */
-    void setTargetValue (FloatType newValue) noexcept
+    void setTargetValue(FloatType newValue) noexcept
     {
-        if (approximatelyEqual (newValue, this->target))
+        if (approximatelyEqual(newValue, this->target))
             return;
 
         if (stepsToTarget <= 0)
         {
-            this->setCurrentAndTargetValue (newValue);
+            this->setCurrentAndTargetValue(newValue);
             return;
         }
 
         // Multiplicative smoothed values cannot ever reach 0!
-        dspAssert (! (std::is_same_v<SmoothingType, ValueSmoothingTypes::Multiplicative>
-                    && approximatelyEqual (newValue, (FloatType) 0)));
+        dspAssert(!(std::is_same_v<SmoothingType, ValueSmoothingTypes::Multiplicative> && approximatelyEqual(newValue, (FloatType)0)));
 
-        this->target = newValue;
+        this->target    = newValue;
         this->countdown = stepsToTarget;
 
         setStepSize();
@@ -960,7 +991,7 @@ public:
     */
     FloatType getNextValue() noexcept
     {
-        if (! this->isSmoothing())
+        if (!this->isSmoothing())
             return this->target;
 
         --(this->countdown);
@@ -979,15 +1010,15 @@ public:
         the new current value.
         @see getNextValue
     */
-    FloatType skip (int numSamples) noexcept
+    FloatType skip(int numSamples) noexcept
     {
         if (numSamples >= this->countdown)
         {
-            this->setCurrentAndTargetValue (this->target);
+            this->setCurrentAndTargetValue(this->target);
             return this->target;
         }
 
-        skipCurrentValue (numSamples);
+        skipCurrentValue(numSamples);
 
         this->countdown -= numSamples;
         return this->currentValue;
@@ -1000,11 +1031,11 @@ private:
     {
         if constexpr (std::is_same_v<T, ValueSmoothingTypes::Linear>)
         {
-            step = (this->target - this->currentValue) / (FloatType) this->countdown;
+            step = (this->target - this->currentValue) / (FloatType)this->countdown;
         }
         else if constexpr (std::is_same_v<T, ValueSmoothingTypes::Multiplicative>)
         {
-            step = std::exp ((std::log (std::abs (this->target)) - std::log (std::abs (this->currentValue))) / (FloatType) this->countdown);
+            step = std::exp((std::log(std::abs(this->target)) - std::log(std::abs(this->currentValue))) / (FloatType)this->countdown);
         }
     }
 
@@ -1024,25 +1055,25 @@ private:
 
     //==============================================================================
     template <typename T = SmoothingType>
-    void skipCurrentValue (int numSamples) noexcept
+    void skipCurrentValue(int numSamples) noexcept
     {
         if constexpr (std::is_same_v<T, ValueSmoothingTypes::Linear>)
         {
-            this->currentValue += step * (FloatType) numSamples;
+            this->currentValue += step * (FloatType)numSamples;
         }
         else if constexpr (std::is_same_v<T, ValueSmoothingTypes::Multiplicative>)
         {
-            this->currentValue *= (FloatType) std::pow (step, numSamples);
+            this->currentValue *= (FloatType)std::pow(step, numSamples);
         }
     }
 
     //==============================================================================
-    FloatType step = FloatType();
+    FloatType step    = FloatType();
     int stepsToTarget = 0;
 };
 
 template <typename FloatType>
-using LinearSmoothedValue = SmoothedValue <FloatType, ValueSmoothingTypes::Linear>;
+using LinearSmoothedValue = SmoothedValue<FloatType, ValueSmoothingTypes::Linear>;
 
 //==============================================================================
 // Helpers de JUCE usados por AudioBuffer. Fuente de cada port:
@@ -1085,15 +1116,24 @@ using LinearSmoothedValue = SmoothedValue <FloatType, ValueSmoothingTypes::Linea
     conversion size_t -> int a la vista sin depender de que compilador y que
     avisos haya activado cada build. */
 template <typename Type, size_t N>
-constexpr int numElementsInArray (Type (&)[N]) noexcept     { return static_cast<int> (N); }
+constexpr int numElementsInArray(Type (&)[N]) noexcept
+{
+    return static_cast<int>(N);
+}
 
 /** Converts a pointer to a pointer of a different type without caring about
     alignment. Port literal de juce::unalignedPointerCast. */
 template <typename Type>
-Type unalignedPointerCast (void* data) noexcept                { return reinterpret_cast<Type> (data); }
+Type unalignedPointerCast(void* data) noexcept
+{
+    return reinterpret_cast<Type>(data);
+}
 
 template <typename Type>
-Type unalignedPointerCast (const void* data) noexcept          { return reinterpret_cast<Type> (data); }
+Type unalignedPointerCast(const void* data) noexcept
+{
+    return reinterpret_cast<Type>(data);
+}
 
 //==============================================================================
 //
@@ -1127,39 +1167,39 @@ public:
         release();
     }
 
-    HeapBlock (const HeapBlock&) = delete;
-    HeapBlock& operator= (const HeapBlock&) = delete;
+    HeapBlock(const HeapBlock&)            = delete;
+    HeapBlock& operator=(const HeapBlock&) = delete;
 
-    HeapBlock (HeapBlock&& other) noexcept
-        : data (other.data)
+    HeapBlock(HeapBlock&& other) noexcept
+        : data(other.data)
     {
         other.data = nullptr;
     }
 
-    HeapBlock& operator= (HeapBlock&& other) noexcept
+    HeapBlock& operator=(HeapBlock&& other) noexcept
     {
-        std::swap (data, other.data);
+        std::swap(data, other.data);
         return *this;
     }
 
-    void malloc (size_t newNumElements, size_t elementSize = sizeof (ElementType))
+    void malloc(size_t newNumElements, size_t elementSize = sizeof(ElementType))
     {
         release();
-        data = static_cast<ElementType*> (::malloc (newNumElements * elementSize));
+        data = static_cast<ElementType*>(::malloc(newNumElements * elementSize));
     }
 
-    void calloc (size_t newNumElements, size_t elementSize = sizeof (ElementType))
+    void calloc(size_t newNumElements, size_t elementSize = sizeof(ElementType))
     {
         release();
-        data = static_cast<ElementType*> (::calloc (newNumElements, elementSize));
+        data = static_cast<ElementType*>(::calloc(newNumElements, elementSize));
     }
 
     /** Asigna y, opcionalmente, limpia. Numero de ELEMENTOS, como JUCE. */
-    void allocate (size_t newNumElements, bool zeroFill)
+    void allocate(size_t newNumElements, bool zeroFill)
     {
         release();
-        data = static_cast<ElementType*> (zeroFill ? ::calloc (newNumElements, sizeof (ElementType))
-                                                   : ::malloc (newNumElements * sizeof (ElementType)));
+        data = static_cast<ElementType*>(zeroFill ? ::calloc(newNumElements, sizeof(ElementType))
+                                                  : ::malloc(newNumElements * sizeof(ElementType)));
     }
 
     void free()
@@ -1169,26 +1209,26 @@ public:
 
     /** Rellena de ceros hasta el numero de ELEMENTOS indicado, como JUCE
         (zeromem (data, sizeof (ElementType) * numElements)). */
-    void clear (size_t numElements) noexcept
+    void clear(size_t numElements) noexcept
     {
         if (data != nullptr)
-            std::memset (data, 0, sizeof (ElementType) * numElements);
+            std::memset(data, 0, sizeof(ElementType) * numElements);
     }
 
     template <typename OtherBlock>
-    void swapWith (OtherBlock& other) noexcept
+    void swapWith(OtherBlock& other) noexcept
     {
-        std::swap (data, other.data);
+        std::swap(data, other.data);
     }
 
-    ElementType* get() const noexcept                       { return data; }
-    operator ElementType*() const noexcept                  { return data; }
-    ElementType* operator->() const noexcept                { return data; }
+    ElementType* get() const noexcept { return data; }
+    operator ElementType*() const noexcept { return data; }
+    ElementType* operator->() const noexcept { return data; }
 
 private:
     void release()
     {
-        ::free (data);
+        ::free(data);
         data = nullptr;
     }
 
@@ -1226,7 +1266,7 @@ public:
     //==============================================================================
     /** Creates an empty buffer with 0 channels and 0 length. */
     AudioBuffer() noexcept
-       : channels (static_cast<Type**> (preallocatedChannelSpace))
+        : channels(static_cast<Type**>(preallocatedChannelSpace))
     {
     }
 
@@ -1240,12 +1280,12 @@ public:
         when the buffer is deleted. If the memory can't be allocated, this will
         throw a std::bad_alloc exception.
     */
-    AudioBuffer (int numChannelsToAllocate,
-                 int numSamplesToAllocate)
-       : numChannels (numChannelsToAllocate),
-         size (numSamplesToAllocate)
+    AudioBuffer(int numChannelsToAllocate,
+                int numSamplesToAllocate)
+        : numChannels(numChannelsToAllocate),
+          size(numSamplesToAllocate)
     {
-        dspAssert (size >= 0 && numChannels >= 0);
+        dspAssert(size >= 0 && numChannels >= 0);
         allocateData();
     }
 
@@ -1264,15 +1304,15 @@ public:
         @param numSamples       the number of samples to use - this must correspond to the
                                 size of the arrays passed in
     */
-    AudioBuffer (Type* const* dataToReferTo,
-                 int numChannelsToUse,
-                 int numSamples)
-        : numChannels (numChannelsToUse),
-          size (numSamples)
+    AudioBuffer(Type* const* dataToReferTo,
+                int numChannelsToUse,
+                int numSamples)
+        : numChannels(numChannelsToUse),
+          size(numSamples)
     {
-        dspAssert (dataToReferTo != nullptr);
-        dspAssert (numChannelsToUse >= 0 && numSamples >= 0);
-        allocateChannels (dataToReferTo, 0);
+        dspAssert(dataToReferTo != nullptr);
+        dspAssert(numChannelsToUse >= 0 && numSamples >= 0);
+        allocateChannels(dataToReferTo, 0);
     }
 
     /** Creates a buffer using a pre-allocated block of memory.
@@ -1291,16 +1331,16 @@ public:
         @param numSamples       the number of samples to use - this must correspond to the
                                 size of the arrays passed in
     */
-    AudioBuffer (Type* const* dataToReferTo,
-                 int numChannelsToUse,
-                 int startSample,
-                 int numSamples)
-        : numChannels (numChannelsToUse),
-          size (numSamples)
+    AudioBuffer(Type* const* dataToReferTo,
+                int numChannelsToUse,
+                int startSample,
+                int numSamples)
+        : numChannels(numChannelsToUse),
+          size(numSamples)
     {
-        dspAssert (dataToReferTo != nullptr);
-        dspAssert (numChannelsToUse >= 0 && startSample >= 0 && numSamples >= 0);
-        allocateChannels (dataToReferTo, startSample);
+        dspAssert(dataToReferTo != nullptr);
+        dspAssert(numChannelsToUse >= 0 && startSample >= 0 && numSamples >= 0);
+        allocateChannels(dataToReferTo, startSample);
     }
 
     /** Copies another buffer.
@@ -1309,14 +1349,14 @@ public:
         using an external data buffer, in which case both buffers will just point to the same
         shared block of data.
     */
-    AudioBuffer (const AudioBuffer& other)
-       : numChannels (other.numChannels),
-         size (other.size),
-         allocatedBytes (other.allocatedBytes)
+    AudioBuffer(const AudioBuffer& other)
+        : numChannels(other.numChannels),
+          size(other.size),
+          allocatedBytes(other.allocatedBytes)
     {
         if (allocatedBytes == 0)
         {
-            allocateChannels (other.channels, 0);
+            allocateChannels(other.channels, 0);
         }
         else
         {
@@ -1329,7 +1369,7 @@ public:
             else
             {
                 for (int i = 0; i < numChannels; ++i)
-                    FloatVectorOperations::copy (channels[i], other.channels[i], size);
+                    FloatVectorOperations::copy(channels[i], other.channels[i], size);
             }
         }
     }
@@ -1338,11 +1378,11 @@ public:
 
         This buffer's size will be changed to that of the other buffer.
     */
-    AudioBuffer& operator= (const AudioBuffer& other)
+    AudioBuffer& operator=(const AudioBuffer& other)
     {
         if (this != &other)
         {
-            setSize (other.getNumChannels(), other.getNumSamples(), false, false, false);
+            setSize(other.getNumChannels(), other.getNumSamples(), false, false, false);
 
             if (other.isClear)
             {
@@ -1353,7 +1393,7 @@ public:
                 isClear = false;
 
                 for (int i = 0; i < numChannels; ++i)
-                    FloatVectorOperations::copy (channels[i], other.channels[i], size);
+                    FloatVectorOperations::copy(channels[i], other.channels[i], size);
             }
         }
 
@@ -1367,14 +1407,14 @@ public:
     ~AudioBuffer() = default;
 
     /** Move constructor. */
-    AudioBuffer (AudioBuffer&& other) noexcept
-        : numChannels (other.numChannels),
-          size (other.size),
-          allocatedBytes (other.allocatedBytes),
-          allocatedData (std::move (other.allocatedData)),
-          isClear (other.isClear)
+    AudioBuffer(AudioBuffer&& other) noexcept
+        : numChannels(other.numChannels),
+          size(other.size),
+          allocatedBytes(other.allocatedBytes),
+          allocatedData(std::move(other.allocatedData)),
+          isClear(other.isClear)
     {
-        if (numChannels < (int) numElementsInArray (preallocatedChannelSpace))
+        if (numChannels < (int)numElementsInArray(preallocatedChannelSpace))
         {
             channels = preallocatedChannelSpace;
 
@@ -1386,21 +1426,21 @@ public:
             channels = other.channels;
         }
 
-        other.numChannels = 0;
-        other.size = 0;
+        other.numChannels    = 0;
+        other.size           = 0;
         other.allocatedBytes = 0;
     }
 
     /** Move assignment. */
-    AudioBuffer& operator= (AudioBuffer&& other) noexcept
+    AudioBuffer& operator=(AudioBuffer&& other) noexcept
     {
-        numChannels = other.numChannels;
-        size = other.size;
+        numChannels    = other.numChannels;
+        size           = other.size;
         allocatedBytes = other.allocatedBytes;
-        allocatedData = std::move (other.allocatedData);
-        isClear = other.isClear;
+        allocatedData  = std::move(other.allocatedData);
+        isClear        = other.isClear;
 
-        if (numChannels < (int) numElementsInArray (preallocatedChannelSpace))
+        if (numChannels < (int)numElementsInArray(preallocatedChannelSpace))
         {
             channels = preallocatedChannelSpace;
 
@@ -1412,8 +1452,8 @@ public:
             channels = other.channels;
         }
 
-        other.numChannels = 0;
-        other.size = 0;
+        other.numChannels    = 0;
+        other.size           = 0;
         other.allocatedBytes = 0;
         return *this;
     }
@@ -1423,13 +1463,13 @@ public:
 
         @see getNumSamples, getReadPointer, getWritePointer
     */
-    int getNumChannels() const noexcept                             { return numChannels; }
+    int getNumChannels() const noexcept { return numChannels; }
 
     /** Returns the number of samples allocated in each of the buffer's channels.
 
         @see getNumChannels, getReadPointer, getWritePointer
     */
-    int getNumSamples() const noexcept                              { return size; }
+    int getNumSamples() const noexcept { return size; }
 
     /** Returns a pointer to an array of read-only samples in one of the buffer's channels.
 
@@ -1440,9 +1480,9 @@ public:
         result! Instead, you must call getWritePointer so that the buffer knows you're
         planning on modifying the data.
     */
-    const Type* getReadPointer (int channelNumber) const noexcept
+    const Type* getReadPointer(int channelNumber) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channelNumber, numChannels));
+        dspAssert(isPositiveAndBelow(channelNumber, numChannels));
         return channels[channelNumber];
     }
 
@@ -1455,10 +1495,10 @@ public:
         result! Instead, you must call getWritePointer so that the buffer knows you're
         planning on modifying the data.
     */
-    const Type* getReadPointer (int channelNumber, int sampleIndex) const noexcept
+    const Type* getReadPointer(int channelNumber, int sampleIndex) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channelNumber, numChannels));
-        dspAssert (isPositiveAndBelow (sampleIndex, size));
+        dspAssert(isPositiveAndBelow(channelNumber, numChannels));
+        dspAssert(isPositiveAndBelow(sampleIndex, size));
         return channels[channelNumber] + sampleIndex;
     }
 
@@ -1478,9 +1518,9 @@ public:
 
         @see setNotClear
     */
-    Type* getWritePointer (int channelNumber) noexcept
+    Type* getWritePointer(int channelNumber) noexcept
     {
-        dspAssert (isPositiveAndBelow (channelNumber, numChannels));
+        dspAssert(isPositiveAndBelow(channelNumber, numChannels));
         isClear = false;
         return channels[channelNumber];
     }
@@ -1501,10 +1541,10 @@ public:
 
         @see setNotClear
     */
-    Type* getWritePointer (int channelNumber, int sampleIndex) noexcept
+    Type* getWritePointer(int channelNumber, int sampleIndex) noexcept
     {
-        dspAssert (isPositiveAndBelow (channelNumber, numChannels));
-        dspAssert (isPositiveAndBelow (sampleIndex, size));
+        dspAssert(isPositiveAndBelow(channelNumber, numChannels));
+        dspAssert(isPositiveAndBelow(sampleIndex, size));
         isClear = false;
         return channels[channelNumber] + sampleIndex;
     }
@@ -1514,7 +1554,7 @@ public:
         Don't modify any of the pointers that are returned, and bear in mind that
         these will become invalid if the buffer is resized.
     */
-    const Type* const* getArrayOfReadPointers() const noexcept            { return channels; }
+    const Type* const* getArrayOfReadPointers() const noexcept { return channels; }
 
     /** Returns an array of pointers to the channels in the buffer.
 
@@ -1529,7 +1569,11 @@ public:
 
         @see setNotClear
     */
-    Type* const* getArrayOfWritePointers() noexcept                       { isClear = false; return channels; }
+    Type* const* getArrayOfWritePointers() noexcept
+    {
+        isClear = false;
+        return channels;
+    }
 
     //==============================================================================
     /** Changes the buffer's size or number of channels.
@@ -1554,21 +1598,20 @@ public:
                                     If this is false, then a new allocation will be done so that the buffer
                                     uses the minimum amount of memory that it needs.
     */
-    void setSize (int newNumChannels,
-                  int newNumSamples,
-                  bool keepExistingContent = false,
-                  bool clearExtraSpace = false,
-                  bool avoidReallocating = false)
+    void setSize(int newNumChannels,
+                 int newNumSamples,
+                 bool keepExistingContent = false,
+                 bool clearExtraSpace     = false,
+                 bool avoidReallocating   = false)
     {
-        dspAssert (newNumChannels >= 0);
-        dspAssert (newNumSamples >= 0);
+        dspAssert(newNumChannels >= 0);
+        dspAssert(newNumSamples >= 0);
 
         if (newNumSamples != size || newNumChannels != numChannels)
         {
-            auto allocatedSamplesPerChannel = ((size_t) newNumSamples + 3) & ~3u;
-            auto channelListSize = ((static_cast<size_t> (1 + newNumChannels) * sizeof (Type*)) + 15) & ~15u;
-            auto newTotalBytes = ((size_t) newNumChannels * (size_t) allocatedSamplesPerChannel * sizeof (Type))
-                                    + channelListSize + 32;
+            auto allocatedSamplesPerChannel = ((size_t)newNumSamples + 3) & ~3u;
+            auto channelListSize            = ((static_cast<size_t>(1 + newNumChannels) * sizeof(Type*)) + 15) & ~15u;
+            auto newTotalBytes              = ((size_t)newNumChannels * (size_t)allocatedSamplesPerChannel * sizeof(Type)) + channelListSize + 32;
 
             if (keepExistingContent)
             {
@@ -1579,12 +1622,12 @@ public:
                 else
                 {
                     HeapBlock<char, true> newData;
-                    newData.allocate (newTotalBytes, clearExtraSpace || isClear);
+                    newData.allocate(newTotalBytes, clearExtraSpace || isClear);
 
-                    auto numSamplesToCopy = (size_t) jmin (newNumSamples, size);
+                    auto numSamplesToCopy = (size_t)jmin(newNumSamples, size);
 
-                    auto newChannels = unalignedPointerCast<Type**> (newData.get());
-                    auto newChan     = unalignedPointerCast<Type*> (newData + channelListSize);
+                    auto newChannels = unalignedPointerCast<Type**>(newData.get());
+                    auto newChan     = unalignedPointerCast<Type*>(newData + channelListSize);
 
                     for (int j = 0; j < newNumChannels; ++j)
                     {
@@ -1592,17 +1635,17 @@ public:
                         newChan += allocatedSamplesPerChannel;
                     }
 
-                    if (! isClear)
+                    if (!isClear)
                     {
-                        auto numChansToCopy = jmin (numChannels, newNumChannels);
+                        auto numChansToCopy = jmin(numChannels, newNumChannels);
 
                         for (int i = 0; i < numChansToCopy; ++i)
-                            FloatVectorOperations::copy (newChannels[i], channels[i], (int) numSamplesToCopy);
+                            FloatVectorOperations::copy(newChannels[i], channels[i], (int)numSamplesToCopy);
                     }
 
-                    allocatedData.swapWith (newData);
+                    allocatedData.swapWith(newData);
                     allocatedBytes = newTotalBytes;
-                    channels = newChannels;
+                    channels       = newChannels;
                 }
             }
             else
@@ -1610,16 +1653,16 @@ public:
                 if (avoidReallocating && allocatedBytes >= newTotalBytes)
                 {
                     if (clearExtraSpace || isClear)
-                        allocatedData.clear (newTotalBytes);
+                        allocatedData.clear(newTotalBytes);
                 }
                 else
                 {
                     allocatedBytes = newTotalBytes;
-                    allocatedData.allocate (newTotalBytes, clearExtraSpace || isClear);
-                    channels = unalignedPointerCast<Type**> (allocatedData.get());
+                    allocatedData.allocate(newTotalBytes, clearExtraSpace || isClear);
+                    channels = unalignedPointerCast<Type**>(allocatedData.get());
                 }
 
-                auto* chan = unalignedPointerCast<Type*> (allocatedData + channelListSize);
+                auto* chan = unalignedPointerCast<Type*>(allocatedData + channelListSize);
 
                 for (int i = 0; i < newNumChannels; ++i)
                 {
@@ -1629,8 +1672,8 @@ public:
             }
 
             channels[newNumChannels] = nullptr;
-            size = newNumSamples;
-            numChannels = newNumChannels;
+            size                     = newNumSamples;
+            numChannels              = newNumChannels;
         }
     }
 
@@ -1655,13 +1698,13 @@ public:
         @param newNumSamples    the number of samples to use - this must correspond to the
                                 size of the arrays passed in
     */
-    void setDataToReferTo (Type* const* dataToReferTo,
-                           int newNumChannels,
-                           int newStartSample,
-                           int newNumSamples)
+    void setDataToReferTo(Type* const* dataToReferTo,
+                          int newNumChannels,
+                          int newStartSample,
+                          int newNumSamples)
     {
-        dspAssert (dataToReferTo != nullptr);
-        dspAssert (newNumChannels >= 0 && newNumSamples >= 0);
+        dspAssert(dataToReferTo != nullptr);
+        dspAssert(newNumChannels >= 0 && newNumSamples >= 0);
 
         size = newNumSamples;
 
@@ -1669,14 +1712,13 @@ public:
         {
             numChannels = newNumChannels;
 
-            std::transform (dataToReferTo, dataToReferTo + numChannels, channels, [&] (auto* src)
-            {
-                dspAssert (src != nullptr);
+            std::transform(dataToReferTo, dataToReferTo + numChannels, channels, [&](auto* src) {
+                dspAssert(src != nullptr);
                 return src + newStartSample;
             });
 
             channels[numChannels] = nullptr;
-            isClear = false;
+            isClear               = false;
         }
         else
         {
@@ -1687,10 +1729,10 @@ public:
             }
 
             numChannels = newNumChannels;
-            allocateChannels (dataToReferTo, newStartSample);
+            allocateChannels(dataToReferTo, newStartSample);
         }
 
-        dspAssert (! isClear);
+        dspAssert(!isClear);
     }
 
     /** Makes this buffer point to a pre-allocated set of channel data arrays.
@@ -1713,11 +1755,11 @@ public:
         @param newNumSamples    the number of samples to use - this must correspond to the
                                 size of the arrays passed in
     */
-    void setDataToReferTo (Type* const* dataToReferTo,
-                           int newNumChannels,
-                           int newNumSamples)
+    void setDataToReferTo(Type* const* dataToReferTo,
+                          int newNumChannels,
+                          int newNumSamples)
     {
-        setDataToReferTo (dataToReferTo, newNumChannels, 0, newNumSamples);
+        setDataToReferTo(dataToReferTo, newNumChannels, 0, newNumSamples);
     }
 
     /** Resizes this buffer to match the given one, and copies all of its content across.
@@ -1729,9 +1771,9 @@ public:
         contains data.
     */
     template <typename OtherType>
-    void makeCopyOf (const AudioBuffer<OtherType>& other, bool avoidReallocating = false)
+    void makeCopyOf(const AudioBuffer<OtherType>& other, bool avoidReallocating = false)
     {
-        setSize (other.getNumChannels(), other.getNumSamples(), false, false, avoidReallocating);
+        setSize(other.getNumChannels(), other.getNumSamples(), false, false, avoidReallocating);
 
         if (other.hasBeenCleared())
         {
@@ -1744,10 +1786,10 @@ public:
             for (int chan = 0; chan < numChannels; ++chan)
             {
                 auto* dest = channels[chan];
-                auto* src = other.getReadPointer (chan);
+                auto* src  = other.getReadPointer(chan);
 
                 for (int i = 0; i < size; ++i)
-                    dest[i] = static_cast<Type> (src[i]);
+                    dest[i] = static_cast<Type>(src[i]);
             }
         }
     }
@@ -1766,7 +1808,7 @@ public:
             return;
 
         for (int i = 0; i < numChannels; ++i)
-            FloatVectorOperations::clear (channels[i], size);
+            FloatVectorOperations::clear(channels[i], size);
 
         isClear = true;
     }
@@ -1783,15 +1825,15 @@ public:
 
         @see hasBeenCleared, setNotClear
     */
-    void clear (int startSample, int numSamples) noexcept
+    void clear(int startSample, int numSamples) noexcept
     {
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
             return;
 
         for (int i = 0; i < numChannels; ++i)
-            FloatVectorOperations::clear (channels[i] + startSample, numSamples);
+            FloatVectorOperations::clear(channels[i] + startSample, numSamples);
 
         isClear = (startSample == 0 && numSamples == size);
     }
@@ -1806,13 +1848,13 @@ public:
 
         @see hasBeenCleared, setNotClear
     */
-    void clear (int channel, int startSample, int numSamples) noexcept
+    void clear(int channel, int startSample, int numSamples) noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
-        if (! isClear)
-            FloatVectorOperations::clear (channels[channel] + startSample, numSamples);
+        if (!isClear)
+            FloatVectorOperations::clear(channels[channel] + startSample, numSamples);
     }
 
     /** Returns true if the buffer has been entirely cleared.
@@ -1822,7 +1864,7 @@ public:
         functions like getWritePointer are invoked. That means the method is quick, but it
         may return false negatives when in fact the buffer is still empty.
     */
-    bool hasBeenCleared() const noexcept                            { return isClear; }
+    bool hasBeenCleared() const noexcept { return isClear; }
 
     /** Forces the internal cleared flag of the buffer to false.
 
@@ -1831,7 +1873,7 @@ public:
         buffer as containing data so that subsequent clear calls will succeed. However a
         better solution is to call getWritePointer each time you need to write data.
     */
-    void setNotClear() noexcept                                     { isClear = false; }
+    void setNotClear() noexcept { isClear = false; }
 
     //==============================================================================
     /** Returns a sample from the buffer.
@@ -1840,10 +1882,10 @@ public:
         an assertion will be thrown, but in a release build, you're into 'undefined behaviour'
         territory.
     */
-    Type getSample (int channel, int sampleIndex) const noexcept
+    Type getSample(int channel, int sampleIndex) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (isPositiveAndBelow (sampleIndex, size));
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(isPositiveAndBelow(sampleIndex, size));
         return *(channels[channel] + sampleIndex);
     }
 
@@ -1855,12 +1897,12 @@ public:
 
         The hasBeenCleared method will return false after this call.
     */
-    void setSample (int destChannel, int destSample, Type newValue) noexcept
+    void setSample(int destChannel, int destSample, Type newValue) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (isPositiveAndBelow (destSample, size));
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(isPositiveAndBelow(destSample, size));
         *(channels[destChannel] + destSample) = newValue;
-        isClear = false;
+        isClear                               = false;
     }
 
     /** Adds a value to a sample in the buffer.
@@ -1871,10 +1913,10 @@ public:
 
         The hasBeenCleared method will return false after this call.
     */
-    void addSample (int destChannel, int destSample, Type valueToAdd) noexcept
+    void addSample(int destChannel, int destSample, Type valueToAdd) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (isPositiveAndBelow (destSample, size));
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(isPositiveAndBelow(destSample, size));
         *(channels[destChannel] + destSample) += valueToAdd;
         isClear = false;
     }
@@ -1884,16 +1926,16 @@ public:
         For speed, this doesn't check whether the channel and sample number
         are in-range, so be careful!
     */
-    void applyGain (int channel, int startSample, int numSamples, Type gain) noexcept
+    void applyGain(int channel, int startSample, int numSamples, Type gain) noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
             return;
 
         auto* d = channels[channel] + startSample;
-        FloatVectorOperations::multiply (d, gain, numSamples);
+        FloatVectorOperations::multiply(d, gain, numSamples);
     }
 
     /** Applies a gain multiple to a region of all the channels.
@@ -1901,16 +1943,16 @@ public:
         For speed, this doesn't check whether the sample numbers
         are in-range, so be careful!
     */
-    void applyGain (int startSample, int numSamples, Type gain) noexcept
+    void applyGain(int startSample, int numSamples, Type gain) noexcept
     {
         for (int i = 0; i < numChannels; ++i)
-            applyGain (i, startSample, numSamples, gain);
+            applyGain(i, startSample, numSamples, gain);
     }
 
     /** Applies a gain multiple to all the audio data. */
-    void applyGain (Type gain) noexcept
+    void applyGain(Type gain) noexcept
     {
-        applyGain (0, size, gain);
+        applyGain(0, size, gain);
     }
 
     /** Applies a range of gains to a region of a channel.
@@ -1922,17 +1964,17 @@ public:
         For speed, this doesn't check whether the sample numbers
         are in-range, so be careful!
     */
-    void applyGainRamp (int channel, int startSample, int numSamples,
-                        Type startGain, Type endGain) noexcept
+    void applyGainRamp(int channel, int startSample, int numSamples,
+                       Type startGain, Type endGain) noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
             return;
 
-        const auto increment = (endGain - startGain) / (float) numSamples;
-        auto* d = channels[channel] + startSample;
+        const auto increment = (endGain - startGain) / (float)numSamples;
+        auto* d              = channels[channel] + startSample;
 
         while (--numSamples >= 0)
         {
@@ -1950,11 +1992,11 @@ public:
         For speed, this doesn't check whether the sample numbers
         are in-range, so be careful!
     */
-    void applyGainRamp (int startSample, int numSamples,
-                        Type startGain, Type endGain) noexcept
+    void applyGainRamp(int startSample, int numSamples,
+                       Type startGain, Type endGain) noexcept
     {
         for (int i = 0; i < numChannels; ++i)
-            applyGainRamp (i, startSample, numSamples, startGain, endGain);
+            applyGainRamp(i, startSample, numSamples, startGain, endGain);
     }
 
     /** Adds samples from another buffer to this one.
@@ -1973,22 +2015,19 @@ public:
 
         @see copyFrom
     */
-    void addFrom (int destChannel,
-                  int destStartSample,
-                  const AudioBuffer& source,
-                  int sourceChannel,
-                  int sourceStartSample,
-                  int numSamples,
-                  Type gainToApplyToSource = Type (1)) noexcept
+    void addFrom(int destChannel,
+                 int destStartSample,
+                 const AudioBuffer& source,
+                 int sourceChannel,
+                 int sourceStartSample,
+                 int numSamples,
+                 Type gainToApplyToSource = Type(1)) noexcept
     {
-        dspAssert (&source != this
-                   || sourceChannel != destChannel
-                   || sourceStartSample + numSamples <= destStartSample
-                   || destStartSample + numSamples <= sourceStartSample);
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
-        dspAssert (isPositiveAndBelow (sourceChannel, source.numChannels));
-        dspAssert (sourceStartSample >= 0 && sourceStartSample + numSamples <= source.size);
+        dspAssert(&source != this || sourceChannel != destChannel || sourceStartSample + numSamples <= destStartSample || destStartSample + numSamples <= sourceStartSample);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(sourceChannel, source.numChannels));
+        dspAssert(sourceStartSample >= 0 && sourceStartSample + numSamples <= source.size);
 
         if (numSamples <= 0 || source.isClear)
             return;
@@ -1999,11 +2038,11 @@ public:
         if (isClear)
         {
             isClear = false;
-            FloatVectorOperations::copyWithMultiply (d, s, gainToApplyToSource, numSamples);
+            FloatVectorOperations::copyWithMultiply(d, s, gainToApplyToSource, numSamples);
         }
         else
         {
-            FloatVectorOperations::addWithMultiply (d, s, gainToApplyToSource, numSamples);
+            FloatVectorOperations::addWithMultiply(d, s, gainToApplyToSource, numSamples);
         }
     }
 
@@ -2021,15 +2060,15 @@ public:
 
         @see copyFrom
     */
-    void addFrom (int destChannel,
-                  int destStartSample,
-                  const Type* source,
-                  int numSamples,
-                  Type gainToApplyToSource = Type (1)) noexcept
+    void addFrom(int destChannel,
+                 int destStartSample,
+                 const Type* source,
+                 int numSamples,
+                 Type gainToApplyToSource = Type(1)) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
-        dspAssert (source != nullptr);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
+        dspAssert(source != nullptr);
 
         if (numSamples <= 0)
             return;
@@ -2039,11 +2078,11 @@ public:
         if (isClear)
         {
             isClear = false;
-            FloatVectorOperations::copyWithMultiply (d, source, gainToApplyToSource, numSamples);
+            FloatVectorOperations::copyWithMultiply(d, source, gainToApplyToSource, numSamples);
         }
         else
         {
-            FloatVectorOperations::addWithMultiply (d, source, gainToApplyToSource, numSamples);
+            FloatVectorOperations::addWithMultiply(d, source, gainToApplyToSource, numSamples);
         }
     }
 
@@ -2065,23 +2104,23 @@ public:
                                     endGain and startGain in subsequent blocks. The gain is linearly
                                     interpolated between the first and last samples.
     */
-    void addFromWithRamp (int destChannel,
-                          int destStartSample,
-                          const Type* source,
-                          int numSamples,
-                          Type startGain,
-                          Type endGain) noexcept
+    void addFromWithRamp(int destChannel,
+                         int destStartSample,
+                         const Type* source,
+                         int numSamples,
+                         Type startGain,
+                         Type endGain) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
-        dspAssert (source != nullptr);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
+        dspAssert(source != nullptr);
 
         if (numSamples <= 0)
             return;
 
-        isClear = false;
-        const auto increment = (endGain - startGain) / (Type) numSamples;
-        auto* d = channels[destChannel] + destStartSample;
+        isClear              = false;
+        const auto increment = (endGain - startGain) / (Type)numSamples;
+        auto* d              = channels[destChannel] + destStartSample;
 
         while (--numSamples >= 0)
         {
@@ -2101,36 +2140,33 @@ public:
 
         @see addFrom
     */
-    void copyFrom (int destChannel,
-                   int destStartSample,
-                   const AudioBuffer& source,
-                   int sourceChannel,
-                   int sourceStartSample,
-                   int numSamples) noexcept
+    void copyFrom(int destChannel,
+                  int destStartSample,
+                  const AudioBuffer& source,
+                  int sourceChannel,
+                  int sourceStartSample,
+                  int numSamples) noexcept
     {
-        dspAssert (&source != this
-                   || sourceChannel != destChannel
-                   || sourceStartSample + numSamples <= destStartSample
-                   || destStartSample + numSamples <= sourceStartSample);
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && destStartSample + numSamples <= size);
-        dspAssert (isPositiveAndBelow (sourceChannel, source.numChannels));
-        dspAssert (sourceStartSample >= 0 && numSamples >= 0 && sourceStartSample + numSamples <= source.size);
+        dspAssert(&source != this || sourceChannel != destChannel || sourceStartSample + numSamples <= destStartSample || destStartSample + numSamples <= sourceStartSample);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && destStartSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(sourceChannel, source.numChannels));
+        dspAssert(sourceStartSample >= 0 && numSamples >= 0 && sourceStartSample + numSamples <= source.size);
 
         if (numSamples <= 0)
             return;
 
         if (source.isClear)
         {
-            if (! isClear)
-                FloatVectorOperations::clear (channels[destChannel] + destStartSample, numSamples);
+            if (!isClear)
+                FloatVectorOperations::clear(channels[destChannel] + destStartSample, numSamples);
         }
         else
         {
             isClear = false;
-            FloatVectorOperations::copy (channels[destChannel] + destStartSample,
-                                         source.channels[sourceChannel] + sourceStartSample,
-                                         numSamples);
+            FloatVectorOperations::copy(channels[destChannel] + destStartSample,
+                                        source.channels[sourceChannel] + sourceStartSample,
+                                        numSamples);
         }
     }
 
@@ -2146,20 +2182,20 @@ public:
 
         @see addFrom
     */
-    void copyFrom (int destChannel,
-                   int destStartSample,
-                   const Type* source,
-                   int numSamples) noexcept
+    void copyFrom(int destChannel,
+                  int destStartSample,
+                  const Type* source,
+                  int numSamples) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
-        dspAssert (source != nullptr);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
+        dspAssert(source != nullptr);
 
         if (numSamples <= 0)
             return;
 
         isClear = false;
-        FloatVectorOperations::copy (channels[destChannel] + destStartSample, source, numSamples);
+        FloatVectorOperations::copy(channels[destChannel] + destStartSample, source, numSamples);
     }
 
     /** Copies samples from an array of floats into one of the channels, applying a gain to it.
@@ -2175,22 +2211,22 @@ public:
 
         @see addFrom
     */
-    void copyFrom (int destChannel,
-                   int destStartSample,
-                   const Type* source,
-                   int numSamples,
-                   Type gain) noexcept
+    void copyFrom(int destChannel,
+                  int destStartSample,
+                  const Type* source,
+                  int numSamples,
+                  Type gain) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
-        dspAssert (source != nullptr);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
+        dspAssert(source != nullptr);
 
         if (numSamples <= 0)
             return;
 
         auto* d = channels[destChannel] + destStartSample;
         isClear = false;
-        FloatVectorOperations::copyWithMultiply (d, source, gain, numSamples);
+        FloatVectorOperations::copyWithMultiply(d, source, gain, numSamples);
     }
 
     /** Copies samples from an array of floats into one of the channels, applying a gain ramp.
@@ -2211,23 +2247,23 @@ public:
                                     endGain and startGain in subsequent blocks. The gain is linearly
                                     interpolated between the first and last samples.
     */
-    void copyFromWithRamp (int destChannel,
-                           int destStartSample,
-                           const Type* source,
-                           int numSamples,
-                           Type startGain,
-                           Type endGain) noexcept
+    void copyFromWithRamp(int destChannel,
+                          int destStartSample,
+                          const Type* source,
+                          int numSamples,
+                          Type startGain,
+                          Type endGain) noexcept
     {
-        dspAssert (isPositiveAndBelow (destChannel, numChannels));
-        dspAssert (destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
-        dspAssert (source != nullptr);
+        dspAssert(isPositiveAndBelow(destChannel, numChannels));
+        dspAssert(destStartSample >= 0 && numSamples >= 0 && destStartSample + numSamples <= size);
+        dspAssert(source != nullptr);
 
         if (numSamples <= 0)
             return;
 
-        isClear = false;
-        const auto increment = (endGain - startGain) / (Type) numSamples;
-        auto* d = channels[destChannel] + destStartSample;
+        isClear              = false;
+        const auto increment = (endGain - startGain) / (Type)numSamples;
+        auto* d              = channels[destChannel] + destStartSample;
 
         while (--numSamples >= 0)
         {
@@ -2242,52 +2278,52 @@ public:
         @param startSample  the start sample within the channel
         @param numSamples   the number of samples to check
     */
-    Range<Type> findMinMax (int channel, int startSample, int numSamples) const noexcept
+    Range<Type> findMinMax(int channel, int startSample, int numSamples) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
-            return { Type (0.0), Type (0.0) };
+            return {Type(0.0), Type(0.0)};
 
-        return FloatVectorOperations::findMinAndMax (channels[channel] + startSample, numSamples);
+        return FloatVectorOperations::findMinAndMax(channels[channel] + startSample, numSamples);
     }
 
     /** Finds the highest absolute sample value within a region of a channel. */
-    Type getMagnitude (int channel, int startSample, int numSamples) const noexcept
+    Type getMagnitude(int channel, int startSample, int numSamples) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
-            return Type (0.0);
+            return Type(0.0);
 
-        const auto r = findMinMax (channel, startSample, numSamples);
-        return jmax (r.getStart(), -r.getStart(), r.getEnd(), -r.getEnd());
+        const auto r = findMinMax(channel, startSample, numSamples);
+        return jmax(r.getStart(), -r.getStart(), r.getEnd(), -r.getEnd());
     }
 
     /** Finds the highest absolute sample value within a region on all channels. */
-    Type getMagnitude (int startSample, int numSamples) const noexcept
+    Type getMagnitude(int startSample, int numSamples) const noexcept
     {
-        Type mag (0.0);
+        Type mag(0.0);
 
         if (isClear)
             return mag;
 
         for (int i = 0; i < numChannels; ++i)
-            mag = jmax (mag, getMagnitude (i, startSample, numSamples));
+            mag = jmax(mag, getMagnitude(i, startSample, numSamples));
 
         return mag;
     }
 
     /** Returns the root mean squared level for a region of a channel. */
-    Type getRMSLevel (int channel, int startSample, int numSamples) const noexcept
+    Type getRMSLevel(int channel, int startSample, int numSamples) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
-        if (numSamples <= 0 || isClear || ! isPositiveAndBelow (channel, numChannels))
-            return Type (0.0);
+        if (numSamples <= 0 || isClear || !isPositiveAndBelow(channel, numChannels))
+            return Type(0.0);
 
         auto* data = channels[channel] + startSample;
         double sum = 0.0;
@@ -2298,32 +2334,32 @@ public:
             sum += sample * sample;
         }
 
-        return static_cast<Type> (std::sqrt (sum / numSamples));
+        return static_cast<Type>(std::sqrt(sum / numSamples));
     }
 
     /** Reverses a part of a channel. */
-    void reverse (int channel, int startSample, int numSamples) const noexcept
+    void reverse(int channel, int startSample, int numSamples) const noexcept
     {
-        dspAssert (isPositiveAndBelow (channel, numChannels));
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(isPositiveAndBelow(channel, numChannels));
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
             return;
 
-        std::reverse (channels[channel] + startSample,
-                      channels[channel] + startSample + numSamples);
+        std::reverse(channels[channel] + startSample,
+                     channels[channel] + startSample + numSamples);
     }
 
     /** Reverses a part of the buffer. */
-    void reverse (int startSample, int numSamples) const noexcept
+    void reverse(int startSample, int numSamples) const noexcept
     {
-        dspAssert (startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
+        dspAssert(startSample >= 0 && numSamples >= 0 && startSample + numSamples <= size);
 
         if (isClear)
             return;
 
         for (int i = 0; i < numChannels; ++i)
-            reverse (i, startSample, numSamples);
+            reverse(i, startSample, numSamples);
     }
 
     //==============================================================================
@@ -2334,28 +2370,28 @@ private:
     //==============================================================================
     void allocateData()
     {
-        dspAssert (size >= 0);
+        dspAssert(size >= 0);
 
-        auto channelListSize = (size_t) (numChannels + 1) * sizeof (Type*);
+        auto channelListSize         = (size_t)(numChannels + 1) * sizeof(Type*);
         auto requiredSampleAlignment = std::alignment_of_v<Type>;
-        size_t alignmentOverflow = channelListSize % requiredSampleAlignment;
+        size_t alignmentOverflow     = channelListSize % requiredSampleAlignment;
 
         if (alignmentOverflow != 0)
             channelListSize += requiredSampleAlignment - alignmentOverflow;
 
-        allocatedBytes = (size_t) numChannels * (size_t) size * sizeof (Type) + channelListSize + 32;
-        allocatedData.malloc (allocatedBytes);
+        allocatedBytes = (size_t)numChannels * (size_t)size * sizeof(Type) + channelListSize + 32;
+        allocatedData.malloc(allocatedBytes);
 
         if (allocatedData.get() == nullptr)
         {
             // Allocation failure!
-            dspAssert (false);
+            dspAssert(false);
             allocatedBytes = 0;
             return;
         }
 
-        channels = unalignedPointerCast<Type**> (allocatedData.get());
-        auto chan = unalignedPointerCast<Type*> (allocatedData + channelListSize);
+        channels  = unalignedPointerCast<Type**>(allocatedData.get());
+        auto chan = unalignedPointerCast<Type*>(allocatedData + channelListSize);
 
         for (int i = 0; i < numChannels; ++i)
         {
@@ -2364,33 +2400,33 @@ private:
         }
 
         channels[numChannels] = nullptr;
-        isClear = false;
+        isClear               = false;
     }
 
-    void allocateChannels (Type* const* dataToReferTo, int offset)
+    void allocateChannels(Type* const* dataToReferTo, int offset)
     {
-        dspAssert (offset >= 0);
+        dspAssert(offset >= 0);
 
         // (try to avoid doing a malloc here, as that'll blow up things like Pro-Tools)
-        if (numChannels < (int) numElementsInArray (preallocatedChannelSpace))
+        if (numChannels < (int)numElementsInArray(preallocatedChannelSpace))
         {
-            channels = static_cast<Type**> (preallocatedChannelSpace);
+            channels = static_cast<Type**>(preallocatedChannelSpace);
         }
         else
         {
-            allocatedData.malloc (numChannels + 1, sizeof (Type*));
-            channels = unalignedPointerCast<Type**> (allocatedData.get());
+            allocatedData.malloc(numChannels + 1, sizeof(Type*));
+            channels = unalignedPointerCast<Type**>(allocatedData.get());
         }
 
         for (int i = 0; i < numChannels; ++i)
         {
             // you have to pass in the same number of valid pointers as numChannels
-            dspAssert (dataToReferTo[i] != nullptr);
+            dspAssert(dataToReferTo[i] != nullptr);
             channels[i] = dataToReferTo[i] + offset;
         }
 
         channels[numChannels] = nullptr;
-        isClear = false;
+        isClear               = false;
     }
 
     /*  On iOS/arm7 the alignment of `double` is greater than the alignment of
@@ -2399,51 +2435,55 @@ private:
     */
     static constexpr size_t getMaxAlignment() noexcept
     {
-        constexpr size_t alignments[] { alignof (std::max_align_t),
-                                        alignof (void*),
-                                        alignof (float),
-                                        alignof (double),
-                                        alignof (long double),
-                                        alignof (short int),
-                                        alignof (int),
-                                        alignof (long int),
-                                        alignof (long long int),
-                                        alignof (bool),
-                                        alignof (char),
-                                        alignof (char16_t),
-                                        alignof (char32_t),
-                                        alignof (wchar_t) };
+        constexpr size_t alignments[]{alignof(std::max_align_t),
+                                      alignof(void*),
+                                      alignof(float),
+                                      alignof(double),
+                                      alignof(long double),
+                                      alignof(short int),
+                                      alignof(int),
+                                      alignof(long int),
+                                      alignof(long long int),
+                                      alignof(bool),
+                                      alignof(char),
+                                      alignof(char16_t),
+                                      alignof(char32_t),
+                                      alignof(wchar_t)};
 
         size_t max = 0;
 
         for (const auto elem : alignments)
-            max = jmax (max, elem);
+            max = jmax(max, elem);
 
         return max;
     }
 
     int numChannels = 0, size = 0;
     size_t allocatedBytes = 0;
-    Type** channels = nullptr;
+    Type** channels       = nullptr;
     HeapBlock<char, true> allocatedData;
     Type* preallocatedChannelSpace[32];
-    bool isClear = false;
+    bool isClear                         = false;
     static constexpr size_t maxAlignment = getMaxAlignment();
 };
 
 //==============================================================================
 template <typename Type>
-bool operator== (const AudioBuffer<Type>& a, const AudioBuffer<Type>& b)
+bool operator==(const AudioBuffer<Type>& a, const AudioBuffer<Type>& b)
 {
     if (a.getNumChannels() != b.getNumChannels())
         return false;
 
     for (auto c = 0; c < a.getNumChannels(); ++c)
     {
-        const auto begin = [c] (auto& x) { return x.getReadPointer (c); };
-        const auto end = [c] (auto& x) { return x.getReadPointer (c) + x.getNumSamples(); };
+        const auto begin = [c](auto& x) {
+            return x.getReadPointer(c);
+        };
+        const auto end = [c](auto& x) {
+            return x.getReadPointer(c) + x.getNumSamples();
+        };
 
-        if (! std::equal (begin (a), end (a), begin (b), end (b)))
+        if (!std::equal(begin(a), end(a), begin(b), end(b)))
             return false;
     }
 
@@ -2451,17 +2491,17 @@ bool operator== (const AudioBuffer<Type>& a, const AudioBuffer<Type>& b)
 }
 
 template <typename Type>
-bool operator!= (const AudioBuffer<Type>& a, const AudioBuffer<Type>& b)
+bool operator!=(const AudioBuffer<Type>& a, const AudioBuffer<Type>& b)
 {
-    return ! (a == b);
+    return !(a == b);
 }
 
 //==============================================================================
 /** Ports literales de utilidades de juce_core/maths que consume el motor.
     Los aliases enteros deben declararse ANTES de Random.
 */
-using int32 = int32_t;
-using int64 = int64_t;
+using int32  = int32_t;
+using int64  = int64_t;
 using uint32 = uint32_t;
 using uint64 = uint64_t;
 
@@ -2477,22 +2517,21 @@ class Random
 public:
     Random() = default;
 
-    void setSeed (int64 newSeed) noexcept
+    void setSeed(int64 newSeed) noexcept
     {
         seed = newSeed;
     }
 
     int nextInt() noexcept
     {
-        seed = (int64) (((((uint64) seed) * 0x5deece66dLL) + 11) & 0xffffffffffffLL);
-        return (int) (seed >> 16);
+        seed = (int64)(((((uint64)seed) * 0x5deece66dLL) + 11) & 0xffffffffffffLL);
+        return (int)(seed >> 16);
     }
 
     float nextFloat() noexcept
     {
-        auto result = static_cast<float> (static_cast<uint32> (nextInt()))
-                      / (static_cast<float> (std::numeric_limits<uint32>::max()) + 1.0f);
-        return dsp::jmin (result, 1.0f - std::numeric_limits<float>::epsilon());
+        auto result = static_cast<float>(static_cast<uint32>(nextInt())) / (static_cast<float>(std::numeric_limits<uint32>::max()) + 1.0f);
+        return dsp::jmin(result, 1.0f - std::numeric_limits<float>::epsilon());
     }
 
 private:

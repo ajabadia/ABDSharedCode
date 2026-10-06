@@ -50,8 +50,8 @@ using namespace abd::dsp::harness;
 // con 1.000.000 el orden de las once funciones se repite entre corridas, que es
 // lo unico que hace que el numero sirva. Se puede bajar por linea de comandos en
 // la pata WASM, donde el coste se INFORMA pero no se usa de puerta.
-#if ! defined (DspMathHarnessRepeticiones)
- #define DspMathHarnessRepeticiones 1000000
+#if !defined(DspMathHarnessRepeticiones)
+#define DspMathHarnessRepeticiones 1000000
 #endif
 constexpr int kRepeticiones = DspMathHarnessRepeticiones;
 
@@ -62,13 +62,13 @@ constexpr int kRepeticiones = DspMathHarnessRepeticiones;
     hace que `pow` se mida con exponente 0.5 en unos casos y 3.0 en otros: el
     mismo camino de código con las dos ramas de la asintota, que es donde
     empezarían a discrepar dos implementaciones. */
-inline float evaluar (const Entrada& e, int i) noexcept
+inline float evaluar(const Entrada& e, int i) noexcept
 {
     const float x = kCasos[i];
     if (e.dos != nullptr)
-        return e.dos (x, e.usaSegundoArgumento ? kCasosB[i] : kSegundoArgumento);
+        return e.dos(x, e.usaSegundoArgumento ? kCasosB[i] : kSegundoArgumento);
 
-    return e.uno (x);
+    return e.uno(x);
 }
 
 /** El bucle de medicion sin llamada a ninguna funcion: es el blanco que se resta.
@@ -77,7 +77,7 @@ inline float evaluar (const Entrada& e, int i) noexcept
     de `evaluar (e, i)`. Si divergieran, el blanco valdria otra cosa y el coste
     neto saldria negativo, que es como se nota si esto algún dia deja de ser el
     mismo bucle. */
-inline float bucleEnBlanco (float& acumulador) noexcept
+inline float bucleEnBlanco(float& acumulador) noexcept
 {
     for (int r = 0; r < kRepeticiones; ++r)
         for (int i = 0; i < kNumCasos; ++i)
@@ -87,11 +87,11 @@ inline float bucleEnBlanco (float& acumulador) noexcept
 }
 
 /** El bucle de medicion de una entrada. */
-inline float bucleDe (const Entrada& e, float& acumulador) noexcept
+inline float bucleDe(const Entrada& e, float& acumulador) noexcept
 {
     for (int r = 0; r < kRepeticiones; ++r)
         for (int i = 0; i < kNumCasos; ++i)
-            acumulador += evaluar (e, i);
+            acumulador += evaluar(e, i);
 
     return acumulador;
 }
@@ -99,22 +99,26 @@ inline float bucleDe (const Entrada& e, float& acumulador) noexcept
 /** Nanos por llamada. `milis` son milisegundos FRACCIONALES del reloj, que es lo
     que hay en las dos patas: en la de WASM el reloj del host tiene resolucion
     de submicrosegundo y truncarlo a entero habia gastado toda. */
-inline double nanosPorLlamada (double milis) noexcept
+inline double nanosPorLlamada(double milis) noexcept
 {
-    return milis * 1.0e6 / (double) (kRepeticiones * kNumCasos);
+    return milis * 1.0e6 / (double)(kRepeticiones * kNumCasos);
 }
 
 /** Mediana de once valores, por inserción.
 
     A mano y no con `std::sort` porque esta pata no tiene biblioteca estándar, y
     porque once elementos no justificanQuarter stack. */
-float mediana (float* v, int n) noexcept
+float mediana(float* v, int n) noexcept
 {
     for (int i = 1; i < n; ++i)
     {
         const float clave = v[i];
-        int j = i - 1;
-        while (j >= 0 && v[j] > clave) { v[j + 1] = v[j]; --j; }
+        int j             = i - 1;
+        while (j >= 0 && v[j] > clave)
+        {
+            v[j + 1] = v[j];
+            --j;
+        }
         v[j + 1] = clave;
     }
 
@@ -126,7 +130,7 @@ float mediana (float* v, int n) noexcept
 //==============================================================================
 /** El informe. Es lo unico que hacen las dos patas, y por eso no depende de
     como se haya compilado. */
-static void construirInforme (Informe& r)
+static void construirInforme(Informe& r)
 {
     float neto[kNumEntradas];
     double msMedidos[kNumEntradas];
@@ -134,35 +138,35 @@ static void construirInforme (Informe& r)
     // 1. El blanco. Se mide una vez, antes que nada, y con el MISMO numero de
     //    repeticiones que las funciones: si se midiera con menos, la resta
     //    seria de dos cosas distintas y daria un neto negativo sin motivo.
-    float basuraBlanco = 0.0f;
-    const double t0 = ahoraMilis();
-    volatile float sinking = bucleEnBlanco (basuraBlanco);
-    const double t1 = ahoraMilis();
-    const double nsBlanco = nanosPorLlamada (t1 - t0);
-    (void) sinking;
+    float basuraBlanco     = 0.0f;
+    const double t0        = ahoraMilis();
+    volatile float sinking = bucleEnBlanco(basuraBlanco);
+    const double t1        = ahoraMilis();
+    const double nsBlanco  = nanosPorLlamada(t1 - t0);
+    (void)sinking;
 
     // 2. Cada función. El bucle se llama dentro de una función aparte a proposito:
     //    si el `for` estuviera pegado al `clock()`, el optimizador puede decidir
     //    que el bucle no tiene efectos y borrarlo, y la funcion "cuesta" 0 ns.
     for (int f = 0; f < kNumEntradas; ++f)
     {
-        const double a = ahoraMilis();
-        float basura = 0.0f;
-        volatile float s = bucleDe (kManifiesto[f], basura);
-        const double b = ahoraMilis();
-        (void) s;
+        const double a   = ahoraMilis();
+        float basura     = 0.0f;
+        volatile float s = bucleDe(kManifiesto[f], basura);
+        const double b   = ahoraMilis();
+        (void)s;
 
-        msMedidos[f] = b - a;
-        const double bruto = nanosPorLlamada (msMedidos[f]);
-        double n = bruto - nsBlanco;
-        if (n < 0.0) n = 0.0;      // por debajo del ruido del reloj, no hay mas
-        neto[f] = (float) n;
+        msMedidos[f]       = b - a;
+        const double bruto = nanosPorLlamada(msMedidos[f]);
+        double n           = bruto - nsBlanco;
+        if (n < 0.0) n = 0.0; // por debajo del ruido del reloj, no hay mas
+        neto[f] = (float)n;
     }
 
     // 3. La mediana, que es la referencia de todos los presupuestos.
     float copia[kNumEntradas];
     for (int f = 0; f < kNumEntradas; ++f) copia[f] = neto[f];
-    const float medianaNeto = mediana (copia, kNumEntradas);
+    const float medianaNeto = mediana(copia, kNumEntradas);
 
     // 4. El informe. El nombre va PRIMERO, para que una linea se pueda leer sin
     //    tener que contar, y los bits van justo detras porque son lo que se
@@ -171,49 +175,49 @@ static void construirInforme (Informe& r)
     {
         const Entrada& e = kManifiesto[f];
 
-        r.texto (e.nombre);
+        r.texto(e.nombre);
 
         for (int i = 0; i < kNumCasos; ++i)
         {
-            r.anade (' ');
-            r.bits (evaluar (e, i));
+            r.anade(' ');
+            r.bits(evaluar(e, i));
         }
 
         const float x = (medianaNeto > 0.0f) ? neto[f] / medianaNeto : 0.0f;
 
-        r.anade (' ');
-        r.numero (neto[f]);
-        r.anade (' ');
-        r.numero (x);
-        r.anade (' ');
-        r.numero (e.presupuestoX);
-        r.anade (' ');
+        r.anade(' ');
+        r.numero(neto[f]);
+        r.anade(' ');
+        r.numero(x);
+        r.anade(' ');
+        r.numero(e.presupuestoX);
+        r.anade(' ');
 
         // El veredicto solo existe si la corrida ha durado lo suficiente. Con
         // pocas repeticiones el reloj no resuelve y decir "ok" seria decir
         // "no he medido nada" con otra palabra.
         if (msMedidos[f] < kTiempoMinimoParaJuzgarMs)
-            r.texto ("sin-medir");
+            r.texto("sin-medir");
         else
-            r.texto (x > e.presupuestoX ? "SOBRE-PRESUPUESTO" : "ok");
+            r.texto(x > e.presupuestoX ? "SOBRE-PRESUPUESTO" : "ok");
 
-        r.anade ('\n');
+        r.anade('\n');
     }
 
     // Y una linea de pie con lo que hace falta para interpretar el resto.
-    r.texto ("# blanco ");
-    r.numero ((float) nsBlanco);
-    r.texto (" ns  mediana ");
-    r.numero (medianaNeto);
-    r.texto (" ns  casos ");
-    r.entero ((unsigned long) kNumCasos);
-    r.texto ("  repeticiones ");
-    r.entero ((unsigned long) kRepeticiones);
-    r.anade ('\n');
+    r.texto("# blanco ");
+    r.numero((float)nsBlanco);
+    r.texto(" ns  mediana ");
+    r.numero(medianaNeto);
+    r.texto(" ns  casos ");
+    r.entero((unsigned long)kNumCasos);
+    r.texto("  repeticiones ");
+    r.entero((unsigned long)kRepeticiones);
+    r.anade('\n');
 }
 
 //==============================================================================
-#if defined (DspMathHarnessWasm)
+#if defined(DspMathHarnessWasm)
 
 extern "C" {
 
@@ -226,7 +230,7 @@ extern "C" {
 const char* dspMathHarnessReport()
 {
     static Informe informe;
-    construirInforme (informe);
+    construirInforme(informe);
     return informe.datos();
 }
 
@@ -239,13 +243,13 @@ const char* dspMathHarnessReport()
 int main()
 {
     Informe informe;
-    construirInforme (informe);
+    construirInforme(informe);
 
     if (informe.seHaLleno())
-        std::printf ("[AVISO] el informe se ha llenado: faltan casos por medir\n");
+        std::printf("[AVISO] el informe se ha llenado: faltan casos por medir\n");
 
-    std::printf ("DspMathHarness %d funciones x %d casos\n", kNumEntradas, kNumCasos);
-    std::printf ("%s", informe.datos());
+    std::printf("DspMathHarness %d funciones x %d casos\n", kNumEntradas, kNumCasos);
+    std::printf("%s", informe.datos());
     return 0;
 }
 

@@ -37,17 +37,17 @@ template <class OwnerClass>
 class LeakedObjectDetector
 {
 public:
-    LeakedObjectDetector() noexcept                                 { ++(getCounter().numObjects); }
-    LeakedObjectDetector (const LeakedObjectDetector&) noexcept     { ++(getCounter().numObjects); }
+    LeakedObjectDetector() noexcept { ++(getCounter().numObjects); }
+    LeakedObjectDetector(const LeakedObjectDetector&) noexcept { ++(getCounter().numObjects); }
 
-    LeakedObjectDetector& operator= (const LeakedObjectDetector&) noexcept = default;
+    LeakedObjectDetector& operator=(const LeakedObjectDetector&) noexcept = default;
 
     ~LeakedObjectDetector()
     {
         if (--(getCounter().numObjects) < 0)
         {
-            dspDbg ("*** Dangling pointer deletion! Class: " << getLeakedObjectClassName());
-            dspAssert (false);
+            dspDbg("*** Dangling pointer deletion! Class: " << getLeakedObjectClassName());
+            dspAssert(false);
         }
     }
 
@@ -61,13 +61,13 @@ private:
         {
             if (numObjects.load() > 0)
             {
-                dspDbg ("*** Leaked objects detected: " << numObjects.load()
-                        << " instance(s) of class " << getLeakedObjectClassName());
-                dspAssert (false);
+                dspDbg("*** Leaked objects detected: " << numObjects.load()
+                                                       << " instance(s) of class " << getLeakedObjectClassName());
+                dspAssert(false);
             }
         }
 
-        std::atomic<int> numObjects { 0 };
+        std::atomic<int> numObjects{0};
     };
 
     static const char* getLeakedObjectClassName()
@@ -85,24 +85,27 @@ private:
 } // namespace abd::dsp
 
 //==============================================================================
-#if ! defined (NDEBUG)
+#if !defined(NDEBUG)
 
-  /** Port de JUCE_LEAK_DETECTOR (solo Debug). */
-  /* Termina en ';' porque los llamantes no ponen ';' tras el macro (igual que
-     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR). */
-  #define dspLeakDetector(OwnerClass)                                                  \
-      friend class ::abd::dsp::LeakedObjectDetector<OwnerClass>;                            \
-      static const char* getLeakedObjectClassName() noexcept { return #OwnerClass; }    \
-      ::abd::dsp::LeakedObjectDetector<OwnerClass> dspLeakDetector_ { };
+/** Port de JUCE_LEAK_DETECTOR (solo Debug). */
+/* Termina en ';' porque los llamantes no ponen ';' tras el macro (igual que
+   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR). */
+#define dspLeakDetector(OwnerClass)                            \
+    friend class ::abd::dsp::LeakedObjectDetector<OwnerClass>; \
+    static const char* getLeakedObjectClassName() noexcept     \
+    {                                                          \
+        return #OwnerClass;                                    \
+    }                                                          \
+    ::abd::dsp::LeakedObjectDetector<OwnerClass> dspLeakDetector_{};
 
 #else
 
-  #define dspLeakDetector(OwnerClass)  /* sin detector en Release, como JUCE */
+#define dspLeakDetector(OwnerClass) /* sin detector en Release, como JUCE */
 
 #endif
 
 /** Port de JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR. */
-#define dspDeclareNonCopyableWithLeakDetector(ClassName)     \
-    ClassName (const ClassName&) = delete;                   \
-    ClassName& operator= (const ClassName&) = delete;        \
-    dspLeakDetector (ClassName)
+#define dspDeclareNonCopyableWithLeakDetector(ClassName) \
+    ClassName(const ClassName&)            = delete;     \
+    ClassName& operator=(const ClassName&) = delete;     \
+    dspLeakDetector(ClassName)

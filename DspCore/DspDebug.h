@@ -20,32 +20,34 @@
 
 #pragma once
 
-#if ! defined (NDEBUG)
+#if !defined(NDEBUG)
 
-  #include <cstdio>
-  #include <sstream>
-  #include <string>
+#include <cstdio>
+#include <sstream>
+#include <string>
 
-  namespace abd::dsp
-  {
-      /** Escribe una linea de diagnostico (solo Debug). */
-      inline void debugPrint (const std::string& text)
-      {
-          std::fprintf (stderr, "%s\n", text.c_str());
-      }
-  }
+namespace abd::dsp
+{
+/** Escribe una linea de diagnostico (solo Debug). */
+inline void debugPrint(const std::string& text)
+{
+    std::fprintf(stderr, "%s\n", text.c_str());
+}
+} // namespace abd::dsp
 
-  /** Port de DBG(): compone el mensaje por streaming y lo escribe en Debug. */
-  #define dspDbg(expr)                                            \
-      do {                                                        \
-          std::ostringstream dspDbgStream_;                       \
-          dspDbgStream_ << expr;                                  \
-          ::abd::dsp::debugPrint (dspDbgStream_.str());                \
-      } while (false)
+/** Port de DBG(): compone el mensaje por streaming y lo escribe en Debug. */
+#define dspDbg(expr)                                 \
+    do {                                             \
+        std::ostringstream dspDbgStream_;            \
+        dspDbgStream_ << expr;                       \
+        ::abd::dsp::debugPrint(dspDbgStream_.str()); \
+    } while (false)
 
 #else
 
-  /** En Release el mensaje no se compila ni se evalua, como DBG en JUCE. */
-  #define dspDbg(expr)  do { } while (false)
+/** En Release el mensaje no se compila ni se evalua, como DBG en JUCE. */
+#define dspDbg(expr) \
+    do {             \
+    } while (false)
 
 #endif
