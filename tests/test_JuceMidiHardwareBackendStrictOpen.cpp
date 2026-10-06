@@ -8,12 +8,12 @@
  * @date 2026
  */
 
-#include <catch2/catch_test_macros.hpp>
 #include <HardwareMidiDetect/JuceMidiHardwareBackend.h>
-#include <vector>
-#include <memory>
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
+#include <memory>
 #include <set>
+#include <vector>
 
 namespace abd::hwid::tests
 {
@@ -70,7 +70,7 @@ public:
         {
             if (dev.identifier == identifier)
             {
-                outputOpened_ = true;
+                outputOpened_        = true;
                 openedOutIdentifier_ = identifier.toStdString();
                 return true;
             }
@@ -141,11 +141,11 @@ private:
     std::vector<std::string> openExactInputCalls_;
     std::vector<std::vector<uint8_t>> sentSysEx_;
     std::string openedOutIdentifier_;
-    bool failNextOpen_ { false };
-    bool outputOpened_ { false };
-    bool inputOpened_ { false };
-    int closeOutputCalls_ { 0 };
-    int closeInputCalls_ { 0 };
+    bool failNextOpen_{false};
+    bool outputOpened_{false};
+    bool inputOpened_{false};
+    int closeOutputCalls_{0};
+    int closeInputCalls_{0};
 };
 
 TEST_CASE("HITO-SHARED-SYNC / SS2 - Positive: Exact StableDeviceId Match Opens Solely Requested Endpoint", "[shared][midi][endpoint][strict_open][no_fallback]")
@@ -153,20 +153,20 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Positive: Exact StableDeviceId Match Opens S
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "USB Audio Device Index 0";
+    dev0.name       = "USB Audio Device Index 0";
     dev0.identifier = "usb_dev_0_fallback_hazard";
 
     juce::MidiDeviceInfo dev1;
-    dev1.name = "Behringer DeepMind 12D";
+    dev1.name       = "Behringer DeepMind 12D";
     dev1.identifier = "deepmind_12d_endpoint_stable";
 
-    mockProvider->setAvailableOutputs({ dev0, dev1 });
+    mockProvider->setAvailableOutputs({dev0, dev1});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "deepmind_12d_endpoint_stable";
-    req.requestedDisplayName = "";
+    req.requestedDisplayName    = "";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -191,20 +191,20 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Positive: Exact DisplayName Match without St
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Device 0";
+    dev0.name       = "Device 0";
     dev0.identifier = "id_0";
 
     juce::MidiDeviceInfo dev1;
-    dev1.name = "Roland Boutique JX-08";
+    dev1.name       = "Roland Boutique JX-08";
     dev1.identifier = "jx08_unique_id";
 
-    mockProvider->setAvailableOutputs({ dev0, dev1 });
+    mockProvider->setAvailableOutputs({dev0, dev1});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "";
-    req.requestedDisplayName = "Roland Boutique JX-08";
+    req.requestedDisplayName    = "Roland Boutique JX-08";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -225,16 +225,16 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Critical Negative: Nonexistent StableDeviceI
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "LoopBe1 Virtual Port (Index 0 Hazard)";
+    dev0.name       = "LoopBe1 Virtual Port (Index 0 Hazard)";
     dev0.identifier = "loopbe1_hazard";
 
-    mockProvider->setAvailableOutputs({ dev0 });
+    mockProvider->setAvailableOutputs({dev0});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "nonexistent_synth_id";
-    req.requestedDisplayName = "";
+    req.requestedDisplayName    = "";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -255,16 +255,16 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Critical Negative: Nonexistent DisplayName N
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Active Device 0";
+    dev0.name       = "Active Device 0";
     dev0.identifier = "active_0";
 
-    mockProvider->setAvailableOutputs({ dev0 });
+    mockProvider->setAvailableOutputs({dev0});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "";
-    req.requestedDisplayName = "Unknown Device Name";
+    req.requestedDisplayName    = "Unknown Device Name";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -279,16 +279,16 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Critical Negative: Empty Selection is Reject
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Active Device 0";
+    dev0.name       = "Active Device 0";
     dev0.identifier = "active_0";
 
-    mockProvider->setAvailableOutputs({ dev0 });
+    mockProvider->setAvailableOutputs({dev0});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "";
-    req.requestedDisplayName = "";
+    req.requestedDisplayName    = "";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -303,20 +303,20 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Critical Negative: Ambiguous Display Name Re
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "USB MIDI";
+    dev0.name       = "USB MIDI";
     dev0.identifier = "usb_midi_port_A";
 
     juce::MidiDeviceInfo dev1;
-    dev1.name = "USB MIDI";
+    dev1.name       = "USB MIDI";
     dev1.identifier = "usb_midi_port_B";
 
-    mockProvider->setAvailableOutputs({ dev0, dev1 });
+    mockProvider->setAvailableOutputs({dev0, dev1});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "";
-    req.requestedDisplayName = "USB MIDI";
+    req.requestedDisplayName    = "USB MIDI";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -331,16 +331,16 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Critical Negative: Contradictory Name Reject
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Actual Device Name";
+    dev0.name       = "Actual Device Name";
     dev0.identifier = "stable_id_123";
 
-    mockProvider->setAvailableOutputs({ dev0 });
+    mockProvider->setAvailableOutputs({dev0});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "stable_id_123";
-    req.requestedDisplayName = "Contradictory Name";
+    req.requestedDisplayName    = "Contradictory Name";
 
     const auto res = backend.openStrictOutput(req);
 
@@ -355,14 +355,14 @@ TEST_CASE("HITO-SHARED-SYNC / SS2 - Critical Negative: Backend Failure Has No Fa
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Fallback Hazard";
+    dev0.name       = "Fallback Hazard";
     dev0.identifier = "hazard_0";
 
     juce::MidiDeviceInfo dev1;
-    dev1.name = "Target Synth";
+    dev1.name       = "Target Synth";
     dev1.identifier = "target_1";
 
-    mockProvider->setAvailableOutputs({ dev0, dev1 });
+    mockProvider->setAvailableOutputs({dev0, dev1});
     mockProvider->setFailNextOpen(true); // Simulate driver open error
 
     JuceMidiHardwareBackend backend(mockProvider);
@@ -392,18 +392,18 @@ TEST_CASE("HITO-SHARED-SYNC / SS2.1 - Caso 9: Successful Open Owns Exactly Resol
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Hazard Device Index 0";
+    dev0.name       = "Hazard Device Index 0";
     dev0.identifier = "hazard_id_0";
 
     juce::MidiDeviceInfo dev1;
-    dev1.name = "Secondary Keyboard Index 1";
+    dev1.name       = "Secondary Keyboard Index 1";
     dev1.identifier = "kb_id_1";
 
     juce::MidiDeviceInfo dev2;
-    dev2.name = "Target Synth Desktop Index 2";
+    dev2.name       = "Target Synth Desktop Index 2";
     dev2.identifier = "target_synth_id_2";
 
-    mockProvider->setAvailableOutputs({ dev0, dev1, dev2 });
+    mockProvider->setAvailableOutputs({dev0, dev1, dev2});
 
     // Step 1: Request an endpoint whose index is non-zero (dev2)
     MidiEndpointSelectionRequest req;
@@ -449,14 +449,14 @@ TEST_CASE("HITO-SHARED-SYNC / SS2.1 - Caso 10: RequestedEndpointUnavailable Diff
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo dev0;
-    dev0.name = "Active Host Port";
+    dev0.name       = "Active Host Port";
     dev0.identifier = "active_port_0";
 
     juce::MidiDeviceInfo dev1;
-    dev1.name = "Enumerated But Locked Synth Port";
+    dev1.name       = "Enumerated But Locked Synth Port";
     dev1.identifier = "locked_synth_1";
 
-    mockProvider->setAvailableOutputs({ dev0, dev1 });
+    mockProvider->setAvailableOutputs({dev0, dev1});
 
     // Mark locked_synth_1 as unavailable prior to open (e.g. exclusive lock by another process)
     mockProvider->setEndpointUnavailable("locked_synth_1", true);
@@ -484,35 +484,35 @@ TEST_CASE("HITO-SHARED-SYNC / SS2.1 - Caso 11: Re-opening Closes Previous Endpoi
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo devA;
-    devA.name = "Endpoint Alpha";
+    devA.name       = "Endpoint Alpha";
     devA.identifier = "id_alpha";
 
     juce::MidiDeviceInfo devB;
-    devB.name = "Endpoint Beta";
+    devB.name       = "Endpoint Beta";
     devB.identifier = "id_beta";
 
-    mockProvider->setAvailableOutputs({ devA, devB });
+    mockProvider->setAvailableOutputs({devA, devB});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     // 1. Open Alpha successfully
     MidiEndpointSelectionRequest reqA;
     reqA.requestedStableDeviceId = "id_alpha";
-    auto resA = backend.openStrictOutput(reqA);
+    auto resA                    = backend.openStrictOutput(reqA);
     CHECK(resA.isSuccess());
     CHECK(backend.getOpenedOutputIdentifier() == "id_alpha");
 
     // 2. Now open Beta: backend must cleanly close Alpha first
     MidiEndpointSelectionRequest reqB;
     reqB.requestedStableDeviceId = "id_beta";
-    auto resB = backend.openStrictOutput(reqB);
+    auto resB                    = backend.openStrictOutput(reqB);
     CHECK(resB.isSuccess());
     CHECK(backend.getOpenedOutputIdentifier() == "id_beta");
 
     // 3. Now attempt opening a nonexistent Gamma: backend must close handle and remain closed
     MidiEndpointSelectionRequest reqGamma;
     reqGamma.requestedStableDeviceId = "nonexistent_gamma";
-    auto resGamma = backend.openStrictOutput(reqGamma);
+    auto resGamma                    = backend.openStrictOutput(reqGamma);
     CHECK(resGamma.outcome == MidiEndpointOpenOutcome::RequestedEndpointNotFound);
     CHECK_FALSE(backend.isOutputOpen());
     CHECK(backend.getOpenedOutputIdentifier().empty());
@@ -524,16 +524,16 @@ TEST_CASE("HITO-SHARED-SYNC / SS2.1 - Caso 12: Virtual Endpoint Allowed in SS2 w
     auto mockProvider = std::make_shared<MockMidiDeviceProvider>();
 
     juce::MidiDeviceInfo virtualDev;
-    virtualDev.name = "loopMIDI Port 1";
+    virtualDev.name       = "loopMIDI Port 1";
     virtualDev.identifier = "virtual_loopmidi_1";
 
-    mockProvider->setAvailableOutputs({ virtualDev });
+    mockProvider->setAvailableOutputs({virtualDev});
 
     JuceMidiHardwareBackend backend(mockProvider);
 
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = "virtual_loopmidi_1";
-    req.requestedDisplayName = "loopMIDI Port 1";
+    req.requestedDisplayName    = "loopMIDI Port 1";
 
     // In SS2 / SS2.1, without SS4 MidiEndpointSafetyPolicy active, explicit selection of a valid endpoint succeeds
     const auto res = backend.openStrictOutput(req);

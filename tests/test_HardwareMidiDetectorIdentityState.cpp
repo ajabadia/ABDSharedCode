@@ -8,9 +8,9 @@
  * @date 2026
  */
 
-#include <catch2/catch_test_macros.hpp>
-#include <HardwareMidiDetect/HardwareMidiDetector.h>
 #include <HardwareMidiDetect/HardwareContract.h>
+#include <HardwareMidiDetect/HardwareMidiDetector.h>
+#include <catch2/catch_test_macros.hpp>
 #include <vector>
 
 namespace abd::hwid::tests
@@ -19,15 +19,15 @@ namespace abd::hwid::tests
 static HardwareContract createSampleDeepMindContract()
 {
     HardwareContract c;
-    c.id = "behringer_deepmind12";
-    c.displayName = "Behringer DeepMind 12";
-    c.brand = "behringer";
-    c.midiIdentity.manufacturer = "Behringer";
+    c.id                             = "behringer_deepmind12";
+    c.displayName                    = "Behringer DeepMind 12";
+    c.brand                          = "behringer";
+    c.midiIdentity.manufacturer      = "Behringer";
     c.midiIdentity.manufacturerIdHex = "00 20 32";
-    c.midiIdentity.model = "DeepMind 12";
-    c.midiIdentity.modelIdHex = "24";
-    c.midiIdentity.familyIdHex = "00 00";
-    c.midiIdentity.portNameMatches = { "DeepMind12", "DeepMind 12", "DeepMind" };
+    c.midiIdentity.model             = "DeepMind 12";
+    c.midiIdentity.modelIdHex        = "24";
+    c.midiIdentity.familyIdHex       = "00 00";
+    c.midiIdentity.portNameMatches   = {"DeepMind12", "DeepMind 12", "DeepMind"};
     return c;
 }
 
@@ -37,14 +37,14 @@ static HardwareContract createSampleDeepMindContract()
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 1: Endpoint Enumerated without Inquiry is PortAvailable", "[shared][midi][identity][preflight][five_state]")
 {
     juce::MidiDeviceInfo inDev;
-    inDev.name = "DeepMind 12 DIN Port";
+    inDev.name       = "DeepMind 12 DIN Port";
     inDev.identifier = "din_in_1";
 
     juce::MidiDeviceInfo outDev;
-    outDev.name = "DeepMind 12 DIN Port";
+    outDev.name       = "DeepMind 12 DIN Port";
     outDev.identifier = "din_out_1";
 
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     auto heuristicMatch = HardwareMidiDetector::matchFromPortNames(inDev, outDev, contracts);
     REQUIRE(heuristicMatch.has_value());
@@ -75,7 +75,7 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 2: Inquiry Not Requested is IdentityUna
 // ------------------------------------------------------------------------------
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 3: Inquiry Sent with No Response is IdentityUnavailable", "[shared][midi][identity][preflight][five_state]")
 {
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     // Empty MIDI message (no response received during scan timeout window)
     juce::MidiMessage emptyMsg;
@@ -90,17 +90,17 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 3: Inquiry Sent with No Response is Ide
 // ------------------------------------------------------------------------------
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 4: Inquiry Unsupported or Truncated Message is IdentityUnavailable", "[shared][midi][identity][preflight][five_state]")
 {
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     // Non-SysEx message (e.g. NoteOn or Active Sensing)
     auto ccMsg = juce::MidiMessage::controllerEvent(1, 1, 0);
-    auto res1 = HardwareMidiDetector::classifyIdentityReply(ccMsg, contracts);
+    auto res1  = HardwareMidiDetector::classifyIdentityReply(ccMsg, contracts);
     CHECK(res1.getState() == HardwareMidiIdentityState::IdentityUnavailable);
 
     // Truncated SysEx (< 4 bytes)
-    const uint8_t shortBytes[] = { 0xF0, 0x7E, 0xF7 };
-    auto shortMsg = juce::MidiMessage(shortBytes, sizeof(shortBytes));
-    auto res2 = HardwareMidiDetector::classifyIdentityReply(shortMsg, contracts);
+    const uint8_t shortBytes[] = {0xF0, 0x7E, 0xF7};
+    auto shortMsg              = juce::MidiMessage(shortBytes, sizeof(shortBytes));
+    auto res2                  = HardwareMidiDetector::classifyIdentityReply(shortMsg, contracts);
     CHECK(res2.getState() == HardwareMidiIdentityState::IdentityUnavailable);
 }
 
@@ -109,18 +109,17 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 4: Inquiry Unsupported or Truncated Mes
 // ------------------------------------------------------------------------------
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 5: Identity Reply Matching Contract is IdentityVerified", "[shared][midi][identity][preflight][five_state]")
 {
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     // Valid Behringer DeepMind 12 Universal Non-Real Time Identity Reply:
     // F0 7E <devId:00> 06 02 <mfg:00 20 32> <family:00 00> <model:24 00> <rev:01 01 02 01> F7
     const uint8_t deepMindReplyBytes[] = {
         0xF0, 0x7E, 0x00, 0x06, 0x02,
-        0x00, 0x20, 0x32, // Behringer MMA
-        0x00, 0x00,       // Family
-        0x24, 0x00,       // Model
+        0x00, 0x20, 0x32,       // Behringer MMA
+        0x00, 0x00,             // Family
+        0x24, 0x00,             // Model
         0x01, 0x00, 0x01, 0x00, // Rev
-        0xF7
-    };
+        0xF7};
     auto msg = juce::MidiMessage(deepMindReplyBytes, sizeof(deepMindReplyBytes));
 
     DiscoveredDevice dev;
@@ -142,18 +141,17 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 5: Identity Reply Matching Contract is 
 // ------------------------------------------------------------------------------
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 6: Identity Reply Contradicting Contract is IdentityMismatch", "[shared][midi][identity][preflight][five_state]")
 {
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     // Valid Roland Identity Reply (Mfg ID: 41, Roland):
     // F0 7E 10 06 02 41 45 00 00 00 ... F7
     const uint8_t rolandReplyBytes[] = {
         0xF0, 0x7E, 0x10, 0x06, 0x02,
-        0x41,             // Roland MMA ID
-        0x45, 0x00,       // Family
-        0x01, 0x00,       // Model
+        0x41,       // Roland MMA ID
+        0x45, 0x00, // Family
+        0x01, 0x00, // Model
         0x01, 0x00, 0x00, 0x00,
-        0xF7
-    };
+        0xF7};
     auto msg = juce::MidiMessage(rolandReplyBytes, sizeof(rolandReplyBytes));
 
     DiscoveredDevice dev;
@@ -211,10 +209,10 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 8: Factory Strongly Prevents UserConfir
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 9: Zero New MIDI Output Calls Introduced by Taxonomy", "[shared][midi][identity][preflight][five_state]")
 {
     // Classification and state mapping are pure functions with 0 side effects and 0 I/O calls
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     juce::MidiMessage msg = juce::MidiMessage::controllerEvent(1, 1, 0);
-    auto res = HardwareMidiDetector::classifyIdentityReply(msg, contracts);
+    auto res              = HardwareMidiDetector::classifyIdentityReply(msg, contracts);
 
     CHECK(res.getState() == HardwareMidiIdentityState::IdentityUnavailable);
     // Verifies purely computational evaluation with zero side effects
@@ -225,7 +223,7 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 9: Zero New MIDI Output Calls Introduce
 // ------------------------------------------------------------------------------
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 10: buildDetectionQueries Produces Identical Query Set", "[shared][midi][identity][preflight][five_state]")
 {
-    std::vector<HardwareContract> contracts = { createSampleDeepMindContract() };
+    std::vector<HardwareContract> contracts = {createSampleDeepMindContract()};
 
     auto queries = HardwareMidiDetector::buildDetectionQueries(contracts);
 
@@ -256,11 +254,11 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 11: Legacy Consumer Reading isSysExVeri
     CHECK(toLegacyIsSysExVerified(HardwareMidiIdentityState::UserConfirmedUnverified) == false);
 
     DiscoveredDevice dev;
-    dev.identityState = HardwareMidiIdentityState::PortAvailable;
+    dev.identityState   = HardwareMidiIdentityState::PortAvailable;
     dev.isSysExVerified = toLegacyIsSysExVerified(dev.identityState);
     CHECK_FALSE(dev.isSysExVerified);
 
-    dev.identityState = HardwareMidiIdentityState::IdentityVerified;
+    dev.identityState   = HardwareMidiIdentityState::IdentityVerified;
     dev.isSysExVerified = toLegacyIsSysExVerified(dev.identityState);
     CHECK(dev.isSysExVerified);
 }
@@ -270,10 +268,10 @@ TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 11: Legacy Consumer Reading isSysExVeri
 // ------------------------------------------------------------------------------
 TEST_CASE("HITO-SHARED-SYNC / SS3 - Caso 12: Modern Consumer Distinguishes IdentityUnavailable from IdentityMismatch", "[shared][midi][identity][preflight][five_state]")
 {
-    auto unavail = SharedDiscoveryIdentityResult::unavailable();
-    auto mismatch = SharedDiscoveryIdentityResult::mismatch();
+    auto unavail   = SharedDiscoveryIdentityResult::unavailable();
+    auto mismatch  = SharedDiscoveryIdentityResult::mismatch();
     auto available = SharedDiscoveryIdentityResult::portAvailable();
-    auto verified = SharedDiscoveryIdentityResult::verified();
+    auto verified  = SharedDiscoveryIdentityResult::verified();
 
     // Modern consumer can branch on rich 5-state representation
     CHECK(unavail.getState() != mismatch.getState());
