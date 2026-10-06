@@ -1,7 +1,7 @@
 #pragma once
 
-#include <juce_gui_basics/juce_gui_basics.h>
 #include <algorithm>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
 #include <vector>
 
@@ -37,28 +37,28 @@ class Segmented : public juce::Component
 public:
     Segmented()
     {
-        setInterceptsMouseClicks (false, true);
+        setInterceptsMouseClicks(false, true);
     }
 
     ~Segmented() override = default;
 
     /** Opciones de la fila. Reconstruye los botones (la cantidad puede cambiar). */
-    void setSegments (const juce::StringArray& segmentLabels)
+    void setSegments(const juce::StringArray& segmentLabels)
     {
         labels = segmentLabels;
         buttons.clear();
 
         for (const auto& label : labels)
         {
-            auto button = std::make_unique<juce::TextButton> (label);
-            button->setClickingTogglesState (true);
-            button->setRadioGroupId (radioGroup);
-            button->setColour (juce::TextButton::buttonColourId, trackColour);
-            button->setColour (juce::TextButton::buttonOnColourId, activeColour);
-            button->setColour (juce::TextButton::textColourOffId, textColour);
-            button->setColour (juce::TextButton::textColourOnId, activeTextColour);
-            addAndMakeVisible (*button);
-            buttons.push_back (std::move (button));
+            auto button = std::make_unique<juce::TextButton>(label);
+            button->setClickingTogglesState(true);
+            button->setRadioGroupId(radioGroup);
+            button->setColour(juce::TextButton::buttonColourId, trackColour);
+            button->setColour(juce::TextButton::buttonOnColourId, activeColour);
+            button->setColour(juce::TextButton::textColourOffId, textColour);
+            button->setColour(juce::TextButton::textColourOnId, activeTextColour);
+            addAndMakeVisible(*button);
+            buttons.push_back(std::move(button));
         }
 
         rebuildAccessibility();
@@ -67,17 +67,17 @@ public:
     }
 
     /** Indices vetados (gating): el segmento no responde y se atenúa. */
-    void setDisabledIndices (std::vector<int> indices)
+    void setDisabledIndices(std::vector<int> indices)
     {
-        disabled = std::move (indices);
+        disabled = std::move(indices);
         refreshAll();
     }
 
     /** Nota explicativa del veto (tooltip), como `note` en la web. */
-    void setDisabledNote (const juce::String& note) { disabledNote = note; }
+    void setDisabledNote(const juce::String& note) { disabledNote = note; }
 
     /** Valor por indice. No notifica (estado que llega del synth). */
-    void setActive (int index)
+    void setActive(int index)
     {
         active = index;
         refreshAll();
@@ -86,41 +86,41 @@ public:
     int getActive() const { return active; }
 
     /** Callback de EDICION de usuario (indice elegido). */
-    std::function<void (int)> onChange;
+    std::function<void(int)> onChange;
 
     /** Paleta tematica; el LookAndFeel del synth puede sobreescribir luego. */
-    void setColours (juce::Colour track, juce::Colour text, juce::Colour activeFill, juce::Colour activeText)
+    void setColours(juce::Colour track, juce::Colour text, juce::Colour activeFill, juce::Colour activeText)
     {
-        trackColour = track;
-        textColour = text;
-        activeColour = activeFill;
+        trackColour      = track;
+        textColour       = text;
+        activeColour     = activeFill;
         activeTextColour = activeText;
 
         for (auto& button : buttons)
         {
-            button->setColour (juce::TextButton::buttonColourId, trackColour);
-            button->setColour (juce::TextButton::buttonOnColourId, activeColour);
-            button->setColour (juce::TextButton::textColourOffId, textColour);
-            button->setColour (juce::TextButton::textColourOnId, activeTextColour);
+            button->setColour(juce::TextButton::buttonColourId, trackColour);
+            button->setColour(juce::TextButton::buttonOnColourId, activeColour);
+            button->setColour(juce::TextButton::textColourOffId, textColour);
+            button->setColour(juce::TextButton::textColourOnId, activeTextColour);
         }
     }
 
-    void paint (juce::Graphics&) override {}
+    void paint(juce::Graphics&) override {}
 
     void resized() override
     {
-        auto bounds = getLocalBounds();
-        const int count = (int) buttons.size();
+        auto bounds     = getLocalBounds();
+        const int count = (int)buttons.size();
 
         if (count == 0)
             return;
 
         const int share = bounds.getWidth() / count;
-        int x = bounds.getX();
+        int x           = bounds.getX();
 
         for (auto& button : buttons)
         {
-            button->setBounds (x, bounds.getY(), share, bounds.getHeight());
+            button->setBounds(x, bounds.getY(), share, bounds.getHeight());
             x += share;
         }
     }
@@ -129,10 +129,9 @@ private:
     void rebuildAccessibility()
     {
         for (auto& button : buttons)
-            button->onClick = [this, index = (int) (button.get() - buttons[0].get())]
-            {
+            button->onClick = [this, index = (int)(button.get() - buttons[0].get())] {
                 // Un segmento vetado no emite (coherente con la web).
-                if (isDisabled (index) || index == active)
+                if (isDisabled(index) || index == active)
                 {
                     refreshAll();
                     return;
@@ -142,13 +141,13 @@ private:
                 refreshAll();
 
                 if (onChange)
-                    onChange (active);
+                    onChange(active);
             };
     }
 
-    bool isDisabled (int index) const
+    bool isDisabled(int index) const
     {
-        return std::find (disabled.begin(), disabled.end(), index) != disabled.end();
+        return std::find(disabled.begin(), disabled.end(), index) != disabled.end();
     }
 
     /** Empuja estado + paleta a los botones (una sola verdad: `active`). */
@@ -156,12 +155,12 @@ private:
     {
         for (auto& button : buttons)
         {
-            const int index = (int) (button.get() - buttons[0].get());
+            const int index = (int)(button.get() - buttons[0].get());
 
-            button->setEnabled (! isDisabled (index));
-            button->setTooltip (isDisabled (index) ? disabledNote : juce::String());
+            button->setEnabled(!isDisabled(index));
+            button->setTooltip(isDisabled(index) ? disabledNote : juce::String());
             // Programatico: sin notificacion (el radio group apaga los demas).
-            button->setToggleState (index == active, juce::dontSendNotification);
+            button->setToggleState(index == active, juce::dontSendNotification);
         }
     }
 
@@ -169,15 +168,15 @@ private:
     std::vector<std::unique_ptr<juce::TextButton>> buttons;
     std::vector<int> disabled;
     juce::String disabledNote;
-    int active = 0;
-    int radioGroup = 0;   // 0 = grupo propio por instancia (JUCE lo asigna unico)
+    int active     = 0;
+    int radioGroup = 0; // 0 = grupo propio por instancia (JUCE lo asigna unico)
 
-    juce::Colour trackColour       { juce::Colour (0xff141d2b) };
-    juce::Colour textColour        { juce::Colour (0xff7e9bb5) };
-    juce::Colour activeColour      { juce::Colour (0xff00c3ff) };
-    juce::Colour activeTextColour  { juce::Colour (0xff0a0e14) };
+    juce::Colour trackColour{juce::Colour(0xff141d2b)};
+    juce::Colour textColour{juce::Colour(0xff7e9bb5)};
+    juce::Colour activeColour{juce::Colour(0xff00c3ff)};
+    juce::Colour activeTextColour{juce::Colour(0xff0a0e14)};
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Segmented)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Segmented)
 };
 
 } // namespace abd::ui

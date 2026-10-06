@@ -13,26 +13,28 @@ struct Probe
 
     Probe()
     {
-        segmented.setSegments ({ "NEURONiK", "Neurotik" });
-        segmented.setDisabledIndices ({ 1 });
-        segmented.setDisabledNote ("Requiere el motor Neurotik");
-        segmented.setColours (juce::Colour (0xff141d2b), juce::Colour (0xff7e9bb5),
-                              juce::Colour (0xff00c3ff), juce::Colour (0xff0a0e14));
+        segmented.setSegments({"NEURONiK", "Neurotik"});
+        segmented.setDisabledIndices({1});
+        segmented.setDisabledNote("Requiere el motor Neurotik");
+        segmented.setColours(juce::Colour(0xff141d2b), juce::Colour(0xff7e9bb5),
+                             juce::Colour(0xff00c3ff), juce::Colour(0xff0a0e14));
 
-        segmented.setActive (0);
-        jassert (segmented.getActive() == 0);
+        segmented.setActive(0);
+        jassert(segmented.getActive() == 0);
 
         // La edicion de usuario notifica; el estado que llega de fuera, no.
-        int received = -1;
-        segmented.onChange = [&received] (int index) { received = index; };
+        int received       = -1;
+        segmented.onChange = [&received](int index) {
+            received = index;
+        };
 
-        segmented.onChange (1);
-        jassert (received == 1);
+        segmented.onChange(1);
+        jassert(received == 1);
 
-        segmented.setActive (1);
-        jassert (segmented.getActive() == 1);
+        segmented.setActive(1);
+        jassert(segmented.getActive() == 1);
 
-        segmented.setSize (120, 22);
+        segmented.setSize(120, 22);
         segmented.resized();
     }
 };
