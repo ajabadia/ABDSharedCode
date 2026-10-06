@@ -106,7 +106,7 @@ comentarios explicativos.
 |---|---|---|
 | **ABDNeural** | `DspCore`, `DspEffects` | Fase 1 de-JUCE completa + efectos migrados a `DspEffects`. |
 | **ABDMS2000** | `SynthCore`, `HardwareDrivers`, `AutoUpdater` | Fase 2 DRY hecha sobre `SynthCore` (con shims). |
-| **ABDEep** | `SynthCore` | Consume `SynthCore` target a target (tiene `.cpp`). |
+| **ABDEep** | `SynthCore`, `DspEffects` | Consume `SynthCore` target a target (tiene `.cpp`). Adopta `DspEffects` para los 10 reverbs del DeepMind 12, que ya no tienen motor propio; su resto de FX sigue sin tocar el módulo. |
 | **ABDJUNiO601** | `HardwareDrivers`, `LutDSP` | Adopción parcial. |
 | **ABDAudioLab** | `AutoUpdater`, `HardwareMidiDetect`, `StudioTopologyAssets` | Adopción de infraestructura, no de DSP. |
 | **ABDCZ101** | *(ninguno)* | **Sin adoptar**: mantiene sus propios ADSR, Arpeggiator, LFO, Reverb, Chorus, PresetManager… |
