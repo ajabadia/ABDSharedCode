@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
 #include "JuceMidiKeyboardComponent.h"
 #include <functional>
+#include <juce_gui_extra/juce_gui_extra.h>
 
 namespace abd::keyboard
 {
@@ -21,9 +21,9 @@ namespace abd::keyboard
 class MidiKeyboardFloatingWindow : public juce::DocumentWindow
 {
 public:
-    explicit MidiKeyboardFloatingWindow(const juce::String& initialTheme = "audiolab",
+    explicit MidiKeyboardFloatingWindow(const juce::String& initialTheme                           = "audiolab",
                                         std::function<void(const juce::MidiMessage&)> midiCallback = nullptr,
-                                        std::function<void()> onClose = nullptr)
+                                        std::function<void()> onClose                              = nullptr)
         : DocumentWindow(juce::String::fromUTF8(u8"Teclado Virtual MIDI"),
                          juce::Colour(0xff070a0e),
                          DocumentWindow::allButtons),
@@ -31,9 +31,9 @@ public:
     {
         setUsingNativeTitleBar(true);
 
-        auto comp = std::make_unique<JuceMidiKeyboardComponent>(initialTheme);
+        auto comp           = std::make_unique<JuceMidiKeyboardComponent>(initialTheme);
         comp->onMidiMessage = std::move(midiCallback);
-        keyboardCompPtr = comp.get();
+        keyboardCompPtr     = comp.get();
         setContentOwned(comp.release(), true);
 
         setResizable(true, true);
@@ -66,7 +66,7 @@ public:
     }
 
 private:
-    JuceMidiKeyboardComponent* keyboardCompPtr { nullptr };
+    JuceMidiKeyboardComponent* keyboardCompPtr{nullptr};
     std::function<void()> onCloseCallback;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiKeyboardFloatingWindow)

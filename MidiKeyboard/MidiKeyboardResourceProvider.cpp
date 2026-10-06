@@ -17,7 +17,7 @@ namespace
 static juce::File findMidiKeyboardDir()
 {
     juce::File exeFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
-    juce::File dir = exeFile.getParentDirectory();
+    juce::File dir     = exeFile.getParentDirectory();
 
     for (int i = 0; i < 8 && dir.exists(); ++i)
     {
@@ -62,8 +62,8 @@ std::optional<juce::WebBrowserComponent::Resource> midiKeyboardResourceProvider(
             {
                 std::vector<std::byte> bytes(mb.getSize());
                 std::memcpy(bytes.data(), mb.getData(), mb.getSize());
-                return juce::WebBrowserComponent::Resource { std::move(bytes),
-                    abd::webview2::getMimeTypeForFilename(targetFile.getFileName()).toStdString() };
+                return juce::WebBrowserComponent::Resource{std::move(bytes),
+                                                           abd::webview2::getMimeTypeForFilename(targetFile.getFileName()).toStdString()};
             }
         }
 
@@ -76,8 +76,8 @@ std::optional<juce::WebBrowserComponent::Resource> midiKeyboardResourceProvider(
             {
                 std::vector<std::byte> bytes(mb.getSize());
                 std::memcpy(bytes.data(), mb.getData(), mb.getSize());
-                return juce::WebBrowserComponent::Resource { std::move(bytes),
-                    abd::webview2::getMimeTypeForFilename(resFile.getFileName()).toStdString() };
+                return juce::WebBrowserComponent::Resource{std::move(bytes),
+                                                           abd::webview2::getMimeTypeForFilename(resFile.getFileName()).toStdString()};
             }
         }
     }

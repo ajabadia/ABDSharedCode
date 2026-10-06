@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
-#include <juce_audio_basics/juce_audio_basics.h>
-#include <WebView2Bridge/JuceWebView2Component.h>
 #include "MidiKeyboardResourceProvider.h"
+#include <WebView2Bridge/JuceWebView2Component.h>
 #include <functional>
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_gui_extra/juce_gui_extra.h>
 
 namespace abd::keyboard
 {
@@ -42,7 +42,7 @@ private:
 
         listeners["noteOn"] = [this](const juce::var& v) {
             if (!onMidiMessage) return;
-            int note = v["note"];
+            int note  = v["note"];
             float vel = static_cast<float>(static_cast<double>(v["velocity"]));
             if (note >= 0 && note <= 127)
                 onMidiMessage(juce::MidiMessage::noteOn(1, note, vel));
@@ -58,14 +58,14 @@ private:
         listeners["pitchBend"] = [this](const juce::var& v) {
             if (!onMidiMessage) return;
             int val = v["value"];
-            val = juce::jlimit(0, 16383, val);
+            val     = juce::jlimit(0, 16383, val);
             onMidiMessage(juce::MidiMessage::pitchWheel(1, val));
         };
 
         listeners["modWheel"] = [this](const juce::var& v) {
             if (!onMidiMessage) return;
             int val = v["value"];
-            val = juce::jlimit(0, 127, val);
+            val     = juce::jlimit(0, 127, val);
             onMidiMessage(juce::MidiMessage::controllerEvent(1, 1, val));
         };
 
