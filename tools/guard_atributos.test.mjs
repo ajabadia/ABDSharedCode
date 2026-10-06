@@ -734,11 +734,19 @@ describe('el verde falso, que es un pipe que se come el codigo de salida', () =>
     // paso de tests, y tiene que salir 1 nombrando ESE paso. Sin esta prueba, un
     // guard que no mirara nada tambien estaria en verde.
     const real = readFileSync(WORKFLOW, 'utf8');
+    // Anclado al paso de tests y no a la primera coincidencia del fichero: el
+    // trabajo de clang-format trae SU propio bloque `shell: bash` +
+    // `set -o pipefail` y aparece ANTES que el de tests, asi que un replace
+    // ciego le quitaba la proteccion a EL y el workflow resultante quedaba
+    // sano (guard 0, test roto).
+    const proteccionDeTests =
+      '      - name: Tests de MidiKeyboard\n' +
+      '        shell: bash\n        run: |\n          set -o pipefail\n';
     const roto = real.replace(
-      '        shell: bash\n        run: |\n          set -o pipefail\n',
-      '        run: |\n');
+      proteccionDeTests,
+      '      - name: Tests de MidiKeyboard\n        run: |\n');
     assert.notEqual(roto, real,
-      'no se ha podido quitar el arreglo del workflow real: el fixture no serviria');
+      'no se ha podido quitar la proteccion del paso de tests: el fixture no serviria');
 
     const d = mkdtempSync(join(tmpdir(), 'real-'));
     try {
