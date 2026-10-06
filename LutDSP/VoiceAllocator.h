@@ -11,9 +11,9 @@
 
 namespace abd::lutdsp
 {
-    using abd::synth::PolyMode;
-    using abd::synth::VoiceState;
+using abd::synth::PolyMode;
+using abd::synth::VoiceState;
 
-    template <size_t MaxVoices = 8>
-    using VoiceAllocator = abd::synth::VoiceAllocator<MaxVoices>;
-}
+template <size_t MaxVoices = 8>
+using VoiceAllocator = abd::synth::VoiceAllocator<MaxVoices>;
+} // namespace abd::lutdsp

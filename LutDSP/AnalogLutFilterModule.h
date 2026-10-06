@@ -12,9 +12,9 @@
 #pragma once
 
 #include "LutEvaluatorSimd.h"
-#include <juce_audio_basics/juce_audio_basics.h>
 #include <array>
 #include <cmath>
+#include <juce_audio_basics/juce_audio_basics.h>
 
 namespace abd::lutdsp
 {
@@ -47,7 +47,7 @@ public:
         if (sampleRate > 0.0 && timeMs > 0.0)
         {
             double seconds = timeMs * 0.001;
-            smoothingCoef = static_cast<float>(1.0 - std::exp(-1.0 / (seconds * sampleRate)));
+            smoothingCoef  = static_cast<float>(1.0 - std::exp(-1.0 / (seconds * sampleRate)));
         }
     }
 
@@ -70,8 +70,8 @@ public:
     {
         if (voiceIndex >= 0 && voiceIndex < kMaxVoices)
         {
-            float c1 = juce::jlimit(0.0f, 1.0f, param1);
-            float c2 = juce::jlimit(0.0f, 1.0f, param2);
+            float c1              = juce::jlimit(0.0f, 1.0f, param1);
+            float c2              = juce::jlimit(0.0f, 1.0f, param2);
             p1Target[voiceIndex]  = c1;
             p2Target[voiceIndex]  = c2;
             p1Current[voiceIndex] = c1;
@@ -158,7 +158,7 @@ public:
     }
 
 private:
-    float smoothingCoef { 0.01f };
+    float smoothingCoef{0.01f};
 
     alignas(32) std::array<float, kMaxVoices> p1Current;
     alignas(32) std::array<float, kMaxVoices> p2Current;

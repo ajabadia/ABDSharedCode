@@ -10,12 +10,12 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <immintrin.h>
 #include <vector>
-#include <cmath>
-#include <algorithm>
-#include <cstdint>
-#include <cstddef>
 
 namespace abd::lutdsp
 {
@@ -40,11 +40,11 @@ struct alignas(16) AbdBatchedPoint
  */
 enum class LutMetric
 {
-    PrimaryMean,       // mu
-    PrimaryStdDev,     // sigma
-    SecondaryMean,     // sec_mu
-    SecondaryStdDev,   // sec_sigma
-    ThdPercent         // thd_percent
+    PrimaryMean,     // mu
+    PrimaryStdDev,   // sigma
+    SecondaryMean,   // sec_mu
+    SecondaryStdDev, // sec_sigma
+    ThdPercent       // thd_percent
 };
 
 /**
@@ -54,7 +54,7 @@ enum class LutMetric
 class LutEvaluator1DSimd
 {
 public:
-    LutEvaluator1DSimd() = default;
+    LutEvaluator1DSimd()  = default;
     ~LutEvaluator1DSimd() = default;
 
     /**
@@ -66,12 +66,12 @@ public:
         if (normalizedPoints.empty())
         {
             alignedLut.clear();
-            lutSize = 0;
+            lutSize        = 0;
             lutScaleFactor = 0.0f;
             return;
         }
 
-        lutSize = static_cast<int>(normalizedPoints.size());
+        lutSize        = static_cast<int>(normalizedPoints.size());
         lutScaleFactor = (lutSize > 1) ? static_cast<float>(lutSize - 1) : 0.0f;
 
         // Size padded up to multiple of 4 for safe SIMD boundary access
@@ -97,14 +97,14 @@ public:
             return _mm_set1_ps(alignedLut[0]);
 
 #if defined(__AVX2__) || defined(__SSE2__)
-        __m128 zero = _mm_setzero_ps();
+        __m128 zero     = _mm_setzero_ps();
         __m128 maxCoord = _mm_set1_ps(lutScaleFactor);
 
         // Clamp normalizedX to [0.0, 1.0] and scale to table index space [0, lutSize - 1]
         __m128 scaledX = _mm_min_ps(_mm_max_ps(_mm_mul_ps(normalizedX, maxCoord), zero), maxCoord);
 
         // Truncate to integer index I0
-        __m128i idx0 = _mm_cvttps_epi32(scaledX);
+        __m128i idx0  = _mm_cvttps_epi32(scaledX);
         __m128 floorX = _mm_cvtepi32_ps(idx0);
 
         // Fractional weight t = scaledX - floor(scaledX) in [0.0, 1.0)
@@ -122,12 +122,12 @@ public:
         {
             int c0 = i0[i];
             int c1 = (c0 < maxIdx) ? (c0 + 1) : maxIdx;
-            y0[i] = alignedLut[static_cast<size_t>(c0)];
-            y1[i] = alignedLut[static_cast<size_t>(c1)];
+            y0[i]  = alignedLut[static_cast<size_t>(c0)];
+            y1[i]  = alignedLut[static_cast<size_t>(c1)];
         }
 
-        __m128 vY0 = _mm_load_ps(y0);
-        __m128 vY1 = _mm_load_ps(y1);
+        __m128 vY0  = _mm_load_ps(y0);
+        __m128 vY1  = _mm_load_ps(y1);
         __m128 diff = _mm_sub_ps(vY1, vY0);
 
 #if defined(__AVX2__) && defined(__FMA__)
@@ -156,10 +156,10 @@ public:
             return alignedLut[0];
 
         float clampedX = std::clamp(normalizedX, 0.0f, 1.0f);
-        float scaled = clampedX * lutScaleFactor;
-        int i0 = static_cast<int>(scaled);
-        int i1 = std::min(i0 + 1, lutSize - 1);
-        float t = scaled - static_cast<float>(i0);
+        float scaled   = clampedX * lutScaleFactor;
+        int i0         = static_cast<int>(scaled);
+        int i1         = std::min(i0 + 1, lutSize - 1);
+        float t        = scaled - static_cast<float>(i0);
 
         return alignedLut[static_cast<size_t>(i0)] + t * (alignedLut[static_cast<size_t>(i1)] - alignedLut[static_cast<size_t>(i0)]);
     }
@@ -173,12 +173,12 @@ public:
         if (audioData == nullptr || numSamples <= 0 || lutSize <= 0)
             return;
 
-        int i = 0;
+        int i          = 0;
         int simdBlocks = numSamples & ~3;
 
         for (; i < simdBlocks; i += 4)
         {
-            __m128 inVec = _mm_loadu_ps(audioData + i);
+            __m128 inVec  = _mm_loadu_ps(audioData + i);
             __m128 outVec = evaluateSingleValueSimd(inVec);
             _mm_storeu_ps(audioData + i, outVec);
         }
@@ -200,24 +200,24 @@ public:
 
 private:
     std::vector<float> alignedLut;
-    float lutScaleFactor { 0.0f };
-    int lutSize { 0 };
+    float lutScaleFactor{0.0f};
+    int lutSize{0};
 };
 
 class LutEvaluatorSimd
 {
 public:
-    LutEvaluatorSimd() = default;
+    LutEvaluatorSimd()  = default;
     ~LutEvaluatorSimd() = default;
 
     /**
      * @brief Evaluates 4 polyphonic voices simultaneously via 128-bit SIMD / scalar fallback.
      */
     static inline __m128 evaluateBilinear4Voices(const float* p1_4x,
-                                                  const float* p2_4x,
-                                                  const AbdBatchedPoint* lut,
-                                                  int gridSize,
-                                                  LutMetric metric = LutMetric::PrimaryMean) noexcept
+                                                 const float* p2_4x,
+                                                 const AbdBatchedPoint* lut,
+                                                 int gridSize,
+                                                 LutMetric metric = LutMetric::PrimaryMean) noexcept
     {
 #if defined(__AVX2__) || defined(__SSE2__)
         // 1. Load 4 voices normalized coordinates [0.0, 1.0]
@@ -226,9 +226,9 @@ public:
 
         // Clamp & scale to grid coordinate space [0.0, gridSize - 1]
         __m128 grid_max = _mm_set1_ps(static_cast<float>(gridSize - 1));
-        __m128 zero = _mm_setzero_ps();
-        x_vec = _mm_min_ps(_mm_max_ps(_mm_mul_ps(x_vec, grid_max), zero), grid_max);
-        y_vec = _mm_min_ps(_mm_max_ps(_mm_mul_ps(y_vec, grid_max), zero), grid_max);
+        __m128 zero     = _mm_setzero_ps();
+        x_vec           = _mm_min_ps(_mm_max_ps(_mm_mul_ps(x_vec, grid_max), zero), grid_max);
+        y_vec           = _mm_min_ps(_mm_max_ps(_mm_mul_ps(y_vec, grid_max), zero), grid_max);
 
         // 2. Truncate to lower grid indices
         __m128i x_idx = _mm_cvttps_epi32(x_vec);
@@ -237,8 +237,8 @@ public:
         // Calculate fractional interpolation weights t and u in [0.0, 1.0)
         __m128 x_floor = _mm_cvtepi32_ps(x_idx);
         __m128 y_floor = _mm_cvtepi32_ps(y_idx);
-        __m128 t = _mm_sub_ps(x_vec, x_floor);
-        __m128 u = _mm_sub_ps(y_vec, y_floor);
+        __m128 t       = _mm_sub_ps(x_vec, x_floor);
+        __m128 u       = _mm_sub_ps(y_vec, y_floor);
 
         // Store indices to temporary aligned buffer for linear addressing
         alignas(16) int rx[4];
@@ -268,7 +268,7 @@ public:
         __m128 v11 = _mm_load_ps(f11);
 
         // 4. Vectorized bilinear weights: (1-t)*(1-u)*v00 + t*(1-u)*v10 + (1-t)*u*v01 + t*u*v11
-        __m128 one = _mm_set1_ps(1.0f);
+        __m128 one         = _mm_set1_ps(1.0f);
         __m128 one_minus_t = _mm_sub_ps(one, t);
         __m128 one_minus_u = _mm_sub_ps(one, u);
 
@@ -279,9 +279,9 @@ public:
 
 #if defined(__AVX2__) && defined(__FMA__)
         __m128 res = _mm_mul_ps(w00, v00);
-        res = _mm_fmadd_ps(w10, v10, res);
-        res = _mm_fmadd_ps(w01, v01, res);
-        res = _mm_fmadd_ps(w11, v11, res);
+        res        = _mm_fmadd_ps(w10, v10, res);
+        res        = _mm_fmadd_ps(w01, v01, res);
+        res        = _mm_fmadd_ps(w11, v11, res);
         return res;
 #else
         __m128 p0 = _mm_mul_ps(w00, v00);
@@ -300,10 +300,10 @@ public:
      * @brief Scalar fallback with exact identical mathematical formulation.
      */
     static inline __m128 evaluateBilinear4VoicesScalar(const float* p1_4x,
-                                                        const float* p2_4x,
-                                                        const AbdBatchedPoint* lut,
-                                                        int gridSize,
-                                                        LutMetric metric = LutMetric::PrimaryMean) noexcept
+                                                       const float* p2_4x,
+                                                       const AbdBatchedPoint* lut,
+                                                       int gridSize,
+                                                       LutMetric metric = LutMetric::PrimaryMean) noexcept
     {
         alignas(16) float result[4];
         float maxCoord = static_cast<float>(gridSize - 1);
@@ -326,10 +326,7 @@ public:
             float v01 = extractMetric(lut[(y1 * gridSize) + x0], metric);
             float v11 = extractMetric(lut[(y1 * gridSize) + x1], metric);
 
-            result[i] = (1.0f - t) * (1.0f - u) * v00
-                      + t * (1.0f - u) * v10
-                      + (1.0f - t) * u * v01
-                      + t * u * v11;
+            result[i] = (1.0f - t) * (1.0f - u) * v00 + t * (1.0f - u) * v10 + (1.0f - t) * u * v01 + t * u * v11;
         }
 
         return _mm_load_ps(result);
@@ -358,12 +355,18 @@ private:
     {
         switch (metric)
         {
-            case LutMetric::PrimaryMean:     return pt.mu;
-            case LutMetric::PrimaryStdDev:   return pt.sigma;
-            case LutMetric::SecondaryMean:   return pt.sec_mu;
-            case LutMetric::SecondaryStdDev: return pt.sec_sigma;
-            case LutMetric::ThdPercent:      return pt.thd_percent;
-            default:                         return pt.mu;
+            case LutMetric::PrimaryMean:
+                return pt.mu;
+            case LutMetric::PrimaryStdDev:
+                return pt.sigma;
+            case LutMetric::SecondaryMean:
+                return pt.sec_mu;
+            case LutMetric::SecondaryStdDev:
+                return pt.sec_sigma;
+            case LutMetric::ThdPercent:
+                return pt.thd_percent;
+            default:
+                return pt.mu;
         }
     }
 };
