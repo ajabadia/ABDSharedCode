@@ -14,14 +14,14 @@
 
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
-#include <juce_core/juce_core.h>
-#include <functional>
-#include <memory>
-#include "MidiHardwareBackend.h"
 #include "HardwareMidiDetector.h"
 #include "HardwareMidiPickerResourceProvider.h"
+#include "MidiHardwareBackend.h"
 #include "WebView2Bridge/JuceWebView2Component.h"
+#include <functional>
+#include <juce_core/juce_core.h>
+#include <juce_gui_extra/juce_gui_extra.h>
+#include <memory>
 
 namespace abd::hwid
 {
@@ -32,7 +32,7 @@ namespace abd::hwid
  */
 struct HardwarePickResult
 {
-    bool cancelled { true };
+    bool cancelled{true};
 
     // Single selection (maxResults == 1)
     std::string hardwareId;
@@ -63,18 +63,15 @@ class JuceHardwareMidiPicker : public abd::webview2::JuceWebView2Component
 public:
     JuceHardwareMidiPicker(MidiHardwareBackend& backend,
                            HardwarePickCallback onResult,
-                           const std::vector<HardwareContract>& contracts = {},
+                           const std::vector<HardwareContract>& contracts      = {},
                            const HardwareMidiDetector::DetectionConfig& config = {},
-                           const juce::String& initialTheme = "audiolab-light")
+                           const juce::String& initialTheme                    = "audiolab-light")
         : JuceWebView2Component(abd::hwid::hardwareMidiPickerResourceProvider,
-                                { { "nativeEvent", [this](const juce::var& message) {
-                                       onNativeEvent(message);
-                                   } } },
+                                {{"nativeEvent", [this](const juce::var& message) {
+                                      onNativeEvent(message);
+                                  }}},
                                 initialTheme),
-          midiBackend(backend),
-          detector(contracts),
-          currentConfig(config),
-          resultCallback(std::move(onResult))
+          midiBackend(backend), detector(contracts), currentConfig(config), resultCallback(std::move(onResult))
     {
     }
 
@@ -112,19 +109,19 @@ public:
     /** @brief Run a full scan with current config and present results in the WebUI. */
     void startPick()
     {
-        auto results = detector.scanAllPorts(currentConfig, 350);
+        auto results        = detector.scanAllPorts(currentConfig, 350);
         lastDetectedDevices = results;
 
         if (currentConfig.autoSelectIfSingle && currentConfig.maxResults == 1 && results.size() == 1)
         {
             HardwarePickResult result;
-            result.cancelled = false;
-            result.hardwareId = results[0].hardwareId;
-            result.displayName = results[0].displayName;
-            result.manufacturer = results[0].manufacturer;
-            result.model = results[0].model;
+            result.cancelled       = false;
+            result.hardwareId      = results[0].hardwareId;
+            result.displayName     = results[0].displayName;
+            result.manufacturer    = results[0].manufacturer;
+            result.model           = results[0].model;
             result.firmwareVersion = results[0].firmwareVersion;
-            result.allDetected = results;
+            result.allDetected     = results;
             if (resultCallback)
                 resultCallback(result);
             return;
@@ -200,12 +197,12 @@ private:
             {
                 if (currentConfig.maxResults == 1)
                 {
-                    result.hardwareId = message.getProperty("hardwareId", "").toString().toStdString();
+                    result.hardwareId  = message.getProperty("hardwareId", "").toString().toStdString();
                     result.displayName = message.getProperty("displayName", "").toString().toStdString();
                 }
                 else
                 {
-                    auto idsVar = message.getProperty("hardwareIds", juce::var());
+                    auto idsVar   = message.getProperty("hardwareIds", juce::var());
                     auto namesVar = message.getProperty("displayNames", juce::var());
                     if (idsVar.isArray())
                     {
@@ -219,8 +216,8 @@ private:
                     }
                 }
 
-                result.manufacturer = message.getProperty("manufacturer", "").toString().toStdString();
-                result.model = message.getProperty("model", "").toString().toStdString();
+                result.manufacturer    = message.getProperty("manufacturer", "").toString().toStdString();
+                result.model           = message.getProperty("model", "").toString().toStdString();
                 result.firmwareVersion = message.getProperty("firmwareVersion", "").toString().toStdString();
             }
 

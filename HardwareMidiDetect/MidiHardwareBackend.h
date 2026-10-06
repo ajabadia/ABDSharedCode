@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include <functional>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>

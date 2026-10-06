@@ -12,13 +12,13 @@
 
 #pragma once
 
-#include <juce_audio_devices/juce_audio_devices.h>
-#include <string>
-#include <vector>
-#include <optional>
-#include <map>
 #include "HardwareContract.h"
 #include "MidiEndpointSafetyPolicy.h"
+#include <juce_audio_devices/juce_audio_devices.h>
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace abd::hwid
 {
@@ -45,13 +45,13 @@ struct DetectionConfig
     bool requireSysExVerified = false;
 
     /** Safety policy governing virtual ports and broadcast SysEx (SS4/SS4.1). */
-    MidiEndpointSafetyPolicy endpointSafetyPolicy {};
+    MidiEndpointSafetyPolicy endpointSafetyPolicy{};
 
     /** Master flag: whether to transmit identity inquiry SysEx (default false for safety). */
-    bool performIdentityInquiry { false };
+    bool performIdentityInquiry{false};
 
     /** Explicit caller authorization for broadcast inquiries. */
-    BroadcastInquiryAuthorization inquiryAuthorization {};
+    BroadcastInquiryAuthorization inquiryAuthorization{};
 };
 
 /**
@@ -60,35 +60,35 @@ struct DetectionConfig
  */
 struct DiscoveredDevice
 {
-    std::string hardwareId;             /**< Registry ID (from matching contract id). */
-    std::string displayName;            /**< Human readable name (from contract displayName). */
-    std::string manufacturer;           /**< Manufacturer name from contract. */
-    std::string model;                  /**< Model designation from contract. */
-    std::string firmwareVersion;        /**< Firmware / software revision string if available. */
+    std::string hardwareId;      /**< Registry ID (from matching contract id). */
+    std::string displayName;     /**< Human readable name (from contract displayName). */
+    std::string manufacturer;    /**< Manufacturer name from contract. */
+    std::string model;           /**< Model designation from contract. */
+    std::string firmwareVersion; /**< Firmware / software revision string if available. */
 
-    juce::MidiDeviceInfo inDevice;      /**< JUCE MIDI input port info. */
-    juce::MidiDeviceInfo outDevice;     /**< JUCE MIDI output port info. */
+    juce::MidiDeviceInfo inDevice;  /**< JUCE MIDI input port info. */
+    juce::MidiDeviceInfo outDevice; /**< JUCE MIDI output port info. */
 
     /** Index of this port in the output device array (for distinguishing multiple ports). */
-    int portIndex { -1 };
+    int portIndex{-1};
 
     /** Device ID from Identity Reply (byte 1 of F0 7E devId 06 02 ...). 0 = unknown. */
-    uint8_t deviceId { 0 };
+    uint8_t deviceId{0};
 
     /** MIDI channel (1-16) if determinable. 0 = unknown. */
-    uint8_t midiChannel { 0 };
+    uint8_t midiChannel{0};
 
     /** True if verified via SysEx response; false if name heuristic only (Legacy API). */
-    bool isSysExVerified { false };
+    bool isSysExVerified{false};
 
     /** Additive 5-state identity classification for SS3. */
-    HardwareMidiIdentityState identityState { HardwareMidiIdentityState::PortAvailable };
+    HardwareMidiIdentityState identityState{HardwareMidiIdentityState::PortAvailable};
 
     /** Physical vs virtual vs unknown classification (SS4). */
-    MidiEndpointKind endpointKind { MidiEndpointKind::Unknown };
+    MidiEndpointKind endpointKind{MidiEndpointKind::Unknown};
 
     /** UI Badge / Label for display (e.g. "[USB]", "[DIN]", "[Virtual]", "[Unknown]"). */
-    std::string kindLabel { "[Unknown]" };
+    std::string kindLabel{"[Unknown]"};
 
     /** Relative path to model image (e.g. "models/korg-ms2000.png"). */
     std::string modelImage;
@@ -104,7 +104,7 @@ struct DiscoveredDevice
 class HardwareMidiDetector : private juce::MidiInputCallback
 {
 public:
-    using DetectionConfig = abd::hwid::DetectionConfig;
+    using DetectionConfig  = abd::hwid::DetectionConfig;
     using DiscoveredDevice = abd::hwid::DiscoveredDevice;
     explicit HardwareMidiDetector(std::vector<HardwareContract> contracts = {});
     ~HardwareMidiDetector() override;

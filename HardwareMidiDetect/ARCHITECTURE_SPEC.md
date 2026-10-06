@@ -16,7 +16,7 @@
 `HardwareMidiDetect` es un **módulo compartido universal de detección e identificación de sintetizadores hardware por MIDI y USB**, diseñado bajo la filosofía **DRY**, **Zero-Copy** y **100% Contract-Driven**:
 
 1. **Objetivo Principal**: Proporcionar una detección automática y fiable de hardware musical conectado por USB/MIDI a toda la suite de sintetizadores y herramientas de ABDSynths, eliminando la duplicación de código en cada plugin.
-2. **Filosofía 100% Contract-Driven**: Ninguna consulta SysEx (Universal Identity Inquiry, Korg SysEx, Roland SysEx, etc.) ni mapeo de fabricante/modelo está hardcodeado en el código fuente C++ o JS. Todo se deriva dinámicamente de los contratos JSON centrales en `ABDSharedAssets/contracts/hardware/`.
+2. **Filosofía 100% Contract-Driven**: Ninguna consulta SysEx (Universal Identity Inquiry, Korg SysEx, Roland SysEx, etc.) ni mapeo de fabricante/modelo está hardcodeado en el código fuente C++ o JS. Todo se deriva dinámicamente de los contratos JSON centrales en `ABDSharedAssets/contracts/`.
 3. **Arquitectura en Dos Capas (Patrón ABDScope)**:
    - **Capa 1 (C++ Puro / Headless)**: `abd::hwid::HardwareMidiDetector` para escaneo programático en segundo plano, pruebas automatizadas y entornos sin interfaz gráfica.
    - **Capa 2 (WebView2 + WebUI)**: `abd::hwid::JuceHardwareMidiPicker` para ofrecer una interfaz moderna de selección asistida, donde el host únicamente "prepara el puente" inyectando el transporte de audio/MIDI (`MidiHardwareBackend`). **El picker usa el detector C++ como motor**; el WebUI es una vista pura.
@@ -78,7 +78,7 @@ graph TD
     end
 
     subgraph SingleSource ["ABDSharedAssets (Single-Source)"]
-        ContractsJson[contracts/hardware/*.json]
+        ContractsJson[contracts/*.json]
         Styles[styles/*.css]
         Models[models/*.png]
         Brands[brands/*.svg]
@@ -93,7 +93,7 @@ graph TD
 
 ## 4. Contrato de Datos: Especificación del Contrato JSON
 
-Los contratos residen en `ABDSharedAssets/contracts/hardware/*.json` y contienen el bloque declarativo `midiIdentification`:
+Los contratos residen en `ABDSharedAssets/contracts/*.json` y contienen el bloque declarativo `midiIdentification`:
 
 ```json
 {

@@ -59,7 +59,7 @@ MidiEndpointOpenResult JuceMidiHardwareBackend::openStrictOutput(const std::stri
 {
     MidiEndpointSelectionRequest req;
     req.requestedStableDeviceId = identifier;
-    req.requestedDisplayName = displayName;
+    req.requestedDisplayName    = displayName;
     return openStrictOutput(req);
 }
 
@@ -68,7 +68,7 @@ MidiEndpointOpenResult JuceMidiHardwareBackend::openStrictOutput(const MidiEndpo
     // Explicit Model B lifecycle: Always close any prior active handle before processing
     closeOpenedOutput();
 
-    const std::string& reqId = request.requestedStableDeviceId;
+    const std::string& reqId   = request.requestedStableDeviceId;
     const std::string& reqName = request.requestedDisplayName;
 
     // Rule 9: If both fields are empty -> InvalidSelection
@@ -209,8 +209,7 @@ MidiEndpointOpenResult JuceMidiHardwareBackend::openStrictOutput(const MidiEndpo
         resolutionMethod,
         reqId, reqName,
         matchedDevice.identifier.toStdString(),
-        matchedDevice.name.toStdString()
-    );
+        matchedDevice.name.toStdString());
 
     return lastOpenResult;
 }
@@ -313,7 +312,7 @@ void JuceMidiHardwareBackend::handleIncomingMidiMessage(juce::MidiInput* /*sourc
     if (message.isSysEx() && receiveCallback)
     {
         const auto* data = message.getSysExData();
-        const int size = message.getSysExDataSize();
+        const int size   = message.getSysExDataSize();
         if (data != nullptr && size > 0)
         {
             std::vector<uint8_t> bytes(data, data + size);

@@ -11,10 +11,10 @@
 
 #pragma once
 
-#include "MidiHardwareBackend.h"
 #include "MidiEndpointTypes.h"
-#include <juce_audio_devices/juce_audio_devices.h>
+#include "MidiHardwareBackend.h"
 #include <functional>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <memory>
 #include <string>
 #include <vector>

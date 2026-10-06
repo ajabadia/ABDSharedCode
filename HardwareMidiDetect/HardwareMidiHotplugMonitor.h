@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include <juce_audio_devices/juce_audio_devices.h>
 #include "HardwareContract.h"
 #include "HardwareMidiDetector.h"
 #include "MidiEndpointSafetyPolicy.h"
-#include <vector>
 #include <functional>
+#include <juce_audio_devices/juce_audio_devices.h>
+#include <vector>
 
 namespace abd::hwid
 {
@@ -38,14 +38,14 @@ public:
         for (const auto& c : contracts)
         {
             HardwareContract hc;
-            hc.id = c.id;
-            hc.displayName = c.displayName;
-            hc.brand = c.brand;
-            hc.brandLogo = c.brandLogo;
-            hc.modelImage = c.modelImage;
+            hc.id                           = c.id;
+            hc.displayName                  = c.displayName;
+            hc.brand                        = c.brand;
+            hc.brandLogo                    = c.brandLogo;
+            hc.modelImage                   = c.modelImage;
             hc.midiIdentity.portNameMatches = c.midiIdentity.portNameMatches;
-            hc.midiIdentity.manufacturer = c.midiIdentity.manufacturer;
-            hc.midiIdentity.model = c.midiIdentity.model;
+            hc.midiIdentity.manufacturer    = c.midiIdentity.manufacturer;
+            hc.midiIdentity.model           = c.midiIdentity.model;
             registeredContracts.push_back(std::move(hc));
         }
     }
@@ -70,7 +70,7 @@ public:
     void refreshBaseline()
     {
         lastOutputs = juce::MidiOutput::getAvailableDevices();
-        lastInputs = juce::MidiInput::getAvailableDevices();
+        lastInputs  = juce::MidiInput::getAvailableDevices();
     }
 
     /**
@@ -106,27 +106,27 @@ public:
                 }
 
                 DefaultMidiEndpointClassifier classifier;
-                const auto kind = classifier.classify(outDev);
+                const auto kind  = classifier.classify(outDev);
                 const auto label = getEndpointKindLabel(kind);
 
                 auto match = HardwareMidiDetector::matchFromPortNames(inDev, outDev, registeredContracts);
                 if (match.has_value())
                 {
-                    auto dev = *match;
+                    auto dev         = *match;
                     dev.endpointKind = kind;
-                    dev.kindLabel = label;
+                    dev.kindLabel    = label;
                     if (onDevicePlugged)
                         onDevicePlugged(dev);
                 }
                 else
                 {
                     DiscoveredDevice genericDev;
-                    genericDev.hardwareId = "generic_midi_synth";
-                    genericDev.displayName = outDev.name.toStdString();
-                    genericDev.outDevice = outDev;
-                    genericDev.inDevice = inDev;
+                    genericDev.hardwareId   = "generic_midi_synth";
+                    genericDev.displayName  = outDev.name.toStdString();
+                    genericDev.outDevice    = outDev;
+                    genericDev.inDevice     = inDev;
                     genericDev.endpointKind = kind;
-                    genericDev.kindLabel = label;
+                    genericDev.kindLabel    = label;
                     if (onDevicePlugged)
                         onDevicePlugged(genericDev);
                 }
@@ -154,7 +154,7 @@ public:
         }
 
         lastOutputs = currentOuts;
-        lastInputs = currentIns;
+        lastInputs  = currentIns;
     }
 
     std::function<void(const DiscoveredDevice& device)> onDevicePlugged;
@@ -164,7 +164,7 @@ private:
     void timerCallback() override
     {
         auto curOuts = juce::MidiOutput::getAvailableDevices();
-        auto curIns = juce::MidiInput::getAvailableDevices();
+        auto curIns  = juce::MidiInput::getAvailableDevices();
         evaluateLists(curOuts, curIns);
     }
 

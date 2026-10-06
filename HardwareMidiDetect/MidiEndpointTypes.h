@@ -9,18 +9,18 @@
 
 #pragma once
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <juce_audio_devices/juce_audio_devices.h>
 #include "MidiEndpointSafetyPolicy.h"
+#include <juce_audio_devices/juce_audio_devices.h>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace abd::hwid
 {
 
 /**
  * @brief Specific outcome of a requested MIDI endpoint opening.
- * 
+ *
  * Outcome Semantics:
  * - Opened: Endpoint was uniquely resolved and successfully opened by the backend.
  * - RequestedEndpointNotFound: Requested stable ID or display name does not exist in enumeration.
@@ -72,8 +72,8 @@ struct MidiEndpointSelectionRequest
  */
 struct MidiEndpointOpenResult
 {
-    MidiEndpointOpenOutcome outcome { MidiEndpointOpenOutcome::InvalidSelection };
-    MidiEndpointResolutionMethod resolutionMethod { MidiEndpointResolutionMethod::None };
+    MidiEndpointOpenOutcome outcome{MidiEndpointOpenOutcome::InvalidSelection};
+    MidiEndpointResolutionMethod resolutionMethod{MidiEndpointResolutionMethod::None};
 
     std::string requestedStableDeviceId;
     std::string requestedDisplayName;
@@ -84,12 +84,12 @@ struct MidiEndpointOpenResult
     std::string diagnosticCode;
     std::string diagnosticMessage;
 
-    bool handleOpened { false };
+    bool handleOpened{false};
 
-    MidiEndpointOpenResult() = default;
-    MidiEndpointOpenResult(const MidiEndpointOpenResult&) = default;
-    MidiEndpointOpenResult& operator=(const MidiEndpointOpenResult&) = default;
-    MidiEndpointOpenResult(MidiEndpointOpenResult&&) noexcept = default;
+    MidiEndpointOpenResult()                                             = default;
+    MidiEndpointOpenResult(const MidiEndpointOpenResult&)                = default;
+    MidiEndpointOpenResult& operator=(const MidiEndpointOpenResult&)     = default;
+    MidiEndpointOpenResult(MidiEndpointOpenResult&&) noexcept            = default;
     MidiEndpointOpenResult& operator=(MidiEndpointOpenResult&&) noexcept = default;
 
     [[nodiscard]] bool isSuccess() const noexcept
@@ -105,15 +105,15 @@ struct MidiEndpointOpenResult
         std::string diagMsg)
     {
         MidiEndpointOpenResult r;
-        r.outcome = outc;
-        r.resolutionMethod = MidiEndpointResolutionMethod::None;
+        r.outcome                 = outc;
+        r.resolutionMethod        = MidiEndpointResolutionMethod::None;
         r.requestedStableDeviceId = std::move(reqId);
-        r.requestedDisplayName = std::move(reqName);
+        r.requestedDisplayName    = std::move(reqName);
         r.resolvedStableDeviceId.clear();
         r.resolvedDisplayName.clear();
-        r.diagnosticCode = std::move(diagCode);
+        r.diagnosticCode    = std::move(diagCode);
         r.diagnosticMessage = std::move(diagMsg);
-        r.handleOpened = false;
+        r.handleOpened      = false;
         return r;
     }
 
@@ -125,15 +125,15 @@ struct MidiEndpointOpenResult
         std::string resName)
     {
         MidiEndpointOpenResult r;
-        r.outcome = MidiEndpointOpenOutcome::Opened;
-        r.resolutionMethod = method;
+        r.outcome                 = MidiEndpointOpenOutcome::Opened;
+        r.resolutionMethod        = method;
         r.requestedStableDeviceId = std::move(reqId);
-        r.requestedDisplayName = std::move(reqName);
-        r.resolvedStableDeviceId = std::move(resId);
-        r.resolvedDisplayName = std::move(resName);
-        r.diagnosticCode = "OK_MIDI_ENDPOINT_OPENED";
-        r.diagnosticMessage = "MIDI endpoint opened successfully.";
-        r.handleOpened = true;
+        r.requestedDisplayName    = std::move(reqName);
+        r.resolvedStableDeviceId  = std::move(resId);
+        r.resolvedDisplayName     = std::move(resName);
+        r.diagnosticCode          = "OK_MIDI_ENDPOINT_OPENED";
+        r.diagnosticMessage       = "MIDI endpoint opened successfully.";
+        r.handleOpened            = true;
         return r;
     }
 };
@@ -147,20 +147,20 @@ public:
     virtual ~IMidiDeviceProvider() = default;
 
     [[nodiscard]] virtual std::vector<juce::MidiDeviceInfo> getAvailableOutputs() const = 0;
-    [[nodiscard]] virtual std::vector<juce::MidiDeviceInfo> getAvailableInputs() const = 0;
+    [[nodiscard]] virtual std::vector<juce::MidiDeviceInfo> getAvailableInputs() const  = 0;
 
     /**
      * @brief Check whether an enumerated endpoint is available for opening before attempting open.
      */
     [[nodiscard]] virtual bool isEndpointAvailable(const juce::String& /*identifier*/) const { return true; }
 
-    [[nodiscard]] virtual bool openExactOutput(const juce::String& identifier) = 0;
+    [[nodiscard]] virtual bool openExactOutput(const juce::String& identifier)                                   = 0;
     [[nodiscard]] virtual bool openExactInput(const juce::String& identifier, juce::MidiInputCallback* callback) = 0;
-    virtual void closeOutput() noexcept = 0;
-    virtual void closeInput() noexcept = 0;
-    virtual void sendSysExMessage(const std::vector<uint8_t>& bytes) = 0;
+    virtual void closeOutput() noexcept                                                                          = 0;
+    virtual void closeInput() noexcept                                                                           = 0;
+    virtual void sendSysExMessage(const std::vector<uint8_t>& bytes)                                             = 0;
 
-    [[nodiscard]] virtual bool isOutputOpen() const noexcept = 0;
+    [[nodiscard]] virtual bool isOutputOpen() const noexcept            = 0;
     [[nodiscard]] virtual std::string getOpenedOutputIdentifier() const = 0;
     [[nodiscard]] virtual juce::MidiOutput* getRawOutput() noexcept { return nullptr; }
 };

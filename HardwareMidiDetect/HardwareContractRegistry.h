@@ -11,12 +11,12 @@
 
 #pragma once
 
+#include "HardwareContract.h"
+#include <juce_core/juce_core.h>
+#include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
-#include <nlohmann/json.hpp>
-#include <juce_core/juce_core.h>
-#include "HardwareContract.h"
 
 namespace abd::hwid
 {
@@ -28,7 +28,7 @@ namespace abd::hwid
 class HardwareContractRegistry
 {
 public:
-    HardwareContractRegistry() = default;
+    HardwareContractRegistry()  = default;
     ~HardwareContractRegistry() = default;
 
     /**

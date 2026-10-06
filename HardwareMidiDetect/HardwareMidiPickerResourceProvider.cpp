@@ -1,6 +1,6 @@
 #include "HardwareMidiPickerResourceProvider.h"
-#include "WebView2Bridge/WebView2ResourceProvider.h"
 #include "HardwareMidiPickerAssets.h"
+#include "WebView2Bridge/WebView2ResourceProvider.h"
 
 namespace abd::hwid
 {
@@ -13,12 +13,11 @@ namespace
 // provider does the URL normalization, MIME resolution and two-pass lookup.
 const abd::webview2::BinaryAssetsCatalog& pickerAssetsCatalog()
 {
-    static const abd::webview2::BinaryAssetsCatalog catalog {
+    static const abd::webview2::BinaryAssetsCatalog catalog{
         HardwareMidiPickerAssets::namedResourceListSize,
         HardwareMidiPickerAssets::namedResourceList,
         HardwareMidiPickerAssets::originalFilenames,
-        HardwareMidiPickerAssets::getNamedResource
-    };
+        HardwareMidiPickerAssets::getNamedResource};
     return catalog;
 }
 
@@ -29,7 +28,7 @@ std::optional<juce::WebBrowserComponent::Resource> hardwareMidiPickerResourcePro
     // Embedded binary assets first (index.html, JS, ...), then the shared
     // ABDSharedAssets filesystem fallback for styles/, models/, brands/.
     return abd::webview2::webView2ResourceProvider(url, pickerAssetsCatalog(),
-                                                   { "styles/", "models/", "brands/" });
+                                                   {"styles/", "models/", "brands/"});
 }
 
 } // namespace abd::hwid

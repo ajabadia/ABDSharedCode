@@ -1,8 +1,8 @@
 #include "HardwareMidiDetector.h"
-#include <cstdio>
-#include <sstream>
 #include <algorithm>
+#include <cstdio>
 #include <set>
+#include <sstream>
 
 namespace abd::hwid
 {
@@ -45,7 +45,7 @@ std::vector<uint8_t> HardwareMidiDetector::parseHexBytes(const std::string& hexS
 
 juce::MidiMessage HardwareMidiDetector::makeIdentityRequest(uint8_t deviceId)
 {
-    const uint8_t sysexBytes[] = { 0x7E, deviceId, 0x06, 0x01 };
+    const uint8_t sysexBytes[] = {0x7E, deviceId, 0x06, 0x01};
     return juce::MidiMessage::createSysExMessage(sysexBytes, sizeof(sysexBytes));
 }
 
@@ -98,7 +98,6 @@ std::vector<juce::MidiMessage> HardwareMidiDetector::buildDetectionQueries(
     return buildDetectionQueries(contracts);
 }
 
-
 bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                                               DiscoveredDevice& outDevice,
                                               const std::vector<HardwareContract>& contracts)
@@ -107,7 +106,7 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
         return false;
 
     const auto* data = msg.getSysExData();
-    const int size = msg.getSysExDataSize();
+    const int size   = msg.getSysExDataSize();
 
     if (data == nullptr || size < 4)
         return false;
@@ -133,13 +132,13 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
                 }
                 if (matches && bestScore < 10)
                 {
-                    bestScore = 10;
-                    bestDev.hardwareId = c.id;
-                    bestDev.displayName = c.displayName;
-                    bestDev.manufacturer = c.midiIdentity.manufacturer;
-                    bestDev.model = c.midiIdentity.model;
+                    bestScore               = 10;
+                    bestDev.hardwareId      = c.id;
+                    bestDev.displayName     = c.displayName;
+                    bestDev.manufacturer    = c.midiIdentity.manufacturer;
+                    bestDev.model           = c.midiIdentity.model;
                     bestDev.isSysExVerified = true;
-                    bestDev.identityState = HardwareMidiIdentityState::IdentityVerified;
+                    bestDev.identityState   = HardwareMidiIdentityState::IdentityVerified;
                 }
             }
         }
@@ -204,14 +203,14 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
 
                 if (modelMatches && bestScore < 10)
                 {
-                    bestScore = 10;
-                    bestDev.deviceId = data[1];
-                    bestDev.hardwareId = c.id;
-                    bestDev.displayName = c.displayName;
-                    bestDev.manufacturer = c.midiIdentity.manufacturer;
-                    bestDev.model = c.midiIdentity.model;
+                    bestScore               = 10;
+                    bestDev.deviceId        = data[1];
+                    bestDev.hardwareId      = c.id;
+                    bestDev.displayName     = c.displayName;
+                    bestDev.manufacturer    = c.midiIdentity.manufacturer;
+                    bestDev.model           = c.midiIdentity.model;
                     bestDev.isSysExVerified = true;
-                    bestDev.identityState = HardwareMidiIdentityState::IdentityVerified;
+                    bestDev.identityState   = HardwareMidiIdentityState::IdentityVerified;
 
                     int revOffset = modelOffset + static_cast<int>(modelBytes.size());
                     if (size >= revOffset + 4)
@@ -226,14 +225,14 @@ bool HardwareMidiDetector::parseIdentityReply(const juce::MidiMessage& msg,
             }
             else if (bestScore < 1)
             {
-                bestScore = 1;
-                bestDev.deviceId = data[1];
-                bestDev.hardwareId = c.id;
-                bestDev.displayName = c.displayName;
-                bestDev.manufacturer = c.midiIdentity.manufacturer;
-                bestDev.model = c.midiIdentity.model;
+                bestScore               = 1;
+                bestDev.deviceId        = data[1];
+                bestDev.hardwareId      = c.id;
+                bestDev.displayName     = c.displayName;
+                bestDev.manufacturer    = c.midiIdentity.manufacturer;
+                bestDev.model           = c.midiIdentity.model;
                 bestDev.isSysExVerified = true;
-                bestDev.identityState = HardwareMidiIdentityState::IdentityVerified;
+                bestDev.identityState   = HardwareMidiIdentityState::IdentityVerified;
             }
         }
     }
@@ -255,7 +254,7 @@ SharedDiscoveryIdentityResult HardwareMidiDetector::classifyIdentityReply(
         return SharedDiscoveryIdentityResult::unavailable();
 
     const auto* data = msg.getSysExData();
-    const int size = msg.getSysExDataSize();
+    const int size   = msg.getSysExDataSize();
 
     if (data == nullptr || size < 4)
         return SharedDiscoveryIdentityResult::unavailable();
@@ -280,11 +279,11 @@ SharedDiscoveryIdentityResult HardwareMidiDetector::classifyIdentityReply(
 }
 
 std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const juce::MidiDeviceInfo& inDev,
-                                                                          const juce::MidiDeviceInfo& outDev,
-                                                                          const std::vector<HardwareContract>& contracts)
+                                                                         const juce::MidiDeviceInfo& outDev,
+                                                                         const std::vector<HardwareContract>& contracts)
 {
     juce::String combined = inDev.name + " " + outDev.name;
-    int bestMatchLength = 0;
+    int bestMatchLength   = 0;
     std::optional<DiscoveredDevice> bestDevice;
 
     for (const auto& c : contracts)
@@ -298,18 +297,18 @@ std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const j
                 {
                     bestMatchLength = static_cast<int>(kw.length());
                     DiscoveredDevice dev;
-                    dev.inDevice = inDev;
-                    dev.outDevice = outDev;
-                    dev.hardwareId = c.id;
-                    dev.displayName = c.displayName;
-                    dev.manufacturer = c.midiIdentity.manufacturer;
-                    dev.model = c.midiIdentity.model;
+                    dev.inDevice        = inDev;
+                    dev.outDevice       = outDev;
+                    dev.hardwareId      = c.id;
+                    dev.displayName     = c.displayName;
+                    dev.manufacturer    = c.midiIdentity.manufacturer;
+                    dev.model           = c.midiIdentity.model;
                     dev.isSysExVerified = false;
-                    dev.identityState = HardwareMidiIdentityState::PortAvailable;
+                    dev.identityState   = HardwareMidiIdentityState::PortAvailable;
                     DefaultMidiEndpointClassifier classifier;
                     dev.endpointKind = classifier.classify(outDev);
-                    dev.kindLabel = getEndpointKindLabel(dev.endpointKind);
-                    bestDevice = dev;
+                    dev.kindLabel    = getEndpointKindLabel(dev.endpointKind);
+                    bestDevice       = dev;
                 }
             }
         }
@@ -320,15 +319,15 @@ std::optional<DiscoveredDevice> HardwareMidiDetector::matchFromPortNames(const j
             {
                 bestMatchLength = static_cast<int>(c.midiIdentity.model.length());
                 DiscoveredDevice dev;
-                dev.inDevice = inDev;
-                dev.outDevice = outDev;
-                dev.hardwareId = c.id;
-                dev.displayName = c.displayName;
-                dev.manufacturer = c.midiIdentity.manufacturer;
-                dev.model = c.midiIdentity.model;
+                dev.inDevice        = inDev;
+                dev.outDevice       = outDev;
+                dev.hardwareId      = c.id;
+                dev.displayName     = c.displayName;
+                dev.manufacturer    = c.midiIdentity.manufacturer;
+                dev.model           = c.midiIdentity.model;
                 dev.isSysExVerified = false;
-                dev.identityState = HardwareMidiIdentityState::PortAvailable;
-                bestDevice = dev;
+                dev.identityState   = HardwareMidiIdentityState::PortAvailable;
+                bestDevice          = dev;
             }
         }
     }
@@ -350,7 +349,7 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
 {
     std::vector<DiscoveredDevice> discovered;
 
-    auto midiInputs = juce::MidiInput::getAvailableDevices();
+    auto midiInputs  = juce::MidiInput::getAvailableDevices();
     auto midiOutputs = juce::MidiOutput::getAvailableDevices();
 
     if (midiOutputs.isEmpty())
@@ -361,12 +360,11 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
     for (int outIdx = 0; outIdx < midiOutputs.size(); ++outIdx)
     {
         const auto& outDevInfo = midiOutputs[outIdx];
-        const auto kind = classifier.classify(outDevInfo);
-        const MidiEndpointDescriptor ep {
+        const auto kind        = classifier.classify(outDevInfo);
+        const MidiEndpointDescriptor ep{
             outDevInfo.identifier.toStdString(),
             outDevInfo.name.toStdString(),
-            kind
-        };
+            kind};
 
         // SS4: Exclude virtual endpoints from automatic discovery sweeps if disallowed by policy
         if (!isAutomaticDiscoveryAllowed(ep, config.endpointSafetyPolicy))
@@ -382,14 +380,14 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
             if (inCandidate.name == outDevInfo.name || inCandidate.identifier == outDevInfo.identifier)
             {
                 inDevInfo = inCandidate;
-                hasInput = true;
+                hasInput  = true;
                 break;
             }
         }
         if (!hasInput && !midiInputs.isEmpty())
         {
             inDevInfo = midiInputs[0];
-            hasInput = true;
+            hasInput  = true;
         }
 
         bool foundSysEx = false;
@@ -432,11 +430,11 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
                             {
                                 for (auto& item : currentScanResults)
                                 {
-                                    item.inDevice = inDevInfo;
-                                    item.outDevice = outDevInfo;
-                                    item.portIndex = outIdx;
+                                    item.inDevice     = inDevInfo;
+                                    item.outDevice    = outDevInfo;
+                                    item.portIndex    = outIdx;
                                     item.endpointKind = kind;
-                                    item.kindLabel = getEndpointKindLabel(kind);
+                                    item.kindLabel    = getEndpointKindLabel(kind);
                                     discovered.push_back(item);
                                 }
                                 foundSysEx = true;
@@ -458,10 +456,10 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
             auto heuristicDev = matchFromPortNames(inDevInfo, outDevInfo, registeredContracts);
             if (heuristicDev.has_value())
             {
-                auto dev = heuristicDev.value();
-                dev.portIndex = outIdx;
+                auto dev         = heuristicDev.value();
+                dev.portIndex    = outIdx;
                 dev.endpointKind = kind;
-                dev.kindLabel = getEndpointKindLabel(kind);
+                dev.kindLabel    = getEndpointKindLabel(kind);
                 discovered.push_back(dev);
             }
         }
@@ -503,7 +501,7 @@ std::vector<DiscoveredDevice> HardwareMidiDetector::scanAllPorts(const Detection
             if (c.id == dev.hardwareId)
             {
                 dev.modelImage = c.modelImage.empty() ? ("models/" + dev.hardwareId + ".png") : c.modelImage;
-                dev.brandLogo = c.brandLogo.empty() ? ("brands/" + c.brand + "-logo.svg") : c.brandLogo;
+                dev.brandLogo  = c.brandLogo.empty() ? ("brands/" + c.brand + "-logo.svg") : c.brandLogo;
                 break;
             }
         }

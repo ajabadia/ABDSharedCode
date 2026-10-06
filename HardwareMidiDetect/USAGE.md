@@ -4,7 +4,7 @@ Detección automática de hardware MIDI sintetizador, **100% contract-driven**.
 
 - **Ningún SysEx** Query está hardcodeado: se construyen desde los contratos.
 - **Ningún mapeo** fabricante/modelo está hardcodeado: se resuelve por contrato.
-- Los contratos son single-source en `ABDSharedAssets/contracts/hardware/` (clave `midiIdentification` + `autoDetectSysEx` + `modelImage` + `brandLogo`).
+- Los contratos son single-source en `ABDSharedAssets/contracts/` (clave `midiIdentification` + `autoDetectSysEx` + `modelImage` + `brandLogo`).
 
 ---
 
@@ -35,7 +35,7 @@ target_link_libraries(TuPlugin PRIVATE ABDShared::HardwareMidiDetect)
 
 abd::hwid::HardwareContractRegistry registry;
 auto dir = juce::File::getCurrentWorkingDirectory()
-               .getChildFile("../../../ABDSharedAssets/contracts/hardware");
+               .getChildFile("../../../ABDSharedAssets/contracts");
 if (registry.loadContractsFromDirectory(dir))
 {
     auto contracts = registry.getContracts(); // std::vector<abd::hwid::HardwareContract>
@@ -229,7 +229,7 @@ El módulo **no copia contratos ni assets**. Deben existir en runtime:
 
 ```
 ABDSharedAssets/
-├── contracts/hardware/*.json
+├── contracts/*.json
 ├── styles/           (tokens.css, themes/*.css, components/*.css, index.css)
 ├── models/           (korg-ms2000.png, roland-juno-106.png, placeholder-synth.svg, ...)
 └── brands/           (korg-logo.svg, roland-logo.svg, ...)
@@ -256,7 +256,7 @@ Forma mínima de un contrato de detección:
 
 ## 8. Extender a un modelo nuevo
 
-1. Agregar (o editar) el contrato JSON en `ABDSharedAssets/contracts/hardware/`.
+1. Agregar (o editar) el contrato JSON en `ABDSharedAssets/contracts/`.
 2. Indicar `midiIdentification` (IDs de fabricante/modelo), `autoDetectSysEx`, `modelImage`, `brandLogo`.
 3. Añadir imagen del modelo en `ABDSharedAssets/models/` y logo en `brands/`.
 4. **Sin tocar C++ ni WebUI**: el detector y el picker lo reconocen solo.

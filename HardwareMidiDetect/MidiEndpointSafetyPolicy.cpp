@@ -20,8 +20,7 @@ static bool containsIgnoreCase(const std::string& text, const std::string& subst
         [](char ch1, char ch2) {
             return std::tolower(static_cast<unsigned char>(ch1)) ==
                    std::tolower(static_cast<unsigned char>(ch2));
-        }
-    );
+        });
     return it != text.end();
 }
 
@@ -97,7 +96,7 @@ UniversalInquiryEligibilityResult evaluateUniversalInquiryEligibilityDetailed(
     if (!policy.allowBroadcastSysEx || policy.sysExInquiryMode == SysExDiscoveryInquiryMode::Disabled)
     {
         result.decision = SysExInquiryDecision::DisabledByPolicy;
-        result.request = std::nullopt;
+        result.request  = std::nullopt;
         return result;
     }
 
@@ -106,7 +105,7 @@ UniversalInquiryEligibilityResult evaluateUniversalInquiryEligibilityDetailed(
         endpoint.kind == MidiEndpointKind::VirtualDriver)
     {
         result.decision = SysExInquiryDecision::VirtualEndpointExcluded;
-        result.request = std::nullopt;
+        result.request  = std::nullopt;
         return result;
     }
 
@@ -114,7 +113,7 @@ UniversalInquiryEligibilityResult evaluateUniversalInquiryEligibilityDetailed(
     if (endpoint.kind == MidiEndpointKind::Unknown)
     {
         result.decision = SysExInquiryDecision::UnknownEndpointExcluded;
-        result.request = std::nullopt;
+        result.request  = std::nullopt;
         return result;
     }
 
@@ -123,7 +122,7 @@ UniversalInquiryEligibilityResult evaluateUniversalInquiryEligibilityDetailed(
         !authorization.callerConfirmedSingleTargetTopology)
     {
         result.decision = SysExInquiryDecision::SingleTargetTopologyUnconfirmed;
-        result.request = std::nullopt;
+        result.request  = std::nullopt;
         return result;
     }
 
@@ -134,7 +133,7 @@ UniversalInquiryEligibilityResult evaluateUniversalInquiryEligibilityDetailed(
         if (!authorization.callerExplicitlyOptedIn)
         {
             result.decision = SysExInquiryDecision::CallerOptInMissing;
-            result.request = std::nullopt;
+            result.request  = std::nullopt;
             return result;
         }
     }
@@ -183,11 +182,16 @@ std::string getEndpointKindLabel(MidiEndpointKind kind) noexcept
 {
     switch (kind)
     {
-        case MidiEndpointKind::PhysicalUsb:          return "[USB]";
-        case MidiEndpointKind::PhysicalDinInterface: return "[DIN]";
-        case MidiEndpointKind::VirtualLoopback:      return "[Virtual]";
-        case MidiEndpointKind::VirtualDriver:        return "[Virtual]";
-        case MidiEndpointKind::Unknown:              return "[Unknown]";
+        case MidiEndpointKind::PhysicalUsb:
+            return "[USB]";
+        case MidiEndpointKind::PhysicalDinInterface:
+            return "[DIN]";
+        case MidiEndpointKind::VirtualLoopback:
+            return "[Virtual]";
+        case MidiEndpointKind::VirtualDriver:
+            return "[Virtual]";
+        case MidiEndpointKind::Unknown:
+            return "[Unknown]";
     }
     return "[Unknown]";
 }

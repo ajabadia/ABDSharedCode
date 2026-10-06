@@ -13,12 +13,12 @@
 
 #pragma once
 
-#include <string>
+#include "HardwareContract.h"
 #include <array>
-#include <optional>
 #include <cstdint>
 #include <juce_audio_devices/juce_audio_devices.h>
-#include "HardwareContract.h"
+#include <optional>
+#include <string>
 
 namespace abd::hwid
 {
@@ -54,19 +54,19 @@ enum class SysExDiscoveryInquiryMode
 struct MidiEndpointSafetyPolicy
 {
     /** Allow virtual endpoints for explicit user/manual routing. */
-    bool allowVirtualEndpointsForManualRouting { true };
+    bool allowVirtualEndpointsForManualRouting{true};
 
     /** Allow virtual endpoints in automatic scanning / discovery sweeps. */
-    bool allowVirtualEndpointsForAutomaticDiscovery { false };
+    bool allowVirtualEndpointsForAutomaticDiscovery{false};
 
     /** Global gate for broadcast SysEx transmission. */
-    bool allowBroadcastSysEx { false };
+    bool allowBroadcastSysEx{false};
 
     /** Operational mode for SysEx inquiries. */
-    SysExDiscoveryInquiryMode sysExInquiryMode { SysExDiscoveryInquiryMode::Disabled };
+    SysExDiscoveryInquiryMode sysExInquiryMode{SysExDiscoveryInquiryMode::Disabled};
 
     /** Requires affirmative single-target topology confirmation from caller. */
-    bool requireSingleTargetTopologyForBroadcast { true };
+    bool requireSingleTargetTopologyForBroadcast{true};
 };
 
 /**
@@ -77,8 +77,8 @@ struct MidiEndpointSafetyPolicy
  */
 struct BroadcastInquiryAuthorization
 {
-    bool callerExplicitlyOptedIn { false };
-    bool callerConfirmedSingleTargetTopology { false };
+    bool callerExplicitlyOptedIn{false};
+    bool callerConfirmedSingleTargetTopology{false};
     std::string callerContext;
 };
 
@@ -104,7 +104,7 @@ struct MidiEndpointDescriptor
 {
     std::string stableDeviceId;
     std::string displayName;
-    MidiEndpointKind kind { MidiEndpointKind::Unknown };
+    MidiEndpointKind kind{MidiEndpointKind::Unknown};
 };
 
 struct UniversalInquiryEligibilityResult;
@@ -140,7 +140,7 @@ private:
     }
 
     MidiEndpointDescriptor endpoint_;
-    std::array<uint8_t, 6> bytes_ { 0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7 };
+    std::array<uint8_t, 6> bytes_{0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7};
     MidiEndpointSafetyPolicy policySnapshot_;
     BroadcastInquiryAuthorization authorizationSnapshot_;
 };
@@ -151,7 +151,7 @@ private:
  */
 struct UniversalInquiryEligibilityResult
 {
-    SysExInquiryDecision decision { SysExInquiryDecision::DisabledByPolicy };
+    SysExInquiryDecision decision{SysExInquiryDecision::DisabledByPolicy};
     std::optional<UniversalInquiryRequest> request;
 
     [[nodiscard]] bool isAllowed() const noexcept { return decision == SysExInquiryDecision::Allowed && request.has_value(); }
@@ -165,11 +165,11 @@ struct SharedMidiEndpointSnapshot
 {
     std::string stableDeviceId;
     std::string displayName;
-    MidiEndpointKind endpointKind { MidiEndpointKind::Unknown };
-    HardwareMidiIdentityState identityState { HardwareMidiIdentityState::PortAvailable };
-    bool isSysExVerified { false };
-    bool eligibleForAutomaticDiscovery { false };
-    SysExInquiryDecision inquiryDecision { SysExInquiryDecision::DisabledByPolicy };
+    MidiEndpointKind endpointKind{MidiEndpointKind::Unknown};
+    HardwareMidiIdentityState identityState{HardwareMidiIdentityState::PortAvailable};
+    bool isSysExVerified{false};
+    bool eligibleForAutomaticDiscovery{false};
+    SysExInquiryDecision inquiryDecision{SysExInquiryDecision::DisabledByPolicy};
     std::string diagnosticCode;
     std::string diagnosticMessage;
 };
@@ -181,8 +181,8 @@ struct SharedMidiEndpointSnapshot
 class IMidiEndpointClassifier
 {
 public:
-    virtual ~IMidiEndpointClassifier() = default;
-    [[nodiscard]] virtual MidiEndpointKind classify(const juce::MidiDeviceInfo& device) const = 0;
+    virtual ~IMidiEndpointClassifier()                                                                            = default;
+    [[nodiscard]] virtual MidiEndpointKind classify(const juce::MidiDeviceInfo& device) const                     = 0;
     [[nodiscard]] virtual MidiEndpointKind classify(const std::string& identifier, const std::string& name) const = 0;
 };
 

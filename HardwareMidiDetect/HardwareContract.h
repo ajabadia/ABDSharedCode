@@ -94,7 +94,8 @@ public:
     [[nodiscard]] constexpr bool isSysExVerified() const noexcept { return toLegacyIsSysExVerified(state_); }
 
 private:
-    explicit constexpr SharedDiscoveryIdentityResult(HardwareMidiIdentityState s) noexcept : state_(s) {}
+    explicit constexpr SharedDiscoveryIdentityResult(HardwareMidiIdentityState s) noexcept
+        : state_(s) {}
     HardwareMidiIdentityState state_;
 };
 
@@ -106,12 +107,12 @@ private:
  */
 struct MidiIdentityContract
 {
-    std::string manufacturer;            /**< e.g. "Korg" */
-    std::string manufacturerIdHex;       /**< e.g. "42", "00 20 32" (MMA ID, space separated) */
-    std::string model;                   /**< e.g. "MS2000" */
-    std::string modelIdHex;              /**< e.g. "58" (family 2nd byte in Universal reply) */
-    std::string familyIdHex;             /**< e.g. "00 00", "32 00" */
-    std::string sysexHeaderHex;          /**< proprietary SysEx header, e.g. "42 30 58" */
+    std::string manufacturer;                 /**< e.g. "Korg" */
+    std::string manufacturerIdHex;            /**< e.g. "42", "00 20 32" (MMA ID, space separated) */
+    std::string model;                        /**< e.g. "MS2000" */
+    std::string modelIdHex;                   /**< e.g. "58" (family 2nd byte in Universal reply) */
+    std::string familyIdHex;                  /**< e.g. "00 00", "32 00" */
+    std::string sysexHeaderHex;               /**< proprietary SysEx header, e.g. "42 30 58" */
     std::vector<std::string> portNameMatches; /**< port-name substring keywords for heuristics */
 };
 
@@ -121,11 +122,11 @@ struct MidiIdentityContract
  */
 struct HardwareContract
 {
-    std::string schemaVersion { "2.0" };
-    std::string id;                      /**< e.g. "korg_ms2000" */
+    std::string schemaVersion{"2.0"};
+    std::string id; /**< e.g. "korg_ms2000" */
     std::string displayName;
     std::string description;
-    std::string deviceType;              /**< MANUAL_EURORACK / ANALOGUE_PEDAL / AUTOMATED_SYSEX / AUTOMATED_MIDI_CC / MOCK_DSP */
+    std::string deviceType; /**< MANUAL_EURORACK / ANALOGUE_PEDAL / AUTOMATED_SYSEX / AUTOMATED_MIDI_CC / MOCK_DSP */
     std::string brand;
     std::string brandLogo;
     std::string modelImage;
@@ -133,7 +134,7 @@ struct HardwareContract
     std::string model;
     std::string modelIdHex;
     std::string autoDetectSysEx;
-    std::string theme { "audiolab-light" };
+    std::string theme{"audiolab-light"};
 
     MidiIdentityContract midiIdentity;
 };
