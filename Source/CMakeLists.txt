@@ -63,7 +63,7 @@ target_sources(ABDScopeCore INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/ScopeResourceProvider.cpp
 )
 
-set(ABD_SCOPE_VERSION "0.3.1")
+set(ABD_SCOPE_VERSION "0.4.0")
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/Core/ABDScopeConfig.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/ABDScopeConfig.h

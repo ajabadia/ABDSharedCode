@@ -1,5 +1,5 @@
 ﻿cmake_minimum_required(VERSION 3.22)
-project(ABDScope VERSION 0.3.1 LANGUAGES CXX)
+project(ABDScope VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,12 +16,19 @@ add_subdirectory(Source)
 # Target Alias for clean consumer integration: ABDScope::ABDScopeCore
 add_library(ABDScope::ABDScopeCore ALIAS ABDScopeCore)
 
-# Optional Native JUCE GUI Standalone Demo
-if(NOT TARGET juce::juce_core)
-  if(EXISTS "C:/JUCE/CMakeLists.txt")
-    add_subdirectory("C:/JUCE" _juce_build EXCLUDE_FROM_ALL)
-  elseif(EXISTS "D:/desarrollos/juce/CMakeLists.txt")
-    add_subdirectory("D:/desarrollos/juce" _juce_build EXCLUDE_FROM_ALL)
+# Optional Native JUCE GUI Standalone Demo.
+# The JUCE probe runs ONLY when ABDScope is the top-level project (standalone
+# dev sandbox). When consumed via add_subdirectory (ABDSharedCode/Scope, and
+# from there any product), the consumer brings its own JUCE — or none, as in
+# the Emscripten/WASM builds — and probing C:/JUCE from inside a consumer
+# build would drag an unrelated JUCE tree into it.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  if(NOT TARGET juce::juce_core)
+    if(EXISTS "C:/JUCE/CMakeLists.txt")
+      add_subdirectory("C:/JUCE" _juce_build EXCLUDE_FROM_ALL)
+    elseif(EXISTS "D:/desarrollos/juce/CMakeLists.txt")
+      add_subdirectory("D:/desarrollos/juce" _juce_build EXCLUDE_FROM_ALL)
+    endif()
   endif()
 endif()
 
@@ -49,10 +56,12 @@ endif()
 add_executable(ABDScope_CppSmoke Source/tests/StandaloneSmoke.cpp)
 target_link_libraries(ABDScope_CppSmoke PRIVATE ABDScopeCoreHeaders)
 
-if(TARGET juce::juce_gui_extra)
+# The demo app is a standalone-sandbox artifact too: gating it with the same
+# top-level check keeps consumer builds (ABDSharedCode products) free of it.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND TARGET juce::juce_gui_extra)
   juce_add_gui_app(ABDScope_GuiDemo
     PRODUCT_NAME "ABDScope Native GUI Demo"
-    VERSION 0.3.1
+    VERSION 0.4.0
   )
 
   target_sources(ABDScope_GuiDemo PRIVATE

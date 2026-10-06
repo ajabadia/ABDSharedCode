@@ -1,5 +1,30 @@
 ﻿# Changelog
 
+All notable changes to the **ABDScope** project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.4.0] - 2026-10-06
+### Added
+- **Absorption into ABDSharedCode**: ABDScope now lives as the `Scope/` subtree of
+  `ABDSharedCode` (git subtree, history preserved). The canonical consumption path
+  is `ABDShared::ScopeCore` / `ABDShared::ScopeCoreHeaders` / `ABDShared::ScopeWebAssets`
+  (aliases registered in `ABDSharedCode/CMakeLists.txt` over the targets defined
+  here). Themes and icons stay canonical in `ABDSharedAssets`; the theme parity
+  test (`WebUI/tests/theme.test.js`) keeps guarding that boundary.
+### Changed
+- **JUCE probe and GuiDemo are standalone-only**: the `C:/JUCE` probe and the
+  `ABDScope_GuiDemo` target now run only when ABDScope is the top-level project
+  (`CMAKE_SOURCE_DIR == CMAKE_CURRENT_SOURCE_DIR`). Consumers that pull Scope via
+  `add_subdirectory` bring their own JUCE (or none, as in the Emscripten builds)
+  and must not get an unrelated JUCE tree or a demo app in their build.
+- **Version alignment** across CMake, package.json files and docs set to 0.4.0.
+
+---
+
 ## [0.3.2] - 2026-09-04
 ### Added
 - Full first-class support for `audiolab-light` theme ("Técnica Refinada" Precision Lab / Sonarworks style: clean light `#f8f9fa` base, `#ffffff` surface, subtle reticle `rgba(15,23,42,0.08)`, and high-contrast `#00a86b` / `#0284c7` traces).
@@ -8,11 +33,6 @@
 ### Changed
 - Refactored `OscilloscopeRenderer` and `SpectrumRenderer` to dynamically resolve canvas background and grid reticle colors via CSS custom properties (`--scope-bg`, `--scope-grid`, `--scope-grid-center`).
 - Improved active state button text contrast in light mode with `#ffffff` text on accent green.
-
-All notable changes to the **ABDScope** project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
