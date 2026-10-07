@@ -70,6 +70,20 @@ int main()
         CHECK(collector.selectTap("Master Out"));
         CHECK(tap1->isActive() && !tap2->isActive() && !tap3->isActive());
 
+        // Non-const getTap() allows direct active control without const_cast
+        auto* directTap = collector.getTap(1);
+        CHECK(directTap == tap2);
+        directTap->setActive(true);
+        CHECK(tap2->isActive());
+
+        // Case-insensitive query by uppercase slug
+        CHECK(collector.selectTap("DIAG_TONE"));
+        CHECK(tap3->isActive() && !tap1->isActive());
+
+        // Re-select master to enable writing on tap1
+        CHECK(collector.selectTap("master"));
+        CHECK(tap1->isActive());
+
         std::vector<float> lSamples(64, 0.5f);
         std::vector<float> rSamples(64, -0.5f);
         tap1->writeStereo(lSamples.data(), rSamples.data(), lSamples.size());

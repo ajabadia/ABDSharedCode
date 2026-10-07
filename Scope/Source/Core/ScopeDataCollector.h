@@ -88,16 +88,17 @@ public:
     {
         const size_t total = m_taps.size();
 
-        // 1) Exact explicit wire id
+        if (query.empty()) return npos;
+        const std::string queryLower = toLowerAscii(query);
+
+        // 1) Explicit wire id (exact or case-insensitive)
         for (size_t i = 0; i < total; ++i)
         {
             const std::string& id = m_taps[i]->getId();
-            if (!id.empty() && id == query) return i;
+            if (!id.empty() && (id == query || toLowerAscii(id) == queryLower)) return i;
         }
-        if (query.empty()) return npos;
 
         // 2) Case-insensitive display name or deterministic derived slug
-        const std::string queryLower = toLowerAscii(query);
         for (size_t i = 0; i < total; ++i)
         {
             const std::string& name = m_taps[i]->getName();
@@ -126,6 +127,11 @@ public:
     }
 
     [[nodiscard]] const ScopeTap* getTap(size_t index) const noexcept
+    {
+        return (index < m_taps.size()) ? m_taps[index].get() : nullptr;
+    }
+
+    [[nodiscard]] ScopeTap* getTap(size_t index) noexcept
     {
         return (index < m_taps.size()) ? m_taps[index].get() : nullptr;
     }
