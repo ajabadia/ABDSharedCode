@@ -34,6 +34,10 @@ ABDSharedCode/
 │   ├── DspMath.h                   ← trascendentes deterministas (sin libm)
 │   ├── DspDebug.h                  ← dspAssert
 │   ├── DspLeakedObjectDetector.h   ← dspDeclareNonCopyableWithLeakDetector
+│   ├── DspResonantFilter.h         ← etapa de paso bajo resonante (con AGC)
+│   ├── DspFilterFamily.h           ← EL CONTRATO de la familia de filtros
+│   ├── DspFilterTpt.h              ← miembro TPT (paso bajo / alto / banda)
+│   ├── DspFilterEquation.h         ← miembro de ecuación (escalera de 4 polos)
 │   └── DspMidiMessage.h / DspMidiBuffer.h
 ├── DspEffects/                 ← Efectos sobre DspCore, INTERFACE (header-only)
 │   ├── EffectPolicy.h            ← contrato de política inyectada
@@ -226,9 +230,16 @@ autoUpdater->setUpdateCallback(
 ### Qué hay dentro
 
 **`DspCore`** — el sustrato. Portado de `juce_core` / `juce_audio_basics`, sin
-JUCE: `DspCore.h` (2509 líneas: `MathConstants`, `Range`, `FloatVectorOperations`,
+JUCE: `DspCore.h` (2566 líneas: `MathConstants`, `Range`, `FloatVectorOperations`,
 `AudioBuffer`, `ScopedNoDenormals`, …), `DspMath.h`, `DspDebug.h`,
-`DspLeakedObjectDetector.h`, `DspMidiMessage.h`, `DspMidiBuffer.h`.
+`DspLeakedObjectDetector.h`, `DspMidiMessage.h`, `DspMidiBuffer.h`, y los tres
+ficheros de **la familia de filtros** (`DspFilterFamily.h` con el contrato,
+`DspFilterTpt.h` y `DspFilterEquation.h` con sus dos miembros del sustrato; el
+tercero, el de la tabla medida, vive en `LutDSP/`). Ver *La familia de filtros*
+más abajo. Su familia hermana —la de **osciladores**— no vive aquí sino en
+`SynthCore/`: los primitivos de oscilador (`PolyBLEP`, `DSPUtils`) ya estaban en
+esa carpeta y un oscilador no necesita el sustrato que un filtro sí usa. Las dos
+son gemelas en contrato, no en módulo. Ver *La familia de osciladores*.
 
 **`DspEffects`** — cuatro clases de cosa, y distinguirlas es medio de usar bien el
 módulo:
@@ -430,12 +441,15 @@ trabajo del CI que vigila eso; ver *El trabajo `foto`* más abajo.
 ### Cómo integrarlo
 
 **1. CMake.** Igual que cualquier módulo (ver *Cómo funciona la integración*,
-arriba), con un apunte: los dos tests standalone del módulo se desactivan en el
-build del plugin, porque los efectos se prueban desde el propio consumidor.
+arriba), con un apunte: los tests standalone de los módulos se desactivan en el
+build del plugin, porque los efectos se prueban desde el propio consumidor. Hay uno
+por módulo, y cada uno tiene su interruptor:
 
 ```cmake
-set(ABDSHAREDCODE_BUILD_DSPCORE_TESTS    OFF)
-set(ABDSHAREDCODE_BUILD_DSPEFFECTS_TESTS OFF)
+set(ABDSHAREDCODE_BUILD_DSPCORE_TESTS     OFF)
+set(ABDSHAREDCODE_BUILD_DSPEFFECTS_TESTS  OFF)
+set(ABDSHAREDCODE_BUILD_SYNTHCORE_TESTS   OFF)   # si se usa SynthCore
+set(ABDSHAREDCODE_BUILD_LUTDSP_TESTS      OFF)   # si se usa LutDSP
 
 # ... tras add_subdirectory / FetchContent_MakeAvailable ...
 
@@ -1576,6 +1590,185 @@ daba ningún error, porque eran dos listas de enteros que nadie contrastaba. Con
 tres sitios que tienen que coincidir, el que se olvida de actualizar gana
 siempre; por eso la regla es **contrato único + test que ate las capas**.
 
+### La familia de filtros: tres filtros, un solo contrato
+
+`DspCore/DspFilterFamily.h` es el contrato que todo filtro del sustrato honra, y
+existe por un motivo concreto: que cambiar de filtro en un synth no sea reescribir
+su voz. Son nueve métodos, y no es una clase base ni una vtable en el lazo de
+audio (es el mismo patrón por convención que `DspEffects/EffectPolicy.h`):
+
+```cpp
+void   prepare (double sampleRate) noexcept;
+void   reset () noexcept;
+void   setCutoff (double hz) noexcept;          // en Hz, no en 0..1
+void   setResonance (double amount01) noexcept; // 0 = sin realce, 1 = borde
+bool   setMode (FilterMode) noexcept;           // false = no lo honra (no miente)
+double processSample (double input) noexcept;
+double getCutoff () const noexcept;
+double getResonance () const noexcept;
+bool   supportsMode (FilterMode) noexcept;
+```
+
+Y un renglón para engancharlo:
+
+```cpp
+using VoiceFilter = abd::dsp::FilterEquation;   // o FilterTpt, o abd::lutdsp::FilterLut
+```
+
+**El idioma de los parámetros es la mitad de la familia.** El corte se pide en Hz
+y la resonancia en 0..1 con el mismo significado en todos los miembros (0 sin
+realce, 1 en el borde). Si no fuera así, cambiar de filtro cambiaría la afinación
+del panel, que es peor que no poder cambiar. La CURVA con la que cada topología
+llega a ese borde es suya y la declara: una Q exponencial de 1/√2 a 20 en el TPT,
+una realimentación de escalera en el de ecuación.
+
+| Miembro | Dónde | Modos | De dónde sale el corte |
+|---|---|---|---|
+| `FilterTpt` | `DspCore/DspFilterTpt.h` | paso bajo, paso alto, banda | la curva de mando de la familia |
+| `FilterEquation` | `DspCore/DspFilterEquation.h` | paso bajo | la misma curva; escalera de cuatro polos con el lazo resuelto **sin retardo** |
+| `FilterLut` | `LutDSP/LutFilter.h` | paso bajo | **medido**: tabla de ABDAudioLab, interpolación bilineal, sobre el núcleo TPT |
+
+El `processBlock` (float y double) es de la familia y no lo implementa cada
+miembro. Y el rasgo `IsFilterStage<T>` convierte la convención en algo que el
+compilador comprueba: `static_assert (IsFilterStage<MiFiltro>::value, "...")`.
+
+Dos cosas **medidas** que conviene saber antes de tocar esto:
+
+- El miembro TPT repite a propósito la formulación de `ResonantFilterStage` (a la
+  etapa compartida no se le tocan los taps: tiene su AGC y hay productos que ya la
+  usan), y un test compara las dos salidas a resonancia 0 y exige **1e-12**. La
+  repetición está vigilada: si se separan, cae el test, no el oído.
+- El tope de resonancia del miembro de ecuación está **por encima** del umbral
+  lineal de 4.0 (en 4.5) porque con el `tanh` en el lazo un `k = 4.0` exacto **no
+  canta, se apaga**: saturar baja la ganancia en cuanto la señal deja de ser
+  infinitesimal. Lo encontró el test de "a tope la escalera canta".
+
+**Verificado**: 2316 comprobaciones de DspCore (las nuevas de la familia incluidas)
+y 33 de LutDSP, los dos a C++17 y sin JUCE.
+
+---
+
+### La familia de osciladores: dos osciladores, un solo contrato
+
+`SynthCore/OscillatorFamily.h` es la hermana de la familia de filtros: el contrato
+que todo oscilador del módulo honra, para que cambiar de oscilador en un synth no
+sea reescribir su voz. Es el mismo patrón por convención (ni clase base ni vtable
+en el lazo de audio) y son quince métodos:
+
+```cpp
+void         prepare (double sampleRate) noexcept;
+void         reset () noexcept;
+void         setFrequency (double hz) noexcept;       // en Hz, no en 0..1
+bool         setWaveform (OscWaveform) noexcept;      // false = no lo honra
+bool         setOversampling (int factor) noexcept;   // 1/2/4/8; false = no lo honra
+void         setPulseWidth (double duty01) noexcept;  // 0.5 = cuadrada
+double       processSample () noexcept;
+double       getFrequency () const noexcept;          // la que SE ESTA usando
+double       getPhase () const noexcept;
+OscWaveform  getWaveform () const noexcept;
+int          getOversampling () const noexcept;
+double       getPulseWidth () const noexcept;
+double       getLatencySamples () const noexcept;
+bool         supportsWaveform (OscWaveform) noexcept;
+bool         supportsOversampling (int factor) noexcept;
+```
+
+Y un renglón para engancharlo:
+
+```cpp
+using VoiceOsc = abd::synth::OscVcoCa72;   // o abd::synth::OscPolyBlep
+```
+
+**El idioma de los parámetros** es, otra vez, la mitad de la familia: la
+frecuencia en Hz (y `getFrequency()` devuelve la que de verdad está usando, no la
+que le pidieron), un enumerado de formas **básicas**, el ancho de pulso en 0..1 con
+el mismo significado en todos (0.5 cuadrada; `oscMinPulseWidth` y
+`oscMaxPulseWidth` recortan lo que no es un pulso), la salida bipolar y
+nominalmente ±1 (`oscNominalPeak`) —para que cambiar de oscilador no cambie el
+nivel que ve el mezclador— y el sobremuestreo como factor 1/2/4/8. La CURVA con la
+que cada pieza llega a ese idioma es suya y la declara: el VCO resuelve la
+corriente de su propio núcleo para dar la frecuencia pedida; el de fase se queda en
+0,45 de Nyquist porque su corrección de un salto abarca un periodo de muestreo a
+cada lado.
+
+| Miembro | Dónde | `kind` | Formas | De dónde sale su carácter |
+|---|---|---|---|---|
+| `OscVcoCa72` | `SynthCore/OscVcoCa72.h` | `Circuit` | sierra, triángulo, rectángulo | **medido**: el perfil del banco de pruebas (`OscVcoCa72Profile.h`) |
+| `OscPolyBlep` | `SynthCore/OscPolyBlep.h` | `Phase` | las cuatro | las formas básicas exactas, sobre el `PolyBLEP` que ya tenía el módulo |
+| `OscReference` | `SynthCore/OscReference.h` | `Phase` | sierra, seno | el esqueleto del contrato: las dos formas que tiene esta versión del prototipo, y lo que le falta dicho en voz alta (triángulo y rectángulo, ningún sobremuestreo). No es una pieza de sonido, es la referencia estandarizada de cómo se escribe un miembro nuevo aquí |
+
+El `processBlock` (float y double) es de la familia y no lo implementa cada
+miembro. Y el rasgo `IsOscillator<T>` convierte la convención en algo que el
+compilador comprueba: `static_assert (IsOscillator<MiOscilador>::value, "...")`.
+Un miembro a medias —le falta `getPhase()`— no pasa el rasgo, y hay un test que lo
+comprueba con un oscilador a medias puesto a propósito.
+
+#### La pieza portada: el VCO de rampa
+
+`OscVcoCa72` es el VCO de un sintetizador analógico de los años 70 tal como está
+medido en el banco de pruebas de su estudio: un condensador que integra una
+corriente, un disparador de Schmitt que reinicia la rampa cuando cruza su umbral
+(con el **retardo del comparador** y la espera del transistor) y tres
+conformadores que salen del mismo nodo: el separador, su diente de sierra y el
+comparador del rectángulo con su histéresis. Su hardware entra como DATOS
+(`OscVcoCa72Profile.h`): capacidades, umbrales, retardos y las constantes de cada
+conformador, a 25 °C y sin carga. La curva **medida** de la transferencia del
+triángulo (891 puntos en la referencia) no se incrusta: se **inyecta**
+(`setTriangleTable`), y por defecto el perfil trae los tres puntos de esa curva en
+el barrido del núcleo —su pliegue y sus dos extremos—, con los que el triángulo
+sale asimétrico, que es como es.
+
+Reescrito limpio desde la idea: la referencia está bajo GPL y **no se ha copiado ni
+una línea**; lo único que viaja son los números medidos del aparato, que sin ellos
+la pieza no sería el aparato sino un oscilador genérico.
+
+Tres cosas que este trabajo encontró **midiendo**, y que conviene saber antes de
+tocar esto:
+
+- **La fase de este núcleo es tiempo, no tensión.** La rampa es cóncava (la
+  corriente baja al caer la tensión), así que la mitad de su RECORRIDO la alcanza
+  en el 49,26 % de su TIEMPO. Con la fase medida en tensión, el ancho de pulso de
+  la familia mentía un 0,7 % en la mitad del ciclo. Lo encontró el test del ancho
+  (0.50 daba 0.491); ahora da 0.499, y las dos cosas —`getPhase()` y la curva de
+  ancho— pasan por la misma ley despejada, que es lo que impide que se separen.
+- **El comparador no llega a cualquier ancho.** Más estrecho que 0,051 de ciclo, su
+  umbral de subida queda por encima del techo del separador y el rectángulo se
+  queda ABAJO para siempre, que no es un pulso fino sino una avería. La pieza lo
+  declara (`minPulseWidth()`) y lo recorta, en vez de sonar mal.
+- **La corriente se busca en logaritmo.** La corriente útil del núcleo va de las
+  décimas de nanoamperio de la nota más grave al miliamperio del tope: cuatro
+  décadas. Bisecar en lineal daba la misma precisión ABSOLUTA en todo el
+  recorrido, o sea una precisión relativa pésima abajo, y el test de 0,05 Hz lo
+  dijo. Ahora la bisección va en logaritmo y la frecuencia se clava.
+
+El limitado de banda tampoco es una promesa. La pieza corre su núcleo a 1, 2, 4 u 8
+veces la frecuencia de salida, coloca los escalones del reinicio y de los flancos
+del rectángulo en su instante exacto (polyBLEP, con el área del rizo del triángulo
+y del retraso del separador) y baja con `SynthCore/OscHalfbandDecimator.h` (etapas
+de media banda: la corta delante y la larga al final, y los coeficientes a
+distancia par del centro, que valen cero de verdad, saltados — que es lo que hace
+pagable el 8× dentro de una voz). Medido: para un diente de sierra de 7 kHz, la
+basura que a 1× queda en 16,1 kHz (el cuarto armónico plegado) vale 2,6e-2, y a 8×
+vale 8,0e-7. El diezmador, solo, deja pasar un tono dentro de la banda que
+sobrevive a 1,0000 y tapa uno por encima del nuevo Nyquist a 1e-6. Y la pieza
+**declara su retardo** en vez de mentir con un oscilador que suena medio periodo
+antes: 1,0 muestra de salida a 1× y 23,75 a 8×.
+
+Lo que la pieza NO hace, dicho en voz alta: **no tiene seno** (`supportsWaveform`
+dice que no y `setWaveform` lo rechaza sin cambiar nada), y la cadena
+voltios→corriente del convertidor exponencial —los trimpots, el par de transistores
+y su temperatura— queda fuera a propósito, porque el idioma de la familia es Hz y
+esa conversión ya la ha hecho quien pide. Lo que sí se queda es lo que el
+convertidor le hace a la rampa: la corriente cae al caer la rampa (el efecto
+Early), y por eso la rampa es un poco cóncava y el diente de sierra no es una
+recta. La puerta del circuito sigue abierta para quien quiera modular en
+corriente —que es como lo hace el aparato—: `setTimingCurrent`.
+
+**Verificado**: 2097 comprobaciones de `ABDShared_SynthCore_Tests` (las nuevas de
+la familia incluidas), exit 0. Y la medición que más vale de todas: el peor error
+de frecuencia medido entre 55 Hz y 4 kHz es 0,0071 %, y una octava es exactamente el
+doble de periodo.
+
 ---
 
 ## Módulo: MidiKeyboard (WebUI/JS)
@@ -2196,13 +2389,88 @@ Evaluación ultra-rápida de Look-Up Tables multidimensionales con aceleración 
 target_link_libraries(TuProyecto PRIVATE ABDShared::LutDSP)
 ```
 
+El target enlaza `ABDShared::DspCore` en `INTERFACE`: quien enlaza LutDSP ya tiene
+el sustrato y el contrato de la familia de filtros, así que no hay que añadirlo a
+mano. Su test standalone se apaga con `-DABDSHAREDCODE_BUILD_LUTDSP_TESTS=OFF`.
+
 ### Componentes
 
 - **`abd::lutdsp::LutEvaluatorSimd`**:
   Evaluador SIMD de tablas 1D y 2D (con interpolación bilineal / bicúbica Catmull-Rom) optimizado para llamadas en bloque dentro del callback de audio de tiempo real.
 - **`abd::lutdsp::AnalogLutFilterModule`**:
   Módulo de filtrado polifónico de 8 voces con suavizado balístico exponencial (`smoothingRate`) para evitar artefactos en saltos bruscos de modulación analógica.
+- **`abd::lutdsp::FilterLut`**:
+  El miembro LUT de la familia de filtros (ver la sección de DspCore): el corte y la Q salen de una tabla **medida** (`AbdBatchedPoint`, con interpolación bilineal) y el núcleo que los toca es el TPT del sustrato, así que habla el mismo idioma que `FilterTpt` y `FilterEquation` y se puede cambiar por ellos. Se le da la geometría real del fichero generado (`loadTable (puntos, columnas, filas)`; el modelo del repo es 8×4) y, sin tabla, se comporta como el analítico de la familia, cosa que declara `hasTable()`.
 
+
+---
+
+## Módulo: Scope
+
+Osciloscopio analítico multi-lane embebido en WebView2: taps nativos C++ que capturan a rate de bloque (master, pre-FX, osc-mix, post-filter...), snapshot lock-free a 60 FPS y WebUI embebida como binary data. Este módulo vivía en el repo hermano `ABDScope`; desde v0.4.0 es un subtree aquí (`Scope/`), con los temas e iconos canónicos en `ABDSharedAssets`.
+
+### Integración en CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::ScopeCore)
+```
+
+**No** hagas `add_subdirectory(../ABDScope)` ni un `FetchContent` del repo
+`ABDScope`: el módulo ya está registrado aquí y dos `add_subdirectory` del
+mismo módulo en un mismo build matan la configuración con
+`add_library cannot create target ABDScopeCore because another target with the
+same name already exists`. Trae tu JUCE **antes** de anadir ABDSharedCode, para
+que `juce_add_binary_data` exista en alcance y la WebUI se embeba.
+
+Tres aliases, según lo que necesites:
+
+| Target | Qué da |
+|---|---|
+| `ABDShared::ScopeCore` | core + glue JUCE (componente WebView2 + resource provider) + WebUI embebida. El que enlaza un producto. |
+| `ABDShared::ScopeCoreHeaders` | solo el core C++ header-only, sin JUCE: tests, tools y TUs DSP. |
+| `ABDShared::ScopeWebAssets` | los binarios de la WebUI (solo existe si `juce_add_binary_data` está en alcance; sin JUCE la WebUI se sirve por filesystem). |
+
+Los include dirs que propaga `ScopeCoreHeaders` son `Scope/Source` y
+`Scope/Source/Core`, así que los includes son a pelo:
+
+```cpp
+#include <ScopeDataCollector.h>           // core header-only
+#include <JUCE/JuceWebScopeComponent.h>   // componente WebView2
+```
+
+Bajo EMSCRIPTEN el glue JUCE no se enlaza (el puente `WebView2Bridge` no
+existe sin `juce_gui_extra` y el probe cae al fallback), pero el core
+header-only sigue disponible: cualquier TU WASM que quiera capturar
+telemetría puede incluir `<ScopeDataCollector.h>` igual que la nativa.
+
+### Componentes
+
+- **`abd::scope::ScopeDataCollector`**: recolector de telemetría lock-free (POE) que expone los taps registrados y sus snapshots a 60 FPS. Es lo que el motor produce y lo que el componente consume.
+- **`abd::scope::ScopeTap` / `TapId` / `ScopeTapType`**: canal de captura nativo por bloque (flush al terminar cada buffer de audio), con id estable para nombrar lanes en la WebUI.
+- **`abd::scope::ScopeFrameSerializer`**: serializa los frames capturados para el puente WebView2.
+- **`abd::scope::TriggerDetector`** y **`SpscRingBuffer`**: armónicas del core (trigger de forma de onda y cola SPSC) usadas por los taps.
+- **`abd::scope::JuceWebScopeComponent`** (`JUCE/`): componente JUCE WebView2 que embebe la WebUI del osciloscopio (multi-lane + waterfall) y la alimenta desde un `ScopeDataCollector`.
+- **`abd::scope::ScopeResourceProvider`** (`JUCE/`): sirve los assets embebidos (catálogo binario + fallback a `ABDSharedAssets`).
+
+### Ejemplo de Uso
+
+```cpp
+#include <ScopeDataCollector.h>
+#include <JUCE/JuceWebScopeComponent.h>
+
+// El motor expone su recolector (p. ej. ABDMS2000 SynthEngine::getScopeCollector)
+auto &collector = engine.getScopeCollector();
+
+// Componente WebView2 con la WebUI embebida: collector, sample rate, FPS
+auto webScope = std::make_unique<abd::scope::JuceWebScopeComponent>(
+    collector, engine.getSampleRate(), 30);
+webScope->setTheme("ms2000"); // tema canónico de ABDSharedAssets
+
+// Activar los lanes (taps) al mostrar la ventana
+for (size_t i = 0; i < collector.getTapCount(); ++i)
+    if (auto *tap = collector.getTap(i))
+        tap->setActive(true);
+```
 
 ---
 

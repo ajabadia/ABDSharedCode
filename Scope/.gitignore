@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# C++ Build outputs & artifacts
+build/
+build*/
+_juce_build/
+bin/
+dist/
+out/
+x64/
+Debug/
+Release/
+
+# Compiled binary formats
+*.exe
+*.dll
+*.so
+*.dylib
+*.wasm
+*.obj
+*.o
+*.pdb
+*.ilk
+*.lib
+*.a
+*.exp
+
+# Testing & Coverage
+coverage/
+.vitest/
+
+# IDE & OS Specific
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.user.*
+*.sln.docstates
+.DS_Store
+Thumbs.db

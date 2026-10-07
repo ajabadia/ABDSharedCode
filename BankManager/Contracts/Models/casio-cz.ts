@@ -231,7 +231,12 @@ const casioCzContract: ModelContract = {
 export const casioCz1000Contract: ModelContract = {
   ...casioCzContract,
   modelId: 'casio-cz1000',
-  compatibleModels: ['casio-cz5000', 'casio-cz1'],
+  // Simetria de familia como cz5000/cz1: familia completa menos si mismo.
+  // Sin cz101 aqui, un banco CZ-101 sin hardwareIds no aparecia bajo CZ-1000
+  // (si bajo CZ-5000/CZ-1) — el espejo contracts/casio_cz1000.json de
+  // ABDSharedAssets ya lo traia; el canónico TS se habia quedado corto en el
+  // corte F4 (1bc971f).
+  compatibleModels: ['casio-cz101', 'casio-cz5000', 'casio-cz1'],
   displayName: 'Casio CZ-1000',
   thumbnail: 'casio-cz1000.webp',
   legacySysEx: { ...casioCzContract.legacySysEx!, modelIdByte: 0x13 }

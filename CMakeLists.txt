@@ -710,3 +710,49 @@ if(COMMAND juce_add_binary_data)
         add_library(ABDShared::StudioTopologyAssets ALIAS StudioTopologyAssets)
     endif()
 endif()
+
+# --- Scope Module ---
+# El osciloscopio analitico de la suite (subtree de ABDScope desde v0.4.0):
+# core C++ header-only (ScopeTap, ScopeDataCollector, ScopeFrameSerializer,
+# SpscRingBuffer, TriggerDetector) + glue JUCE (JuceWebScopeComponent,
+# ScopeResourceProvider) + WebUI embebida como binary data.
+#
+# FUENTE UNICA DE VERDAD: el codigo vive AQUI (Scope/) y los consumidores
+# enlazan `ABDShared::ScopeCore` en vez de hacer su propio
+# `add_subdirectory(../ABDScope)`. Si funciona, funciona igual para todos; si
+# se arregla, se arregla para todos; si se rompe, se rompe para todos. Y no
+# puede haber DOS add_subdirectory del mismo modulo en un build: CMake muere
+# con "add_library cannot create target ABDScopeCore because another target
+# with the same name already exists", que es exactamente lo que pasaria si un
+# consumidor siguiera anadiendo ../ABDScope al lado de este bloque.
+#
+# EL ORDEN IMPORTA: Scope/Source/CMakeLists.txt hace
+# `if(TARGET ABDShared::WebView2Bridge)` para decidir entre enlazar el puente
+# o caer a un simple include dir, asi que este bloque va DESPUES del de
+# WebView2Bridge (arriba). Bajo EMSCRIPTEN el puente no existe (juce_gui_extra
+# no esta en las builds WASM), el probe cae al fallback y el core header-only
+# sigue disponible: cualquier TU WASM futura que incluya
+# `<ScopeDataCollector.h>` (hoy ninguna lo hace: SynthEngine.cpp esta fuera de
+# MS2000_DSP_SOURCES_WASM por juce_audio_processors) encuentra el include path.
+#
+# add_subdirectory sin condiciones: el CMakeLists de Scope ya trae sus propias
+# compuertas (probe de JUCE solo en standalone, juce_add_binary_data solo si
+# el comando existe, GuiDemo solo en standalone), asi que anadirlo aqui no
+# arrastra JUCE a nadie ni anade targets de demo a los builds de producto.
+add_subdirectory(Scope)
+
+# Aliases ABDShared::Scope*: los targets reales conservan su nombre ABDScope*
+# (heredado del repo original, que sigue existiendo como hermano hasta que se
+# archive) y los alias son la interfaz que documenta el guia y enlazan los
+# consumidores. ALIAS del target real, nunca del alias (ABDScope::ABDScopeCore
+# es ya un alias; enlazar a traves de dos saltos no anade nada).
+add_library(ABDShared::ScopeCoreHeaders ALIAS ABDScopeCoreHeaders)
+add_library(ABDShared::ScopeCore ALIAS ABDScopeCore)
+
+# La WebUI embebida solo existe si juce_add_binary_data esta en alcance (el
+# consumidor trajo su JUCE antes de anadir ABDSharedCode). Sin JUCE — builds
+# WASM, o consumidores que solo quieren el core— no hay target y la WebUI se
+# sirve por filesystem, que es el fallback documentado del propio modulo.
+if(TARGET ABDScopeWebAssets)
+    add_library(ABDShared::ScopeWebAssets ALIAS ABDScopeWebAssets)
+endif()

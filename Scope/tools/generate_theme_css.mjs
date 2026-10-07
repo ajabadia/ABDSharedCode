@@ -1,0 +1,166 @@
+#!/usr/bin/env node
+/**
+ * generate_theme_css.mjs — ABDScope theme cascade generator
+ *
+ * Produces ABDScope/WebUI/src/theme.generated.css from the canonical sources:
+ *   - ABDSharedAssets/styles/themes/*.css  (host palettes)
+ *   - ABDSharedAssets/styles/components/scope.css  (module→host adapter)
+ *
+ * The generated file is committed alongside the module so the embedded
+ * binary-data WebUI stays self-contained
+ * (nothing is read from disk at runtime).
+ * Kept in sync by WebUI/tests/theme.test.js.
+ *
+ * Resolved paths:
+ *   ROOT            — workspace root: first dir ABOVE this file (or cwd) that
+ *                     contains ABDSharedAssets/ (suite root in both layouts:
+ *                     standalone ABDScope/ and subtree ABDSharedCode/Scope/)
+ *   SCOPE_WEBUI     — <this module>/WebUI (derived from THIS file, never from
+ *                     ROOT: ROOT/ABDScope only exists in the standalone repo)
+ *   SCOPE_SRC       — <this module>/WebUI/src
+ *   OUT_PATH        — <this module>/WebUI/src/theme.generated.css
+ *   THEMES_DIR      — ABDSharedAssets/styles/themes
+ *   ADAPTER_PATH    — ABDSharedAssets/styles/components/scope.css
+ */
+
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+// Primer directorio, subiendo desde `start`, que contiene ABDSharedAssets/.
+// Busqueda hacia arriba y no un ../../.. fijo: en el repo standalone este
+// script esta en ABDScope/tools (ABDSharedAssets es hermano de ABDScope), y en
+// el subtree esta en ABDSharedCode/Scope/tools (ABDSharedAssets es hermano de
+// ABDSharedCode, tres niveles mas arriba). La misma clase de bug que
+// WebUI/tests/theme.test.js: una raiz escrita a mano solo es cierta en uno de
+// los dos layouts, y en el otro falla — o peor, escribe en el repo equivocado.
+function findRootFrom(start) {
+  let dir = start;
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(resolve(dir, 'ABDSharedAssets'))) return dir;
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return null;
+}
+
+function resolveRoot() {
+  const argv = process.argv;
+  const explicit = argv.find((a) => !a.startsWith('--') && /ABDSharedAssets/.test(a));
+  if (explicit) {
+    const p = resolve(explicit);
+    if (existsSync(p)) return resolve(p, '..');
+  }
+
+  const fromCwd = findRootFrom(process.cwd());
+  if (fromCwd) return fromCwd;
+
+  const fromHere = findRootFrom(HERE);
+  if (fromHere) return fromHere;
+
+  throw new Error(
+    [
+      'No se encuentra ABDSharedAssets desde el workspace actual.',
+      'Sube por los directorios hasta encontrarla (raíz de la suite) o pasa',
+      'la ruta base explícita como primer argumento no opcional.',
+      '',
+      `cwd actual: ${process.cwd()}`,
+    ].join('\n')
+  );
+}
+
+const ROOT = resolveRoot();
+// SCOPE_DIR sale de ESTE fichero y no de ROOT: ROOT/ABDScope solo existe en el
+// repo standalone. Aqui el modulo es ROOT/ABDSharedCode/Scope, y HERE/.. es el
+// directorio WebUI del modulo en los dos layouts.
+const SCOPE_DIR = resolve(HERE, '..');
+const SCOPE_WEBUI = join(SCOPE_DIR, 'WebUI');
+const SCOPE_SRC = join(SCOPE_WEBUI, 'src');
+
+const ABS_ASSETS = join(ROOT, 'ABDSharedAssets');
+const THEMES_DIR = join(ABS_ASSETS, 'styles', 'themes');
+const ADAPTER_PATH = join(ABS_ASSETS, 'styles', 'components', 'scope.css');
+
+const OUT_PATH = join(SCOPE_SRC, 'theme.generated.css');
+
+const normalize = (css) => css.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
+
+function readCanonical() {
+  if (!existsSync(ABS_ASSETS)) {
+    throw new Error(`ABDSharedAssets no está en el workspace: ${ABS_ASSETS}`);
+  }
+  if (!existsSync(THEMES_DIR)) {
+    throw new Error(`ABDSharedAssets/styles/themes no está: ${THEMES_DIR}`);
+  }
+  if (!existsSync(ADAPTER_PATH)) {
+    throw new Error(`El adaptador no está: ${ADAPTER_PATH}`);
+  }
+
+  const themeFiles = readdirSync(THEMES_DIR)
+    .filter((f) => f.endsWith('.css'))
+    .sort();
+
+  const themes = themeFiles.map((f) => {
+    const raw = readFileSync(join(THEMES_DIR, f), 'utf8');
+    return { file: f.replace(/\.css$/, ''), css: normalize(raw) };
+  });
+
+  const adapterRaw = readFileSync(ADAPTER_PATH, 'utf8');
+  const adapter = normalize(adapterRaw);
+
+  return { themes, adapter };
+}
+
+function buildGenerated({ themes, adapter }) {
+  const header = [
+    '/**',
+    ' * ABDScope Theme Cascade (generated)',
+    ' * ===============================',
+    ' * Host-driven theme palettes, generated at development time from',
+    ' * ABDSharedAssets/styles/themes/*.css plus the component adapter',
+    ' * ABDSharedAssets/styles/components/scope.css.',
+    ' *',
+    ' * Commited alongside el módulo: the embedded binary-data WebUI',
+    ' * loads this static file and never reads from disk at runtime.',
+    ' *',
+    ' * Generated by: tools/generate_theme_css.mjs',
+    ' * Sync guard:   WebUI/tests/theme.test.js',
+    ' */',
+    '',
+  ].join('\n');
+
+  const themeBlocks = themes.map(({ file, css }) => {
+    return [
+      `/* ── theme: ${file} ── */`,
+      `/* canonical: ABDSharedAssets/styles/themes/${file}.css */`,
+      css,
+      '',
+    ].join('\n');
+  });
+
+  const adapterComment = [
+    '/* ── adapter: module tokens → host tokens ── */',
+    '/* canonical: ABDSharedAssets/styles/components/scope.css */',
+    adapter,
+    '',
+  ].join('\n');
+
+  return header + themeBlocks.join('\n') + adapterComment;
+}
+
+function main() {
+  const canon = readCanonical();
+  const generated = buildGenerated(canon);
+
+  mkdirSync(SCOPE_SRC, { recursive: true });
+  writeFileSync(OUT_PATH, generated, 'utf8');
+
+  console.log(`generated ${OUT_PATH}`);
+  console.log(`  themes: ${canon.themes.length}`);
+  console.log(`    ${canon.themes.map((t) => t.file).join(', ')}`);
+}
+
+main();

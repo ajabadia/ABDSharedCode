@@ -1,0 +1,53 @@
+{
+  "name": "@abdsynths/scope",
+  "version": "0.4.0",
+  "description": "Universal lock-free audio visualizer and analysis engine for ABDSynths suite",
+  "type": "module",
+  "main": "./src/scope.js",
+  "exports": {
+    ".": "./src/scope.js",
+    "./trigger": "./src/trigger.js",
+    "./frame": "./src/frame.js",
+    "./input/AnalyserInput": "./src/input/AnalyserInput.js",
+    "./input/PushInput": "./src/input/PushInput.js",
+    "./renderers/OscilloscopeRenderer": "./src/renderers/OscilloscopeRenderer.js",
+    "./renderers/SpectrumRenderer": "./src/renderers/SpectrumRenderer.js",
+    "./renderers/LissajousRenderer": "./src/renderers/LissajousRenderer.js",
+    "./renderers/PhaseMeterRenderer": "./src/renderers/PhaseMeterRenderer.js",
+    "./renderers/VuMeterRenderer": "./src/renderers/VuMeterRenderer.js",
+    "./renderers/SpectrogramRenderer": "./src/renderers/SpectrogramRenderer.js",
+    "./renderers/BaseRenderer": "./src/renderers/BaseRenderer.js",
+    "./mount/EmbeddedMount": "./src/mount/EmbeddedMount.js",
+    "./mount/FloatingMount": "./src/mount/FloatingMount.js",
+    "./mount/MountBase": "./src/mount/MountBase.js",
+    "./mount/LaneController": "./src/mount/LaneController.js",
+    "./utils/exportImage": "./src/utils/exportImage.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "serve": "npx serve . -l 8080"
+  },
+  "keywords": [
+    "audio",
+    "visualizer",
+    "oscilloscope",
+    "spectrum",
+    "fft",
+    "lissajous",
+    "vst",
+    "juce"
+  ],
+  "author": "ABDSynths",
+  "license": "Proprietary",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.0.0",
+    "jsdom": "^30.0.1",
+    "serve": "^14.2.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

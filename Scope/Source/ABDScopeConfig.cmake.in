@@ -1,0 +1,25 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(NOT TARGET ABDScope::ABDScopeCore)
+  add_library(ABDScope::ABDScopeCore INTERFACE IMPORTED)
+
+  set_target_properties(ABDScope::ABDScopeCore PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES
+      "${PACKAGE_PREFIX_DIR}/include/abd/scope/Core"
+      "${PACKAGE_PREFIX_DIR}/include/abd/scope/JUCE"
+  )
+
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set_target_properties(ABDScope::ABDScopeCore PROPERTIES
+      INTERFACE_COMPILE_OPTIONS "/MD"
+    )
+  else()
+    set_target_properties(ABDScope::ABDScopeCore PROPERTIES
+      INTERFACE_COMPILE_OPTIONS "-fPIC"
+    )
+  endif()
+
+  target_compile_definitions(ABDScope::ABDScopeCore INTERFACE ABD_SCOPE_EXPORTS)
+endif()
