@@ -80,7 +80,7 @@ private:
     {
         for (size_t i = 0; i < scopeCollector.getTapCount(); ++i)
         {
-            auto* tap = const_cast<ScopeTap*>(scopeCollector.getTap(i));
+            auto* tap = scopeCollector.getTap(i);
             if (tap != nullptr)
                 tap->setActive(true);
         }
@@ -129,7 +129,7 @@ private:
 
         for (size_t i = 0; i < total; ++i)
         {
-            auto* tap = const_cast<ScopeTap*>(scopeCollector.getTap(i));
+            auto* tap = scopeCollector.getTap(i);
             if (tap != nullptr)
                 tap->setActive(referenceCount[i] > 0);
         }
@@ -147,7 +147,7 @@ private:
         bool first         = true;
         for (size_t i = 0; i < count; ++i)
         {
-            auto* tap = const_cast<ScopeTap*>(scopeCollector.getTap(i));
+            auto* tap = scopeCollector.getTap(i);
             if (tap == nullptr || !tap->isActive()) continue;
 
             std::string tapJson = frameSerializer.serializeActiveFrame(tap, sr);
