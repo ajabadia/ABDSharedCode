@@ -41,13 +41,15 @@ Los consumidores integran el módulo añadiendo `ABDSharedCode` a su build.
 target_link_libraries(MiProyecto PRIVATE ABDShared::ScopeCore)
 ```
 
-### 3.1 Targets Exportados
+### 3.1 Targets Exportados y Frontera de Dependencias
 
-| Target CMake | Tipo | Alcance y Propósito |
+Se delimita la arquitectura de targets en tres niveles ortogonales:
+
+| Target CMake | Tipo | Alcance, Componentes y Propósito |
 |---|---|---|
-| **`ABDShared::ScopeCore`** | `INTERFACE` | **Target principal para productos con UI.** Incluye el core C++20, el pegamento JUCE (`JuceWebScopeComponent`, `ScopeResourceProvider`) y el target de binarios web (`ABDShared::ScopeWebAssets`) si JUCE está disponible. |
-| **`ABDShared::ScopeCoreHeaders`** | `INTERFACE` | **Target header-only puro (cero dependencias externas).** No requiere JUCE ni WebView2. Diseñado para motores de audio en tiempo real, arneses de tests aislados, utilidades de línea de comandos y compilaciones WebAssembly (Emscripten). |
-| **`ABDShared::ScopeWebAssets`** | `INTERFACE` | Target generado vía `juce_add_binary_data` que empaqueta todos los recursos de `WebUI/` en código C++ compilado. |
+| **`ABDShared::ScopeCoreHeaders`** | `INTERFACE` | **Core C++20 header-only puro (cero dependencias externas).**<br>• Componentes: `<Core/SpscRingBuffer.h>`, `<Core/ScopeTap.h>`, `<Core/ScopeTapType.h>`, `<Core/ScopeDataCollector.h>`, `<Core/TapId.h>`, `<Core/TriggerDetector.h>`, `<Core/ScopeFrameSerializer.h>`.<br>• Cero JUCE, cero WebView2, cero assets web.<br>• Destinado a motores DSP en tiempo real, utilidades CLI, arneses de pruebas unitarias puras y compilaciones WebAssembly (Emscripten). |
+| **`ABDShared::ScopeCore`** | `INTERFACE` | **Target principal para hosts de producto con GUI JUCE.**<br>• Incluye: `ScopeCoreHeaders` + pegamento JUCE (`JuceScopeComponent.h`, `JuceWebScopeComponent.h`, `ScopeResourceProvider.h/.cpp`).<br>• **Transitividad de Assets:** Enlaza transitivamente `ABDShared::ScopeWebAssets` (`target_link_libraries(ABDScopeCore INTERFACE ABDScopeWebAssets)` en `Scope/CMakeLists.txt`) cuando JUCE está en alcance.<br>• **Consumo Simplificado:** El producto host solo necesita enlazar `target_link_libraries(MiHost PRIVATE ABDShared::ScopeCore)`. **No se requiere enlazar `ABDShared::ScopeWebAssets` de forma manual**. |
+| **`ABDShared::ScopeWebAssets`** | `INTERFACE` | **Binarios de recursos web compilados.**<br>• Generado condicionalmente mediante `juce_add_binary_data(ABDScopeWebAssets ...)` conteniendo los módulos empaquetados de `WebUI/src/*` e `index.html`.<br>• Si `juce_add_binary_data` no está disponible (e.g. toolchains WASM o consumidores sin JUCE), este target no se genera y el módulo opera en modo fallback de sistema de archivos. |
 
 ### 3.2 Regla de Exclusión de `add_subdirectory(../ABDScope)`
 ⛔ **Está terminantemente prohibido incluir `add_subdirectory(../ABDScope)` o un `FetchContent` paralelo del repositorio legado `ABDScope`.**
@@ -125,8 +127,18 @@ Para certificar que el módulo `ABDSharedCode/Scope` es completamente autónomo 
    * Configurado en `Scope/CMakeLists.txt` enlazando exclusivamente `ABDScopeCoreHeaders`.
    * Verifica `SpscRingBuffer`, `ScopeDataCollector`, `TriggerDetector` (incluyendo tracking de 55 Hz A1) y serialización JSON.
    * Ejecutable directamente desde `Scope/build.bat` sin requerir JUCE ni dependencias externas.
-2. **Suite WebUI Vitest:**
-   * 56 tests unitarios en `WebUI/tests/` ejecutados bajo Node.js / happy-dom.
+2. **Suite WebUI Vitest (`WebUI/tests/`):**
+   * **62 tests pasando \| 1 omitido (63 tests totales en 9 suites de pruebas)** bajo Node.js / happy-dom:
+     - `frame.test.js` (10 tests): Normalización de trama `ScopeDataFrame`, cálculo de picos y RMS.
+     - `icons.test.js` (3 tests): Catálogo SVG canónico y paridad con `ABDSharedAssets`.
+     - `input.test.js` (5 tests): Proveedor de entrada `PushInput` vía IPC/bridge y `AnalyserInput` WebAudio.
+     - `lane.test.js` (11 tests): Empaquetado inteligente de carriles, control de ancho 50%/100%, freeze y snapshots.
+     - `renderers.test.js` (13 tests): Osciloscopio temporal, analizador FFT logarítmico, vectorescopio Lissajous M/S, correlación estéreo y espectrograma cascada.
+     - `scope.test.js` (3 tests): Orquestador fábrica `createScope`, montaje en DOM y ciclo de vida.
+     - `smoke.test.js` (2 tests): Inicialización DOM y arranque básico.
+     - `theme.test.js` (4 tests): Inyección de temas, CSS custom properties y paridad con `ABDSharedAssets`.
+     - `trigger.test.js` (12 tests): Estabilización por histéresis adaptativa y pitch lock en sub-graves.
+   * *Nota:* La suite histórica de 56 tests de v0.3.x creció a 63 tests al incorporar la validación de empaquetado y control de ancho de carriles en `lane.test.js` y `renderers.test.js`.
 
 ---
 
