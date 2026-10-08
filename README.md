@@ -8,18 +8,21 @@ Repositorio: https://github.com/ajabadia/ABDSharedCode.git
 
 | Módulo | Contenido | Tipo | Target CMake | Consumidores |
 |---|---|---|---|---|
-| **SynthCore** | Primitivas DSP de los sintetizadores (`abd::synth`): PolyBLEP, ADSR, EnvelopeCurves, PortamentoGlide, LFO, AudioThreadSnapshot, VoiceAllocator, **ModMatrix**, DSPUtils | STATIC | `ABDShared::SynthCore` | ABDMS2000, ABDEep, ABDMS2000/ABDEep/ABDNeural (ModMatrix, header-only) |
-| **DspCore** | Sustrato portado de `juce_core`/`juce_audio_basics` (`abd::dsp`): Maths, Range, SmoothedValue, HeapBlock, AudioBuffer, FloatVectorOperations, MidiMessage/Buffer, Debug, LeakedObjectDetector, `DspMath` (trascendentes deterministas) y `ResonantFilterStage` (sección de paso bajo resonante que se auto-oscila y **se asienta** en un nivel) | INTERFACE (header-only, **sin JUCE**) | `ABDShared::DspCore` | ABDNeural (+ DspEffects) |
+| **SynthCore** | Primitivas DSP de los sintetizadores (`abd::synth`): PolyBLEP, ADSR, EnvelopeCurves, PortamentoGlide, LFO, AudioThreadSnapshot, VoiceAllocator, **ModMatrix**, DSPUtils, **Arpeggiator** (motor determinista de 11 modos, sample-accurate, zero-alloc). Y **la familia de osciladores**: `OscillatorFamily` (el contrato común, el idioma de sus parámetros en Hz y el rasgo `IsOscillator`), `OscVcoCa72` (el VCO de rampa, con su perfil medido como dato), `OscPolyBlep` (acumulador de fase) y `OscReference` (el prototipo estandarizado de nuevo miembro). Y **el convertidor exponencial independiente**: `CvToControl` (CA-72: teclado + VTUNE + trimpots → corriente de temporización, como puerta inyectable en cualquier VCO que reciba corriente) | STATIC | `ABDShared::SynthCore` | ABDMS2000, ABDEep, ABDMS2000/ABDEep/ABDNeural (ModMatrix, header-only) |
+| **DspCore** | Sustrato portado de `juce_core`/`juce_audio_basics` (`abd::dsp`): Maths, Range, SmoothedValue, HeapBlock, AudioBuffer, FloatVectorOperations, MidiMessage/Buffer, Debug, LeakedObjectDetector, `DspMath` (trascendentes deterministas) y `ResonantFilterStage` (sección de paso bajo resonante que se auto-oscila y **se asienta** en un nivel). Y **la familia de filtros**: `DspFilterFamily` (el contrato común, el idioma de sus parámetros y el rasgo `IsFilterStage`), `FilterTpt` (los tres taps del mismo par de estados) y `FilterEquation` (escalera de cuatro polos con el lazo resuelto sin retardo) | INTERFACE (header-only, **sin JUCE**) | `ABDShared::DspCore` | ABDNeural (+ DspEffects) |
 | **DspEffects** | Efectos sobre el sustrato DspCore (`abd::dsp`): Reverb (Freeverb, port literal de `juce::Reverb`), Chorus, Delay, Saturation, `SchroederReverb`; y los de maquina, por politica inyectada: `EffectPolicy` + motores (`MultiHeadEcho`, `RingMod`, `JunoBBD`), etapas de caracter (`TapeColour`, `DiodeBridge`, `BbdNoise`) y perfiles de dispositivo (`Re201Profile` con los doce modos del selector, `ReverbProfile` con las diez variantes del DeepMind 12, `JunoBbdProfile` con los dos clones de la Juno) | INTERFACE (header-only, **sin JUCE**), linka DspCore | `ABDShared::DspEffects` | ABDNeural, ABDEep, ABDAudioLab (BBD), ABDJUNiO601 (referencia congelada) |
-| **LutDSP** | Evaluación de LUTs y modelado analógico (`abd::lutdsp`): LutEvaluatorSimd (SSE), AnalogLutFilterModule, VoiceDispersionModel, VoiceAllocator | INTERFACE (header-only) | `ABDShared::LutDSP` | ABDJUNiO601 |
+| **LutDSP** | Evaluación de LUTs y modelado analógico (`abd::lutdsp`): LutEvaluatorSimd (SSE), AnalogLutFilterModule, VoiceDispersionModel, VoiceAllocator; y `LutFilter`, **el miembro LUT de la familia de filtros** (el corte y la Q medidos de una tabla, sobre el núcleo TPT del sustrato) | INTERFACE (header-only), linka DspCore | `ABDShared::LutDSP` | ABDJUNiO601 |
 | **HardwareDrivers** | Codecs de protocolo de hardware (`abd::hw`): SysExCodec, NRPNParser. Enlaza `nlohmann_json` en `PUBLIC` porque `CasioCzVirtualController.h` es superficie pública del módulo e incluye `<nlohmann/json.hpp>` | STATIC | `ABDShared::HardwareDrivers` | ABDMS2000, ABDJUNiO601 |
 | **HardwareMidiDetect** | Detección contract-driven de hardware MIDI (C++ puro + picker WebView2 estilo ABDScope) | INTERFACE | `ABDShared::HardwareMidiDetect` (+ `ABDShared::HardwareMidiPickerAssets`) | ABDAudioLab |
 | **AutoUpdater** | Auto-actualización via GitHub Releases | STATIC | `ABDShared::AutoUpdater` | ABDMS2000, ABDAudioLab |
 | **MidiKeyboard** | Teclado y ruedas compartidos (`@abdsynths/midi-keyb`) | paquete de workspace pnpm, no CMake | — | ABDMS2000 |
 | **Segmented** | Selector segmentado universal (`abd::ui::Segmented`): radio group de botones planos, valor por índice, vetados con nota (gating por motor) | INTERFACE (header-only), sonda opt-in `ABDShared_SegmentedProbe` | `ABDShared::Segmented` | (gemelo JS: `@abdsynths/shared/components/segmented.js`; consumidor NEURONiK pendiente de adoptarlo en el panel nativo) |
 | **LcdDisplay** | Pantalla de caracteres universal + máquina de menú (`abd::ui`): LcdDisplay + LcdMenuManager, arbol como dato y hooks | INTERFACE (header-only), gate WASM | `ABDShared::LcdDisplay` | (gemelo JS: lcdMachine/lcdScreen/lcdPanel en `@abdsynths/shared`) |
+| **Scope** | Osciloscopio analítico multi-lane embebido en WebView2: taps nativos C++ que capturan a rate de bloque (master, pre-FX, osc-mix, post-filter...), snapshot lock-free a 60 FPS y WebUI embebida como binary data | INTERFACE + STATIC (core header-only + glue JUCE + WebUI), subtree de ABDScope desde v0.4.0 | `ABDShared::ScopeCore` (+ `ABDShared::ScopeCoreHeaders`, `ABDShared::ScopeWebAssets`) | ABDAudioLab, ABDMS2000 (consumidores del core; la WebUI se sirve por filesystem si no hay JUCE) |
+| **AudioComparator** | Motor de comparación acústica A/B: alineación temporal por correlación cruzada FFT, medida de error temporal y espectral, veredicto formal (`pass`/`warn`/`fail`) contra matriz de tolerancias | STATIC (4 .cpp), linka juce_dsp | `ABDShared::AudioComparator` | (fuente para consumir por ruta o candidato a módulo formal) |
+| **BankManager** | Módulo embebible del Bank Manager (corte desde ABDBankManager): core C++ (ValueTree v1, blobs Base64, IPC por callback), adaptador JSON <-> core sin dependencia de WebView2, loader de factory content y protocolo SysEx del Behringer Pro800. El lado contrato vive en TypeScript (`BankManager/Contracts/`): contrato de modelo (`ModelContract`), contrato de enlace MIDI (`HardwareLinkContract` / `BaseHardwareLink`), registro declarativo (`ContractRegistry`) y los adapters concretos, con los modelos por familia bajo `BankManager/Contracts/Models/` (Behringer DeepMind 12/DM6/DM12D/Pro800, Korg MS2000/microKORG/Prophecy, Roland Juno, Roland AIRA, Casio CZ, Yamaha DX7) y los adapters de import/export/hardware (`BankManager/Contracts/Adapters/`). Es la cara JS del mismo contrato que el corte C++ expone vía `ModelContract.h`, `ModelContractRegistry`, `ImportAdapter`, `ExportAdapter`, `HardwareLinkContract` y los adapters concretos. Ver `INTEGRATION_GUIDE.md` → «Contratos del Bank Manager» | INTERFACE, linka HardwareDrivers + JUCE | `ABDShared::BankManagerCore` | ABDBankManager (consumidor del módulo; OFF por defecto, lo activa quien consume; lado contrato: workspace pnpm, no CMake) |
 
-> `StudioTopology/resources` se expone como `ABDShared::StudioTopologyAssets` cuando el asset existe (consumido por ABDAudioLab). Los directorios `Certification`, `WebView2Bridge`, `AudioComparator` y `visualizers` **no están expuestos como target CMake** todavía: son fuentes para consumir por ruta o candidatas a módulo formal.
+> `StudioTopology/resources` se expone como `ABDShared::StudioTopologyAssets` cuando el asset existe (consumido por ABDAudioLab). Los directorios `Certification`, `WebView2Bridge`, `visualizers` **no están expuestos como target CMake** todavía: son fuentes para consumir por ruta o candidatas a módulo formal.
 
 > **HardwareMidiDetect** consume los contratos single-source de `ABDSharedAssets/contracts`. Ninguna consulta SysEx ni mapeo fabricante/modelo está hardcodeado: todo se deriva de `midiIdentification` y `autoDetectSysEx` de cada contrato.
 
@@ -80,7 +83,96 @@ Etapa en curso: extraer a este repo el DSP que hoy vive duplicado en los sintets
   Mz950, nada copiado. El nivel asienta a un 0.03–0.4 % de lo predicho y el tercer
   armónico queda a −84 dB. Los tests comprueban también el **control negativo**:
   con la AGC apagada el nivel es infinito y la señal crece. Detalle y medido en
-  [`docs/mz950-reaprovechamiento.md`](docs/mz950-reaprovechamiento.md) (fila C1).
+  [`docs/mz950-reaprovechamiento.md`](docs/mz950-reaprovechamiento.md)  (fila C1).
+- **`DspCore/DspFilterFamily.h`** — **LA FAMILIA DE FILTROS**: el contrato por
+  convención que todo filtro del sustrato honra (`prepare`, `reset`, `setCutoff` en
+  Hz, `setResonance` 0..1, `setMode`, `processSample`), el rasgo `IsFilterStage`
+  que lo comprueba **al compilar** (sin clase base y sin vtable en el lazo), y el
+  idioma de sus parámetros: la curva de corte (20 Hz..20 kHz, exponencial) y la de
+  Q (1/√2..20) son **de la familia y no de cada miembro**, para que cambiar de
+  filtro no cambie la afinación del panel. Tres miembros: `FilterTpt` (los tres
+  taps del mismo par de estados; a resonancia 0 es el **mismo filtro** que
+  `ResonantFilterStage`, comprobado a 1e-12 muestra a muestra), `FilterEquation`
+  (una escalera de cuatro polos con el lazo resuelto **sin retardo** y `tanh` en la
+  realimentación: a resonancia 1 el pico queda acotado en vez de crecer) y
+  `LutDSP/LutFilter.h` (el corte y la Q de una **tabla medida**, sobre el mismo
+  núcleo TPT). El `processBlock` (float y double) también es de la familia: no lo
+  implementa cada miembro.
+- **`SynthCore/OscillatorFamily.h`** — **LA FAMILIA DE OSCILADORES**, la hermana de
+  la de filtros y con el mismo patrón: el contrato por convención que todo oscilador
+  del módulo honra (`prepare`, `reset`, `setFrequency` en Hz, `setWaveform`,
+  `setOversampling`, `setPulseWidth`, `processSample`) y el rasgo `IsOscillator` que
+  lo comprueba **al compilar**. El idioma de sus parámetros es la mitad del asunto:
+  la frecuencia en **Hz** (una unidad, no una posición de mando), las formas
+  básicas de un oscilador de voz, el ancho de pulso 0..1 con el **mismo**
+  significado en todos (0.5 es cuadrada), la salida bipolar y nominalmente ±1, y el
+  sobremuestreo como factor 1/2/4/8. El `processBlock` (float y double) también es
+  de la familia: no lo implementa cada miembro. Vive en `SynthCore` y no en el
+  sustrato porque los primitivos de oscilador (`PolyBLEP`, `DSPUtils`) ya vivían
+  aquí. Dos miembros:
+  - **`abd::synth::OscVcoCa72`** (`OscKind::Circuit`) — el de **circuito**: un
+    condensador que integra una corriente y un disparador de Schmitt que reinicia la
+    rampa al cruzar su umbral —con el retardo del comparador y la espera del
+    transistor, que son tiempos **absolutos** y por eso el núcleo tiene su propio
+    tiempo dentro—, y tres conformadores de onda que salen del **mismo nodo**:
+    diente de sierra (asimétrico: no sube lo que baja), triángulo por el **pliegue
+    medido** y rectángulo con histéresis. El limitado de banda son escalones polyBLEP
+    en los sucesos (reinicio y flancos) más decimación de media banda al
+    sobremuestrear (`SynthCore/OscHalfbandDecimator.h`). **El hardware entra como
+    DATO** (`SynthCore/OscVcoCa72Profile.h`): los números medidos del banco de
+    pruebas y, inyectable entera con `setTriangleTable`, la transferencia medida del
+    triángulo. **No tiene seno, y lo dice**: `supportsWaveform(Sine)` es `false` y
+    `setWaveform` lo rechaza sin cambiar nada.
+  - **`abd::synth::OscPolyBlep`** (`OscKind::Phase`) — el de **fase**: un acumulador
+    con las cuatro formas básicas corregidas por el `PolyBLEP` que el módulo ya
+    tenía (el triángulo sale de integrar su derivada ya banda-limitada). Declara que
+    no sobresamplea, porque ya está limitado a 1x, y su propio tope: 0,45 de Nyquist.
+
+  - **`abd::synth::OscReference`** (`OscKind::Phase`) — el **prototipo de
+    referencia** de la familia: el esqueleto mínimo que un nuevo miembro tiene que
+    poder compilar, declarar y probar aquí, con el mismo contrato (`IsOscillator`),
+    el mismo idioma (Hz, formas básicas, ancho 0..1, salida bipolar ±1) y la misma
+    disciplina de prueba. En esta versión del prototipo dice en voz alta qué tiene
+    (sierra + seno, 1x) y qué falta (triángulo, rectángulo, ningún sobremuestreo),
+    y no dibuja una aproximación cuando le falta una. No es una pieza de sonido, es
+    la referencia estandarizada de cómo se escribe un miembro nuevo en
+    `SynthCore`; el resto del archivo se lee como ejemplo antes de escribir el
+    propio núcleo.
+
+  Lo que se **midió**, para que esto no sea una promesa: el peor error de frecuencia
+  entre 55 Hz y 4 kHz es **0,0071 %** y una octava es exactamente el doble de
+  periodo; el ancho de pulso de la familia sale donde debe (0,20 → 0,200 y 0,50 →
+  0,499 del ciclo) porque la pieza mide la fase en **tiempo** y no en tensión —la
+  rampa es cóncava y cubre la mitad de su recorrido en el 49,26 % de su tiempo—; el
+  ancho más estrecho que su comparador da es **0,051** y lo **declara**
+  (`minPulseWidth()`) en vez de dejar el rectángulo pegado abajo; y el limitado de
+  banda está medido, no afirmado: para un diente de sierra de 7 kHz la basura que 1x
+  deja en 16,1 kHz vale 2,6e-2 y a 8x vale 8,0e-7, mientras el diezmador deja pasar
+  entero (1,0000) un tono dentro de la banda que sobrevive y mata a 1e-6 uno por
+  encima del nuevo Nyquist. La pieza declara además su propio retardo —1,0 muestras
+  de salida a 1x, 23,75 a 8x— en vez de sonar medio ciclo antes sin decirlo. Verde
+  en las 2097 comprobaciones de `ABDShared_SynthCore_Tests`.
+
+  Y la provenance, que es lo primero que hay que saber al tocar esto: el algoritmo
+  está escrito de nuevo desde la idea del VCO del aparato de estudio —cuya
+  referencia está bajo GPL y de la que **no se copió ni una línea**—, y lo único que
+  viaja son los **números medidos** del instrumento, como perfil inyectado.
+
+- **`SynthCore/CvToControl`** — **EL CONVERTIDOR EXPONENCIAL INDEPENDIENTE DEL CA-72**:
+  la puerta del aparato, separada del VCO: convierte voltios de teclado + VTUNE +
+  trimpots de escala y centro → corriente de temporización, con el modelo de la
+  pareja de transistores (Vbe = kT/q · ln Ic/I0), la beta del par y la temperatura
+  del chip. Es **independiente**: no tiene muestreo, no tiene forma de onda, no tiene
+  sobremuestreo; solo convierte V → A según el aparato, y puede inyectarse en un VCO
+  que recibe corriente directa (`setTimingCurrent`), en un VCO que resuelve frecuencia,
+  o en un motor de CV que no es un VCO. El perfil (`CvToControlProfile`) es datos del
+  banco de pruebas (Vbe0, i0, beta, trimpots, temperatura de referencia), y el
+  convertidor también hace las inversas (corriente → semitonos del teclado,
+  corriente → VTUNE) para un panel o un afinador. Reescrito de nuevo desde la idea del
+  convertidor exponencial de pareja de transistores; la referencia está bajo GPL y **no
+  se ha copiado ni una línea**. Quedan fuera, dichos en voz alta: la tabla medida de la
+  beta a temperatura, el ruido de la fuente de corriente fija y los
+  microcompensados del banco de pruebas.
 - **`SynthCore/S950PatchFields.h`** — el **catálogo de patches** del Akai S950: 38
   campos de keygroup y 18 trims de Perform, cada uno con su byte, su rango de panel,
   su codificación y su nombre de humano. Un panel y un motor que no dicen lo mismo del
@@ -202,8 +294,8 @@ van en el consumidor, que es quien tiene JUCE y quien asume el riesgo del port.
 [docs/homonimias-cabeceras.md](docs/homonimias-cabeceras.md) — incluye la matriz de
 qué proyecto ha adoptado qué módulo (hoy ABDCZ101 no enlaza ninguno).
 
-**Y lo contrario:** qué hay aquí que no usa ningún producto. Hoy son 17 de 115
-fuentes, todas con motivo escrito en la lista blanca de
+**Y lo contrario:** qué hay aquí que no usa ningún producto. Hoy son 19 de 170
+fuentes (la medida del propio auditor), todas con motivo escrito en la lista blanca de
 `tools/audit_unconsumed_sources.py` (`--check` devuelve 1 si aparece una nueva).
 El inventario y el porqué están en
 [docs/fuentes-sin-consumidor.md](docs/fuentes-sin-consumidor.md).

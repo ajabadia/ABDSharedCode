@@ -48,6 +48,13 @@ ABDSharedCode/
 │   ├── RingMod.h                  ← modulador de anillo
 │   ├── characters/                ← TapeColour.h, DiodeBridge.h
 │   └── profiles/                  ← Re201Profile.h, ReverbProfile.h
+├── SynthCore/                  ← Primitivas DSP y motores C++20, STATIC (sin JUCE)
+│   ├── Arpeggiator.h / .cpp    ← Motor de arpegiador determinista (11 modos, sample-accurate, zero-alloc)
+│   ├── OscillatorFamily.h      ← Contrato de la familia de osciladores
+│   ├── PolyBLEP.h / .cpp       ← Corrección de discontinuidades banda-limitada
+│   ├── ADSREnvelope.h / .cpp   ← Generador de envolvente ADSR
+│   ├── LFO.h / .cpp            ← Oscilador de baja frecuencia
+│   └── PortamentoGlide.h / .cpp← Suavizado de portamento y glide
 ├── AutoUpdater/
 │   ├── AutoUpdaterConfig.h     ← Config por proyecto
 │   ├── AutoUpdater.h           ← Interfaz pública
@@ -900,10 +907,48 @@ JUCE-free, que es justo lo que sostiene la paridad nativa <-> WASM de ABDNeural.
 | 4 | `saturation` | `DspSaturation` | drive (1–8) |
 | 5 | `schroeder` | `DspSchroederReverb` | decay, damping, diffusion, predelay |
 | 6 | `bbd` | `JunoBBD` + `BbdNoise` | mode (**4 pasos**), rate, depth, wear |
-| 7 | `shelf` | `ShelfFilter` | mode (**2 pasos**), freq (20 Hz–20 kHz), gain (±12 dB) |
+| 7 | `shelf` | `ShelfFilter` | mode (**2 pasos**), freq (20 Hz–20 kHz), gain (±12 dB) |**El 0 es siempre bypass**, esté o no en la tabla, para que un panel permita elegir "nada" sin que ningún producto tenga que acordarlo.
 
-**El 0 es siempre bypass**, esté o no en la tabla, para que un panel permita
-elegir "nada" sin que ningún producto tenga que acordarlo.
+---
+
+### El convertidor exponencial independiente del CA-72
+
+`OscVcoCa72` tiene la puerta del circuito abierta: `setTimingCurrent` / `getTimingCurrent`. Eso permite modular en corriente (FM lineal) sin pasar por Hz, y leer la calibración que la pieza está usando. Pero el VCO no sabe de dónde viene esa corriente: quien pide en Hz ya recorrió el camino voltios → corriente → Hz.
+
+`SynthCore/CvToControl.h` (y su `.cpp`) es **ese camino, separado del VCO**: el convertidor exponencial del CA-72 como pieza independiente, no como parte del núcleo del oscilador. Convierte los voltios del teclado y de VTUNE, los trimpots de escala y de centro, y la temperatura del par, en la corriente de temporización que el VCO recibe.
+
+**Qué es**: el convertidor exponencial de pareja de transistores, modelo completo del aparato (Vbe = kT/q · ln Ic/I0, beta del par, dos trimpots de escala y de centro, temperatura del chip como T/T0 del exponente). Es **independiente**: no tiene muestreo, no tiene forma de onda, no tiene sobremuestreo; solo convierte V → A según el modelo del aparato. El perfil (`CvToControlProfile`) es datos del banco de pruebas, igual que `OscVcoCa72Profile.h` lo es para el VCO.
+
+**Para qué sirve**: para que un consumidor pueda modular el VCO en corriente o en voltios **según el aparato**, no según lo que el motor de frecuencia de la familia pida. El VCO de rampa del CA-72 tiene esa puerta abierta, y este convertidor es quien la cierra con la ley del aparato, no con una recta arbitraria:
+
+```
+Vtune, semitonos del teclado, coarse/fine + temperatura → corriente
+```
+
+Y viceversa, si el motor lo pide: corriente → lo que el teclado y VTUNE estarían haciendo (las inversas `keyboardSemitonesForCurrent`, `tuneVoltageForCurrent`).
+
+**Qué no es, y es a propósito**: no es el VCO, ni el limitado de banda, ni la tabla del triángulo. No es calibración del módulo: el módulo habla en Hz, y quien pide Hz ya recorrió este camino. Es la **puerta del aparato**, y por eso es pieza independiente.
+
+**Y lo que queda fuera, dicho en voz alta**: la tabla medida de la beta a temperatura, el ruido de la fuente de corriente fija y los microcompensados que el banco de pruebas añadió. Lo que viaja son los parámetros del modelo, no el código de la referencia, que está bajo GPL y de la que **no se ha copiado ni una línea**.
+
+**Verificado**: el convertidor se compila en `ABDShared_SynthCore` y su implementación está en el árbol; la puerta `setTimingCurrent` del VCO que lo recibiría ya existe en `OscVcoCa72.h`. No hay consumidor de producto todavía: es el estado del trabajo, no un descuido.
+
+Lo que dicen los fuentes del árbol:
+
+- **Puerta del circuito del VCO, presente.** `OscVcoCa72` expone `setTimingCurrent` (`SynthCore/OscVcoCa72.h#L226`) y `getTimingCurrent`, y la implementación está en `SynthCore/OscVcoCa72.cpp#L243`. Esa puerta es la que recibiría la corriente del convertidor; está abierta por diseño.
+- **Convertidor en el árbol, como pieza independiente.** `SynthCore/CvToControl.h` declara la clase y su perfil `CvToControlProfile`; `SynthCore/CvToControl.cpp` tiene la implementación (incluyendo el modelo Vbe = kT/q · ln Ic/I0, beta del par, trimpots de escala/centro y temperatura). No es parte del núcleo del oscilador: es el camino voltios → corriente que el VCO reconocería.
+- **Compilación en `ABDShared_SynthCore`, por la arquitectura del build.** El target `ABDShared_SynthCore` listado en `CMakeLists.txt` agrupa las fuentes de SynthCore, y entre ellas `SynthCore/CvToControl.cpp` y `SynthCore/OscVcoCa72.cpp`; el alias visible es `ABDShared::SynthCore`. Es la disposición del árbol, no un número de corrida: aquí no hay un test o corrida de compilación que haya dado verde en este momento, así que la confirmación es de presencia en el target, no de resultado de build ejecutado.
+
+Qué queda fuera de esta confirmación:
+
+- Un consumidor de producto que cierre la puerta: ningún sintetizador del árbol enlaza el convertidor todavía. Esto es el estado del trabajo, no un defecto del convertidor.
+- Un número de corrida concreta de `ABDShared_SynthCore_Tests` que compruebe el convertidor: el árbol tiene el target de tests (`ABDShared_SynthCore_Tests`) y los tests de la familia de osciladores que ejercen `setTimingCurrent`, pero no se ha ejecutado ni mostrado un resultado de esa corrida en este momento, así que no se afirma un verde confirmado por ejecución; se afirma solo que la pieza está en el árbol y en el target.
+
+---
+
+### La familia de osciladores
+
+Ver la sección de SynthCore más abajo. `OscVcoCa72` tiene la puerta del circuito abierta: `setTimingCurrent` / `getTimingCurrent`, para que un consumidor pueda modular en corriente o en voltios según el aparato. Ese convertidor, separado del VCO, está en `SynthCore/CvToControl.h` (ver la sección *El convertidor exponencial independiente del CA-72*).
 
 #### Cuatro cosas que costaron, y que un test de "suena igual" no caza
 
@@ -1771,6 +1816,101 @@ doble de periodo.
 
 ---
 
+## Módulo: SynthCore — Arpeggiator (C++20, sin JUCE)
+
+> **Documentación exhaustiva de integración:**  
+> Consulta [`docs/ARPEGGIATOR_INTEGRATION_GUIDE.md`](docs/ARPEGGIATOR_INTEGRATION_GUIDE.md) para el manual completo con ejemplos detallados, tabla de cálculo de frecuencia para sincronización de BPM y el patrón de adaptador para plugins JUCE.
+
+### Qué hay dentro
+
+`SynthCore/Arpeggiator.h` y `SynthCore/Arpeggiator.cpp` implementan el motor de arpegiador algorítmico `abd::synth::Arpeggiator`:
+- **100% C++20 puro, agnóstico de frameworks:** sin dependencias de JUCE, GUI ni llamadas al sistema operativo.
+- **Zero-alloc en el render loop:** `generate(...)` opera sobre buffers estáticos acotados (`kMaxHeld = 64`, `kMaxNotesPerStep = 8`, `kMaxPending = 32`). Libre de asignaciones dinámicas y seguro para el hilo de audio en tiempo real.
+- **Sample-accurate:** cálculo de desplazamientos temporales de muestra exactos para eventos Note-On y Note-Off dentro de cada bloque de proceso.
+- **Retrigger sin colisiones:** si una nota vuelve a sonar en el mismo paso antes de apagarse, emite un Note-Off explícito en la misma muestra antes del nuevo Note-On.
+- **Generador pseudoaleatorio determinista:** `FastRng` (Xorshift32) integrado para reproducibilidad idéntica bit a bit del modo Random (modo 8) entre plataformas.
+
+### Modos de reproducción (11 modos: 0 a 10)
+
+| Modo | Nombre | Descripción |
+|:---:|:---|:---|
+| 0 | `Up` | Ascendente: de menor a mayor nota |
+| 1 | `Down` | Descendente: de mayor a menor nota |
+| 2 | `Up/Down` | Sube y baja sin repetir extremos |
+| 3 | `Up-Inv` | Sube y, al completar ciclo, sube invirtiendo |
+| 4 | `Down-Inv` | Baja y luego baja invirtiendo |
+| 5 | `Up/Down-Inv` | Sube y baja atravesando inversiones de acordes |
+| 6 | `Up-Alt` | Alternancia: más baja, más alta, alternando |
+| 7 | `Down-Alt` | Alternancia: más alta, más baja, alternando |
+| 8 | `Random` | Selección pseudoaleatoria determinista con `FastRng` |
+| 9 | `As-Played` | En el orden cronológico en que se tocaron las notas |
+| 10 | `Chord` | Todas las notas del pool se disparan simultáneamente al unísono |
+
+### Enlace CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::SynthCore)
+```
+
+### Consumo directo (Zero-alloc por invocable / lambda)
+
+```cpp
+#include "SynthCore/Arpeggiator.h"
+
+// En el lazo de proceso de audio del sintetizador:
+arpeggiator.generate(numSamples, [&](const abd::synth::Arpeggiator::NoteEvent& ev) {
+    if (ev.isNoteOn)
+        motorVoces.dispararNota(ev.note, ev.velocity, ev.sampleOffset);
+    else
+        motorVoces.apagarNota(ev.note, ev.sampleOffset);
+});
+```
+
+### Patrón para consumidores JUCE (Shim de compatibilidad)
+
+Si el sintetizador usa JUCE (`juce::MidiBuffer`), hereda de la clase base y utiliza `using` para evitar el *name-hiding*:
+
+```cpp
+// Source/DSP/Arpeggiator.h en el proyecto del sintetizador:
+#pragma once
+#include "SynthCore/Arpeggiator.h"
+
+namespace juce { class MidiBuffer; }
+
+namespace MiSynth
+{
+    class Arpeggiator : public abd::synth::Arpeggiator
+    {
+    public:
+        using abd::synth::Arpeggiator::Arpeggiator;
+        using abd::synth::Arpeggiator::generate; // Expone la plantilla base
+
+        void generate(juce::MidiBuffer& out, int numSamples);
+    };
+}
+```
+
+```cpp
+// Source/DSP/Arpeggiator.cpp:
+#include "Arpeggiator.h"
+#include <JuceHeader.h>
+
+namespace MiSynth
+{
+    void Arpeggiator::generate(juce::MidiBuffer& out, int numSamples)
+    {
+        abd::synth::Arpeggiator::generate(numSamples, [&out](const NoteEvent& ev) {
+            if (ev.isNoteOn)
+                out.addEvent(juce::MidiMessage::noteOn(1, ev.note, ev.velocity), ev.sampleOffset);
+            else
+                out.addEvent(juce::MidiMessage::noteOff(1, ev.note, 0.0f), ev.sampleOffset);
+        });
+    }
+}
+```
+
+---
+
 ## Módulo: MidiKeyboard (WebUI/JS)
 
 > **OJO: este módulo tiene DOS mitades y solo una es JS.** El paquete
@@ -2325,6 +2465,8 @@ public:
 
 ---
 
+---
+
 ## Módulo: AudioComparator
 
 Motor de alta precisión para comparación acústica A/B, alineamiento temporal y dictamen automático de calidad analógica vs digital.
@@ -2335,19 +2477,20 @@ Motor de alta precisión para comparación acústica A/B, alineamiento temporal 
 target_link_libraries(TuProyecto PRIVATE ABDShared::AudioComparator)
 ```
 
-El target se puede apagar con `-DABDSHAREDCODE_BUILD_AUDIOCOMPARATOR=OFF`, y
-arranca en `ON`. Propaga `juce_core`, `juce_audio_basics` y `juce_dsp`: este
-último no es opcional, porque la correlación cruzada FFT que se describe más
-abajo vive en la unidad de traducción que lo incluye.
+El target arranca en `ON` y se puede apagar con `-DABDSHAREDCODE_BUILD_AUDIOCOMPARATOR=OFF`.
+Es **STATIC** (cuatro `.cpp`: `AudioABComparator`, `AudioABComparator_Alignment`,
+`AudioABComparator_Spectral` y `AudioABVerdictEngine`) y propaga `juce_core`,
+`juce_audio_basics` y `juce_dsp`; este último no es opcional porque la correlación
+cruzada FFT que se describe más abajo vive en la unidad de traducción que lo incluye.
+Los headers públicos son `AudioABComparator.h` y `AudioABVerdictEngine.h`, con los que
+el consumidor hace `#include <AudioComparator/AudioABComparator.h>` y lo equivalente para
+el veredicto.
 
-### Componentes
-
-- **`abd::audio::AudioABComparator`**:
-  - **Alineamiento Sub-Muestra**: Correlación cruzada FFT para cálculo de retardo intrínseco (`sampleOffset`, `timeOffsetMs`, `correlationPeak`).
-  - **Métricas Temporales**: Comparativa de Peak dBFS, RMS dBFS, MAE y RMSE.
-  - **Métricas Espectrales**: Desviación de magnitud logarítmica (`logMagMeanAbsDiffDb`), centroide espectral y balance de energía en 3 bandas (bajos, medios, agudos).
-- **`abd::audio::AudioABVerdictEngine`**:
-  Evalúa el resultado frente a una matriz de tolerancias configurables (`AudioABVerdictTolerances`) emitiendo un resultado formal: `pass` (dentro de tolerancia), `warn` o `fail`.
+### Componentes    - **`abd::audio::AudioABComparator`**: el comparador, con tres bloques de trabajo:
+    - **Alineamiento sub-muestra** por correlación cruzada FFT, que calcula el retardo intrínseco entre las dos señales (`sampleOffset`, `timeOffsetMs`, `correlationPeak`).
+    - **Métricas temporales** entre la referencia alineada y la capturada: Peak dBFS, RMS dBFS, MAE y RMSE.
+    - **Métricas espectrales**: desviación de magnitud logarítmica (`logMagMeanAbsDiffDb`), centroide espectral y balance de energía en tres bandas (bajos / medios / agudos).
+- **`abd::audio::AudioABVerdictEngine`**: evalúa el resultado contra una matriz de tolerancias configurable (`AudioABVerdictTolerances`) y emite un veredicto formal: `pass` (dentro de tolerancia), `warn` o `fail`.
 
 ### Ejemplo de Uso
 
@@ -2373,9 +2516,15 @@ auto verdict = verdictEngine.evaluate(result, tolerances);
 
 if (verdict.level == "pass")
 {
-    // El modelo coincide fielmente con el hardware
+    // El modelo coincide fielmente con el hardware (o la diferencia está dentro de lo medido).
 }
 ```
+
+> **Qué queda fuera dicho en voz alta.** Hoy el módulo es una fuente lista para un
+consumidor por ruta o para unirse como módulo formal; en la tabla de este mismo guide
+aparece como **fuente para consumir por ruta o candidato a módulo formal**. Si tu
+proyecto lo enlaza como `ABDShared::AudioComparator`, quita esa nota de la tabla y
+deja solo el consumidor.
 
 ---
 
@@ -2449,28 +2598,158 @@ telemetría puede incluir `<ScopeDataCollector.h>` igual que la nativa.
 - **`abd::scope::ScopeTap` / `TapId` / `ScopeTapType`**: canal de captura nativo por bloque (flush al terminar cada buffer de audio), con id estable para nombrar lanes en la WebUI.
 - **`abd::scope::ScopeFrameSerializer`**: serializa los frames capturados para el puente WebView2.
 - **`abd::scope::TriggerDetector`** y **`SpscRingBuffer`**: armónicas del core (trigger de forma de onda y cola SPSC) usadas por los taps.
-- **`abd::scope::JuceWebScopeComponent`** (`JUCE/`): componente JUCE WebView2 que embebe la WebUI del osciloscopio (multi-lane + waterfall) y la alimenta desde un `ScopeDataCollector`.
-- **`abd::scope::ScopeResourceProvider`** (`JUCE/`): sirve los assets embebidos (catálogo binario + fallback a `ABDSharedAssets`).
+- **`abd::scope::JuceWebScopeComponent`** (`JUCE/`): componente JUCE WebView2 que embebe la WebUI del osciloscopio (multi-lane + waterfall) y la alimenta desde un `ScopeDataCollector`.  - **`abd::scope::ScopeResourceProvider`** (`JUCE/`): sirve los assets embebidos (catálogo binario + fallback a `ABDSharedAssets`).  ### Ejemplo de Uso
 
-### Ejemplo de Uso
+  ```cpp
+  #include <ScopeDataCollector.h>
+  #include <JUCE/JuceWebScopeComponent.h>
 
-```cpp
-#include <ScopeDataCollector.h>
-#include <JUCE/JuceWebScopeComponent.h>
+  // El motor expone su recolector (p. ej. ABDMS2000 SynthEngine::getScopeCollector)
+  auto &collector = engine.getScopeCollector();
 
-// El motor expone su recolector (p. ej. ABDMS2000 SynthEngine::getScopeCollector)
-auto &collector = engine.getScopeCollector();
+  // Componente WebView2 con la WebUI embebida: collector, sample rate, FPS
+  auto webScope = std::make_unique<abd::scope::JuceWebScopeComponent>(
+      collector, engine.getSampleRate(), 30);
+  webScope->setTheme("ms2000"); // tema canónico de ABDSharedAssets
 
-// Componente WebView2 con la WebUI embebida: collector, sample rate, FPS
-auto webScope = std::make_unique<abd::scope::JuceWebScopeComponent>(
-    collector, engine.getSampleRate(), 30);
-webScope->setTheme("ms2000"); // tema canónico de ABDSharedAssets
+  // Activar los lanes (taps) al mostrar la ventana
+  for (size_t i = 0; i < collector.getTapCount(); ++i)
+      if (auto *tap = collector.getTap(i))
+          tap->setActive(true);
+  ```
 
-// Activar los lanes (taps) al mostrar la ventana
-for (size_t i = 0; i < collector.getTapCount(); ++i)
-    if (auto *tap = collector.getTap(i))
-        tap->setActive(true);
+  ---
+
+## Módulo: BankManager
+
+Módulo embebible del Bank Manager (corte desde `ABDBankManager`): core C++ de ValueTree v1 con blobs Base64 y comunicación con el host por callback, adaptador JSON <-> core que no depende de WebView2, loader de factory content y protocolo SysEx del Behringer Pro800. Es el módulo del que se desgajó la app y que `ABDBankManager` hace consumidor; el corte está documentado en `ABDBankManager/DOCS/bank-manager-module-cut.md`.
+
+### Integración en CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::BankManagerCore)
 ```
+
+El target está **OFF por defecto** (`-DABDSHAREDCODE_BUILD_BANKMANAGER=OFF`), y solo lo
+activa quien consume el módulo; `ABDBankManager` lo fuerza en su propio bloque de
+integración. Cuando no está activo, los builds JUCE/WASM del monorepo que no enlazan el
+módulo no cambian de comportamiento por el corte.
+
+Propaga `ABDShared::HardwareDrivers` y las unidades de JUCE que usa por dentro:
+`juce_core`, `juce_data_structures`, `juce_cryptography` y `juce_audio_devices`. El
+adaptador y el loader son parte de la superficie pública del módulo.
+
+### Estrategia de corte
+
+El módulo usa **dos niveles de adaptación** en vez de meter JUCE o WebView2 en el core:
+
+- **`ABDBankManagerCore`** (lo que exporta `ABDShared::BankManagerCore`): administración
+  del estado como `juce::ValueTree` v1 (library, banks, patches, preset actual),
+  blobs Base64 para contenidos binarios, y comunicación con el host por callback (`
+  handleWebUIMessage` / `sendToWebUI`, `handleHardwareSend`). Es el contrato del corte:
+  esto es lo que se llevaba el módulo y lo que `ABDBankManager` consume.
+- **`BankManagerWebViewAdapter`** (`BankManagerWebViewAdapter.h`/`.cpp`): adaptador que
+  traduce mensajes JSON del host al core y viceversa. También manda la versión del
+  esquema con `BankManagerCore::valueTreeSchemaVersion`, lo que hace que la app y el
+  módulo lean el mismo `schemaVersion`.
+
+El loader de factory content (`FactoryContentLoader`) y el protocolo del Pro800
+(`Pro800Midi`, `HardwareMidiPipe`) vienen con el módulo porque son parte del contrato de
+quién consume el banco. Ojo: **no** es el módulo el que inventa el SysEx — el protocolo
+viene de `behringer-pro800` — pero sí lo porta como parte de su superficie.
+
+### Lo que queda fuera dicho en voz alta
+
+- El módulo **no** es el runtime del bank manager completo de la app: es la parte que el
+  corte movió a compartido y que quedó como INTERFACE porque la superficie pública es el
+  conjunto de cabeceras/includes (`<BankManager/ABDBankManagerCore.h>` y las que acompañan).
+- El lado de la WebUI más amplio (el host completo) sigue en `ABDBankManager`; este
+  módulo es la pieza portable.
+
+### Verificado
+
+- El target, cuando está ON, enlista los mismos archivos que promete el bloque CMake del
+  orquestador (`ABDBankManagerCore`, `BankManagerWebViewAdapter`, `FactoryContentLoader`,
+  `Pro800Midi`, `HardwareMidiPipe`), con la dependencia en `ABDShared::HardwareDrivers` +
+  las unidades de JUCE listadas arriba.
+
+---
+
+## Contratos del Bank Manager: arquitectura contract-driven y el modelo en tres niveles
+
+El Bank Manager no es un único programa con un único formato de SysEx: es un **contrato por sintetizador**. Cada familia (Roland Juno, Korg MS2000/Prophecy, Behringer DeepMind/Pro800, Casio CZ, Yamaha DX7, Roland AIRA…) tiene su propio `ModelContract`, y el core/UI se auto-configuran a partir del registro de contratos que haya cargado, no a partir de `switch` por modelo.
+
+Esto es lo que hace que el mismo código sirva tanto a un gestor universal standalone como a un plugin que solo gestiona su propio synth: la diferencia está en **qué contratos se registran**, no en el núcleo.
+
+### Qué hay dentro
+
+Los contratos viven en `BankManager/Contracts/` y son **TypeScript/JS**: el `ModelContract` es la SSOT del modelo, y los adapters son delegaciones finas sobre ese contrato.
+
+| Fichero | Qué es |
+|---|---|
+| `ModelContract.ts` | El CONTRATO: `ModelContract` y `validateModelContract(...)`. Define identidad, capacidad del banco, direccionamiento, tamaño de patch, categorías, transporte (hardware/software, `sysex` vs `native`), metadatos de SysEx, detección MIDI y las operaciones de dump/parse/checksum/file. |
+| `HardwareLinkContract.ts` | El contrato de comunicación bidireccional con hardware: `detectHardware`, `buildPatchDump`/`buildBankDump`, `buildDumpRequest`/`parseDumpResponse`, edit buffer, tieming (`interMessageDelayMs`, `dumpTimeoutMs`), y la clase base `BaseHardwareLink` con utilidades de cabecera/finalización/checksum. |
+| `ContractRegistry.ts` | El registro declarativo (`ContractRegistry` + `createStandaloneRegistry`). Registra modelos, import adapters, export adapters y hardware links, valida al registrar y expone consultas de cobertura (`getCoverage`, `getHardwareIds`, `getCompatibleModels`, `mode` standalone/plugin). |
+| `Adapters/index.ts` | Los adapters concretos: `allImportAdapters`, `allExportAdapters`, `allHardwareLinks`. Cada uno es un thin wrapper sobre su `ModelContract`. |
+| `Models/` | Los contratos por familia: `behringer-dm12`, `behringer-dm12d`, `behringer-dm6`, `behringer-pro800`, `korg-ms2000`, `korg-prophecy`, `roland-juno`, `roland-aira-*` (desmembrados), `casio-cz`, `yamaha-dx7`, etc. |
+
+El módulo C++ que está en `BankManager/` es un **corte del mismo contrato hacia C++/JUCE**: expone `ModelContract.h`, `ModelContractRegistry.{h,cpp}`, `ImportAdapter.h`, `ExportAdapter.h`, `HardwareLinkContract.h`, `PatchData.h` y los adapters concretos (CasioCZ, RolandJuno, Korg, Behringer, YamahaDX7). No es un segundo contrato distinto: es la cara embebible del registro de contratos. Ver `docs/cmake-bankmanager-block.md`.
+
+### Arquitectura contract-driven: cómo se usa
+
+El flujo normal no es «el código decide por modelo»:
+
+1. **Declaración.** Cada sintetizador se describe con su `ModelContract`: identidad, banco, patch, SysEx, detección MIDI y capacidades de transporte. Si el modelo emula hardware, puede declarar `transport.software.systems: ['sysex']` y los métodos de build/parse necesarios; si tiene su propio formato, usa `native`.
+2. **Registro.** Los contratos se registran en `ContractRegistry`. Standalone registra todos (`createStandaloneRegistry()`); un plugin registra solo el suyo (+ compatibles). El registro **valida al registrar**: `modelId` duplicado, `HardwareLink` sin `ModelContract` registrado, y `targetModelIds` huérfanos son errores/avisos explícitos.
+3. **Auto-configuración.** El core/UI consulta el registro (`getModels`, `getImportAdapters`, `getExportAdapters`, `getHardwareLinks`, `getCoverage`, `getCompatibleModels`, `getHardwareIds`) y se monta solo: qué adaptadores mostrar, qué modos de transporte ofrecer, qué modelos son compatibles.
+4. **Operación.** Import/export/hardware se delegan al adapter y al `ModelContract` del modelo. El contrato es la fuente de verdad para parsear/volcar/checksum/detectar, así que un adapter nuevo suele ser una delegación, no un segundo lugar donde se describen los formatos.
+
+### El modelo en tres niveles
+
+Esta arquitectura encaja en el mismo esquema en tres niveles que el ecosistema:
+
+1. **Nivel 0 — Fuente única de verdad.** El contrato del synth: sus `ModelContract`s y sus `HardwareLinkContract`s. En el lado JS/TS es `BankManager/Contracts/`; en el lado C++ es el corte de `BankManager/Contracts/` más los adapters concretos.
+2. **Nivel 1 — Core de detección y transporte.** El registry (`ContractRegistry`) y los contracts de hardware (`HardwareLinkContract` / `BaseHardwareLink`), + los codecs de protocolo del nivel C++ (`SysExCodec`, `NRPNParser`) cuando el host necesita transporte genérico.
+3. **Nivel 2 — Aplicaciones consumidoras.** Standalone (todos los contratos) o plugin (solo el suyo). El banco, la UI y la cola MIDI se montan a partir de lo que el registro dice que hay, no al revés.
+
+### Cómo integrarlo
+
+**1. Instalar.** El contrato es un workspace pnpm, no un target CMake. En `pnpm-workspace.yaml` ya está el miembro; `@abdsynths/shared` lo resuelve desde `ABDSharedAssets`. En un proyecto que consuma el monorepo, el contrato entra como dependencia de workspace, no como librería CMake. Ver la sección de `MidiKeyboard` y *Cómo funciona la integración* arriba.
+
+**2. Elegir modo de despliegue.** La diferencia entre standalone y plugin es cuántos contratos registras:
+```ts
+import { createStandaloneRegistry } from 'BankManager/Contracts/ContractRegistry';
+
+// Standalone: todos los ModelContracts del monorepo.
+const registry = createStandaloneRegistry();
+
+// Plugin: solo el contrato del synth que lo hospeda (+ los compatibles que quiera exponer).
+const pluginRegistry = new ContractRegistry();
+pluginRegistry.registerModel(getModelContract('behringer-deepmind12'));
+```
+
+El `registry.mode` sale solo: `'standalone'` si hay más de un modelo registrado, `'plugin'` si solo hay uno. Los adapters, los hardware links y la cobertura (`registry.getCoverage()`) se derivan del mismo registro.
+
+**3. Usar el registry para auto-configurar.** Ejemplo de consulta típica (no un `switch` por modelo):
+```ts
+const models = registry.getModels();
+const cobertura = registry.getCoverage();
+
+for (const entry of cobertura) {
+  console.log(`${entry.modelId}: import=${entry.importAdapters.join(',')} export=${entry.exportAdapters.join(',')} hw=${entry.hardwareLinks}`);
+}
+
+const compatibles = registry.getCompatibleModels('behringer-deepmind12');
+const ids = registry.getHardwareIds('behringer-deepmind12');
+```
+
+**4. Añadir un nuevo sintetizador.** Es añadir un `ModelContract` en `BankManager/Contracts/Models/` y, si el host lo necesita, un `HardwareLinkContract`/adapter en `BankManager/Contracts/Adapters/`. El registry lo valida al registrarse, y los adapters existentes no tienen que saber que el nuevo existe: el registro es lo que los conecta.
+
+### Qué queda fuera dicho en voz alta
+
+- **El contrato no es el runtime completo.** Es el descriptor del synth: qué guarda, cómo viaja, cómo se detecta, qué SysEx soporta. La app/consumidor decide cómo usarlo (cola MIDI, UI, sincronización).
+- **No es un SysEx codec universal.** Los codecs de protocolo genérico viven en `HardwareDrivers` (C++); el contrato vive aquí y describe un modelo concreto. El `Pro800SysEx` del módulo C++ es el corte de ese contrato concreto hacia C++, no un formato genérico.
+- **El formato `sysex` no es siempre correcto.** Un synth emulado que no emite el payload binario del hardware no debe declararlo; el contrato permite `native` y valida que si declara `sysex`, tiene build/parse. Ver la nota en `ModelContract.ts` sobre `abd-sm002`.
 
 ---
 
