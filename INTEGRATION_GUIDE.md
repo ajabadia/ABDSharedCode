@@ -50,6 +50,8 @@ ABDSharedCode/
 │   └── profiles/                  ← Re201Profile.h, ReverbProfile.h
 ├── SynthCore/                  ← Primitivas DSP y motores C++20, STATIC (sin JUCE)
 │   ├── Arpeggiator.h / .cpp    ← Motor de arpegiador determinista (11 modos, sample-accurate, zero-alloc)
+│   ├── ControlSequencer.h/.cpp ← Secuenciador analógico de control (1-32 pasos, swing, slew modulable)
+│   ├── ModMatrix.h             ← Matriz de modulación genérica desacoplada (header-only, N slots)
 │   ├── OscillatorFamily.h      ← Contrato de la familia de osciladores
 │   ├── PolyBLEP.h / .cpp       ← Corrección de discontinuidades banda-limitada
 │   ├── ADSREnvelope.h / .cpp   ← Generador de envolvente ADSR
@@ -1906,6 +1908,62 @@ namespace MiSynth
                 out.addEvent(juce::MidiMessage::noteOff(1, ev.note, 0.0f), ev.sampleOffset);
         });
     }
+}
+```
+
+---
+
+## Módulo: SynthCore — ControlSequencer (C++20, sin JUCE)
+
+> **Documentación exhaustiva de integración:**  
+> Consulta [`docs/CONTROL_SEQUENCER_INTEGRATION_GUIDE.md`](docs/CONTROL_SEQUENCER_INTEGRATION_GUIDE.md) para el manual de referencia completo y la tabla detallada de divisores de reloj.  
+> Consulta [`docs/SYNTHCORE_TRIAD_INTEGRATION_GUIDE.md`](docs/SYNTHCORE_TRIAD_INTEGRATION_GUIDE.md) para el SSOT de la tríada de control y modulación (`Arpeggiator` / `ModMatrixT` / `ControlSequencer`), perfiles de shims y consumo en sintetizadores.
+
+### Qué hay dentro
+
+`SynthCore/ControlSequencer.h` y `SynthCore/ControlSequencer.cpp` implementan el motor analógico de secuenciador de control `abd::synth::ControlSequencer`:
+- **100% C++20 puro, agnóstico de frameworks:** sin dependencias de JUCE, GUI ni llamadas al sistema operativo.
+- **Zero-alloc en el render loop:** `nextSample()` opera sobre memoria estática interna (`float steps[32]`) con cálculo de muestra continua y curvas de deslizamiento analógicas.
+- **Doble participación en la arquitectura de modulación:**
+  - Actúa como **fuente de modulación** (`ModSource::kControlSequencer` #18 en DeepMind), entregando valores bipolares `[-1.0f, +1.0f]`.
+  - Actúa como **destino de modulación** (`ModDestination::kSeqSlew` #72 en DeepMind), permitiendo modular dinámicamente la velocidad de glide mediante `setSlewModulation(float m)`.
+- **16 divisores métricos de reloj:** desde 4 notas enteras (16 negras) hasta tresillo de semicorchea (1/6 negra), anclado a `setMasterBpm`.
+- **Swing continuo ponderado:** partición rítmica de los pasos pares e impares ($r = 0.5 + 0.25 \times \text{swing}$).
+- **Filtro analógico de Slew / Glide:** filtro exponencial de 1 polo ($\tau = s \times 1.0\text{s}$, $\text{coef} = 1 - e^{-1/(\tau \cdot F_s)}$).
+
+### Enlace CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::SynthCore)
+```
+
+### Consumo directo (Audio loop por muestra)
+
+```cpp
+#include "SynthCore/ControlSequencer.h"
+
+// En el lazo de proceso de audio del sintetizador:
+for (int i = 0; i < numSamples; ++i)
+{
+    const float seqBipolar = controlSequencer.nextSample();
+    modSources[(int)ModSource::kControlSequencer] = seqBipolar;
+}
+```
+
+### Patrón para consumidores JUCE (Shim de compatibilidad)
+
+```cpp
+// Source/DSP/ControlSequencer.h en el proyecto del sintetizador:
+#pragma once
+#include "SynthCore/ControlSequencer.h"
+
+namespace MiSynth
+{
+    class ControlSequencer : public abd::synth::ControlSequencer
+    {
+    public:
+        using abd::synth::ControlSequencer::ControlSequencer;
+    };
 }
 ```
 
