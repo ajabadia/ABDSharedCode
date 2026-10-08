@@ -54,7 +54,8 @@ ABDSharedCode/
 │   ├── ModMatrix.h             ← Matriz de modulación genérica desacoplada (header-only, N slots)
 │   ├── OscillatorFamily.h      ← Contrato de la familia de osciladores
 │   ├── PolyBLEP.h / .cpp       ← Corrección de discontinuidades banda-limitada
-│   ├── ADSREnvelope.h / .cpp   ← Generador de envolvente ADSR
+│   ├── ADSREnvelope.h / .cpp   ← Generador de envolvente ADSR MS2000 (carga de condensador exponencial)
+│   ├── EnvelopeAnalog.h / .cpp ← Envolvente analógica ADSR de 4 fases (curvatura continua, loop, one-shot)
 │   ├── LFO.h / .cpp            ← Oscilador de baja frecuencia MS2000 (LFO1/2, SquarePlus, tempo sync)
 │   ├── LfoAnalog.h / .cpp      ← LFO analógico multionda (7 formas, fade-in delay, slew, audio-rate)
 │   └── PortamentoGlide.h / .cpp← Suavizado de portamento y glide
@@ -2020,6 +2021,65 @@ namespace MiSynth
     public:
         using abd::synth::LfoAnalog::LfoAnalog;
         using Shape = abd::synth::LfoAnalog::Shape;
+    };
+}
+```
+
+---
+
+## Módulo: SynthCore — EnvelopeAnalog (C++20, sin JUCE)
+
+> **Documentación exhaustiva de integración:**  
+> Consulta [`docs/ENVELOPE_ANALOG_INTEGRATION_GUIDE.md`](docs/ENVELOPE_ANALOG_INTEGRATION_GUIDE.md) para el manual de referencia completo, fórmulas de curvatura no lineal continua y modos de bucle/one-shot.
+
+### Qué hay dentro
+
+`SynthCore/EnvelopeAnalog.h` y `SynthCore/EnvelopeAnalog.cpp` implementan el generador de envolvente ADSR de 4 fases modelado analógicamente `abd::synth::EnvelopeAnalog`:
+- **100% C++20 puro, agnóstico de frameworks:** sin dependencias de JUCE ni GUI.
+- **Curvatura continua por etapa:** control exponencial a logarítmico continuo (`-1.0f..+1.0f`) para Attack, Decay, Sustain y Release.
+- **Modulación dinámica de curvatura y offset:** soporte de modulación en tiempo real desde la matriz de modulación (`setCurveModulation`, `setSustainOffset`).
+- **Escala de tiempo dinámica (`setTimeScale`):** acelera o frena la envolvente dinámicamente para emular inestabilidades analógicas (Analog Drift).
+- **Modos avanzados:** `setLoopMode(bool)` para retrigger continuo y `setBypassSustain(bool)` para envolventes percusivas de un solo disparo (One-Shot).
+- **Zero-alloc en el render loop:** `nextSample()` opera sobre variables escalares primitivas.
+
+### Enlace CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::SynthCore)
+```
+
+### Consumo directo
+
+```cpp
+#include "SynthCore/EnvelopeAnalog.h"
+
+// Inicialización:
+env.setSampleRate(44100.0);
+env.setParameters(0.01f, 0.2f, 0.7f, 0.5f); // A, D, S, R
+env.setCurves(0.0f, -0.5f, 0.0f, -0.5f);     // Curvas por etapa
+
+// Control de notas:
+env.trigger(); // Note-On
+env.release(); // Note-Off
+
+// En el lazo de proceso:
+float envVal = env.nextSample(); // Salida [0.0f, 1.0f]
+```
+
+### Patrón para consumidores JUCE (Shim de compatibilidad)
+
+```cpp
+// Source/DSP/Envelope.h en el proyecto del sintetizador:
+#pragma once
+#include "SynthCore/EnvelopeAnalog.h"
+
+namespace MiSynth
+{
+    class Envelope : public abd::synth::EnvelopeAnalog
+    {
+    public:
+        using abd::synth::EnvelopeAnalog::EnvelopeAnalog;
+        using Stage = abd::synth::EnvelopeAnalog::Stage;
     };
 }
 ```

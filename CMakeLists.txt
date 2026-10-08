@@ -158,6 +158,7 @@ add_library(ABDShared_SynthCore STATIC
     SynthCore/Arpeggiator.cpp
     SynthCore/ControlSequencer.cpp
     SynthCore/LfoAnalog.cpp
+    SynthCore/EnvelopeAnalog.cpp
 )
 
 add_library(ABDShared::SynthCore ALIAS ABDShared_SynthCore)
