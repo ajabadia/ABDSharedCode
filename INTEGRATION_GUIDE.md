@@ -55,7 +55,8 @@ ABDSharedCode/
 │   ├── OscillatorFamily.h      ← Contrato de la familia de osciladores
 │   ├── PolyBLEP.h / .cpp       ← Corrección de discontinuidades banda-limitada
 │   ├── ADSREnvelope.h / .cpp   ← Generador de envolvente ADSR
-│   ├── LFO.h / .cpp            ← Oscilador de baja frecuencia
+│   ├── LFO.h / .cpp            ← Oscilador de baja frecuencia MS2000 (LFO1/2, SquarePlus, tempo sync)
+│   ├── LfoAnalog.h / .cpp      ← LFO analógico multionda (7 formas, fade-in delay, slew, audio-rate)
 │   └── PortamentoGlide.h / .cpp← Suavizado de portamento y glide
 ├── AutoUpdater/
 │   ├── AutoUpdaterConfig.h     ← Config por proyecto
