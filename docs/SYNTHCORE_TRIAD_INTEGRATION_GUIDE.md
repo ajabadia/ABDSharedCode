@@ -21,6 +21,8 @@ Este documento consolida la arquitectura canónica de la **Tríada de Control y 
 El principio rector inmutable de esta tríada es:
 > **«El motor compartido calcula la muestra y el suceso; la política de producto y el framework residen en el sintetizador consumidor.»**
 
+Para la metodología y flujo de trabajo para promover nuevos módulos DSP a `SynthCore`, consulta el [`Checklist Canónico de Promoción`](PROMOTION_WORKFLOW_CHECKLIST.md).
+
 ---
 
 ## 2. Inventario Canónico: Qué se promovió y Dónde vive
