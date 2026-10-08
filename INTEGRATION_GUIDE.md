@@ -58,6 +58,7 @@ ABDSharedCode/
 │   ├── EnvelopeAnalog.h / .cpp ← Envolvente analógica ADSR de 4 fases (curvatura continua, loop, one-shot)
 │   ├── LFO.h / .cpp            ← Oscilador de baja frecuencia MS2000 (LFO1/2, SquarePlus, tempo sync)
 │   ├── LfoAnalog.h / .cpp      ← LFO analógico multionda (7 formas, fade-in delay, slew, audio-rate)
+│   ├── DriftEngine.h / .cpp    ← Motor de deriva analógica (Brownian walk, SR-invariante, LCG local)
 │   └── PortamentoGlide.h / .cpp← Suavizado de portamento y glide
 ├── AutoUpdater/
 │   ├── AutoUpdaterConfig.h     ← Config por proyecto
@@ -2081,6 +2082,60 @@ namespace MiSynth
         using abd::synth::EnvelopeAnalog::EnvelopeAnalog;
         using Stage = abd::synth::EnvelopeAnalog::Stage;
     };
+}
+```
+
+---
+
+## Módulo: SynthCore — DriftEngine (C++20, sin JUCE)
+
+> **Documentación exhaustiva de integración:**  
+> Consulta [`docs/DRIFT_ENGINE_INTEGRATION_GUIDE.md`](docs/DRIFT_ENGINE_INTEGRATION_GUIDE.md) para el manual de referencia completo, fórmulas de intervalo exponencial y slew rate invariante.
+
+### Qué hay dentro
+
+`SynthCore/DriftEngine.h` y `SynthCore/DriftEngine.cpp` implementan el generador de inestabilidad y deriva analógica continua `abd::synth::DriftEngine`:
+- **100% C++20 puro, agnóstico de frameworks:** sin dependencias de JUCE ni GUI.
+- **Random-walk browniano suavizado:** deriva independiente para afinación de osciladores (OSC1/OSC2 en cents), corte de filtro (VCF Cutoff), resonancia (VCF Res) y constantes temporales de envolventes (ADSR).
+- **Física invariante al Sample Rate:** el slew factor se normaliza según el sample rate del DAW para un comportamiento sonoro idéntico de 44.1 kHz a 192 kHz.
+- **Mapeo perceptual exponencial:** rango continuo de 10s (slow drift analógico) a 50ms (micro-shimmer).
+- **LCG local y determinismo:** generador lineal congruencial local de 32 bits, thread-safe, libre de llamadas a `rand()` y determinista en pruebas unitarias y calibración.
+- **Zero-alloc en el render loop:** `nextSample()` actualiza los 5 osciladores escalares directamente en el audio thread.
+
+### Enlace CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::SynthCore)
+```
+
+### Consumo directo
+
+```cpp
+#include "SynthCore/DriftEngine.h"
+
+// Inicialización:
+drift.setSampleRate(44100.0);
+drift.setDriftParams(0.2f, 0.1f, 0.5f); // voiceDrift, paramDrift, driftRate
+
+// Por nota (solo re-randomiza fase de timing, sin discontinuidades audibles):
+drift.resetForNote(voiceIndex);
+
+// En el lazo de proceso (audio thread):
+drift.nextSample();
+float pitchDriftOSC1 = drift.getOsc1PitchDrift();
+float cutoffDrift    = drift.getVcfCutoffDrift();
+```
+
+### Patrón para consumidores JUCE (Shim de compatibilidad)
+
+```cpp
+// Source/DSP/DriftEngine.h en el proyecto del sintetizador:
+#pragma once
+#include <SynthCore/DriftEngine.h>
+
+namespace MiSynth
+{
+    using DriftEngine = abd::synth::DriftEngine;
 }
 ```
 
