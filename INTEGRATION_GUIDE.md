@@ -1970,6 +1970,62 @@ namespace MiSynth
 
 ---
 
+## Módulo: SynthCore — LfoAnalog (C++20, sin JUCE)
+
+> **Documentación exhaustiva de integración:**  
+> Consulta [`docs/LFO_ANALOG_INTEGRATION_GUIDE.md`](docs/LFO_ANALOG_INTEGRATION_GUIDE.md) para el manual de referencia completo, curvas matemáticas de fade-in delay y fórmulas del slew limiter analógico.
+
+### Qué hay dentro
+
+`SynthCore/LfoAnalog.h` y `SynthCore/LfoAnalog.cpp` implementan el oscilador de baja frecuencia modelado analógicamente `abd::synth::LfoAnalog`:
+- **100% C++20 puro, agnóstico de frameworks:** sin dependencias de JUCE ni GUI.
+- **7 formas de onda continuas:** Seno, Triángulo, Cuadrada, Rampa Arriba, Rampa Abajo, Sample & Hold y Sample & Glide.
+- **Curva analógica de delay y fade-in:** 40% inicial de silencio absoluto seguido de un 60% de rampa lineal de amplitud.
+- **Limitador de pendiente analógica (*Slew Limiter*):** rampa de variación continua en el dominio temporal dependiente de sample-rate.
+- **Rango audio-rate:** de 0.005 Hz a 1280.0 Hz.
+- **Zero-alloc en el render loop:** `nextSample()` opera exclusivamente sobre tipos primitivos escalares.
+
+### Enlace CMake
+
+```cmake
+target_link_libraries(TuProyecto PRIVATE ABDShared::SynthCore)
+```
+
+### Consumo directo
+
+```cpp
+#include "SynthCore/LfoAnalog.h"
+
+// Inicialización:
+lfo.setSampleRate(44100.0);
+lfo.setRate(2.5f); // Hz
+lfo.setShape(1);   // Triángulo
+
+// En el lazo de proceso:
+float lfoVal = lfo.nextSample(); // Salida bipolar [-1.0f, +1.0f]
+float uniVal = lfo.getUnipolar(); // Salida unipolar [0.0f, 1.0f]
+```
+
+### Patrón para consumidores JUCE (Shim de compatibilidad)
+
+```cpp
+// Source/DSP/LFO.h en el proyecto del sintetizador:
+#pragma once
+#include "SynthCore/LfoAnalog.h"
+
+namespace MiSynth
+{
+    class LFO : public abd::synth::LfoAnalog
+    {
+    public:
+        using abd::synth::LfoAnalog::LfoAnalog;
+        using Shape = abd::synth::LfoAnalog::Shape;
+    };
+}
+```
+
+---
+
 ## Módulo: MidiKeyboard (WebUI/JS)
 
 > **OJO: este módulo tiene DOS mitades y solo una es JS.** El paquete
