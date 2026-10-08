@@ -104,11 +104,58 @@ endif()
 #   --- curves only lfoRate and filterEnvOctaves have a linear vertical axis;
 #   --- the four logarithmic ones cannot draw it without a value that does not
 #   --- exist yet. That count is the useful output, and it is a test.
+#   --- la familia de osciladores, la hermana de la de filtros: mismo contrato por
+#   --- convencion (no hay clase base ni vtable en el lazo) y mismo idioma de
+#   --- parametros para todos sus miembros. Vive AQUI y no en DspCore porque los
+#   --- primitivos de oscilador de este repo (PolyBLEP, DSPUtils) ya viven aqui, y
+#   --- porque un oscilador no necesita el sustrato entero que un filtro si usa.
+#   OscillatorFamily.h  LA FAMILIA DE OSCILADORES: el contrato que todo oscilador
+#                       honra (prepare/reset/setFrequency en Hz/setWaveform/
+#                       setOversampling/setPulseWidth/processSample y sus getters),
+#                       el rasgo IsOscillator que lo comprueba al compilar, el
+#                       idioma (frecuencia en Hz, formas BASICAS, ancho 0..1 con el
+#                       mismo significado, salida bipolar +-1) y el processBlock
+#                       (float y double) de la familia.
+#   OscVcoCa72Profile.h EL VCO DE RANPA COMO DATOS: el nucleo (condensador de
+#                       temporizacion, umbral del disparador de Schmitt, retardo del
+#                       comparador, pendiente del efecto Early) y el conformador de
+#                       ondas (separador, diente de sierra, comparador del rectangulo
+#                       con su histeresis), a 25 C y sin carga. El hardware entra
+#                       como perfil inyectado: el motor no lo sabe.
+#   OscVcoCa72.h        EL miembro de CIRCUITO de la familia: la rampa integrada con
+#   OscVcoCa72.cpp      su reinicio, sus tres conformadores y el limitado de banda
+#                       (escalones polyBLEP en los sucesos y decimacion al bajar).
+#                       Escrito de nuevo desde la idea del VCO del aparato de estudio
+#                       (su referencia esta bajo GPL y no se copio codigo suyo); los
+#                       numeros son los medidos del banco de pruebas. No tiene seno, y
+#                       lo dice: supportsWaveform(Waveform::Sine) es false y
+#                       setWaveform lo rechaza sin cambiar nada.
+#   OscPolyBlep.h       El miembro de FASE: acumulador de fase con las cuatro formas y
+#                       las discontinuidades corregidas por el PolyBLEP del modulo.
+#                       Su tope de frecuencia y su ancho de pulso los declara.
+#   OscHalfbandDecimator.h  La decimacion de media banda (etapas cortas delante y la
+#                       larga al final, con los taps a distancia par del centro
+#                       saltados) que usa el VCO al sobremuestrear. Ajeno a la familia
+#                       a proposito: no sabe de formas ni de frecuencias, solo de
+#                       muestras.
+#
+#   --- el miembro de REFERENCIA de la familia: el esqueleto del contrato que todo
+#   --- nuevo miembro tiene que poder compilar, declarar y probar. No suena mejor
+#   --- que los otros dos; su trabajo es ser el ejemplo que el compilador verifica
+#   --- (rasgo IsOscillator) y que luego otro miembro pueda leer antes de escribir
+#   --- su propio nucleo.
+#   OscReference.h    El miembro de REFERENCIA minimal: acumulador de fase con dos
+#                       formas (diente de sierra y seno) y lo que le falta dicho en
+#                       voz alta (triangulo y rectangulo, ningun sobremuestreo). Es
+#                       el prototipo estandarizado del que hablan README e
+#                       INTEGRATION_GUIDE.
 add_library(ABDShared_SynthCore STATIC
     SynthCore/PolyBLEP.cpp
     SynthCore/ADSREnvelope.cpp
     SynthCore/PortamentoGlide.cpp
     SynthCore/LFO.cpp
+    SynthCore/OscVcoCa72.cpp
+    SynthCore/Arpeggiator.cpp
 )
 
 add_library(ABDShared::SynthCore ALIAS ABDShared_SynthCore)
@@ -147,6 +194,21 @@ endif()
 #                             and whose band-power AGC makes that oscillation
 #                             settle at a level instead of growing (clean-room from
 #                             the Mz950 study; nothing AGPL was copied)
+#   DspFilterFamily.h         LA FAMILIA DE FILTROS: el contrato por convencion que
+#                             todo filtro del sustrato honra (prepare/reset/setCutoff
+#                             en Hz/setResonance 0..1/setMode/processSample), el
+#                             rasgo IsFilterStage que lo comprueba al compilar, la
+#                             curva de corte y la de Q que TODOS comparten (para que
+#                             cambiar de filtro no cambie la afinacion del panel) y
+#                             el processBlock (float y double) de la familia.
+#   DspFilterTpt.h            FilterTpt: el miembro TPT. Los tres taps (paso bajo,
+#                             paso alto, banda) del mismo par de estados.
+#   DspFilterEquation.h       FilterEquation: el miembro de ecuacion. Escalera de
+#                             cuatro polos con el lazo resuelto SIN retardo (ZDF) y
+#                             tanh en la realimentacion, que es lo que la asienta.
+#                             Los tres van AQUI y no fuera porque su contrato es del
+#                             sustrato; el miembro LUT (tabla medida) vive en LutDSP,
+#                             que depende de este modulo y no al reves.
 # Header-only (everything is inline/template), so consumers only need the
 # include path; there is nothing to link. C++17 on purpose: the consumer that
 # motivated the move (ABDNeural) builds at 17, not 20.
@@ -247,6 +309,13 @@ endif()
 # WASM note: LutEvaluatorSimd.h compiles under Emscripten with the recipe
 # -msimd128 -D__SSE__ -D__SSE2__ -include immintrin.h (see ABDCZ101/wasm),
 # which maps the SSE intrinsics onto WASM SIMD128.
+#   LutFilter.h              el miembro LUT de la familia de filtros: el corte y la
+#                             Q salen de una tabla MEDIDA (AbdBatchedPoint) y el
+#                             nucleo que los toca es el TPT del sustrato. Depende de
+#                             DspCore por eso mismo: el contrato de la familia y el
+#                             nucleo son suyos, y el miembro LUT no puede vivir sin
+#                             ellos. La dependencia va en un sentido solo (LutDSP ->
+#                             DspCore), como la de DspEffects.
 add_library(ABDShared_LutDSP INTERFACE)
 
 add_library(ABDShared::LutDSP ALIAS ABDShared_LutDSP)
@@ -254,6 +323,28 @@ add_library(ABDShared::LutDSP ALIAS ABDShared_LutDSP)
 target_include_directories(ABDShared_LutDSP INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# El modulo NO declara un estandar propio: no lo declaraba antes y no es esta tarea
+# la que lo decide (fijarlo aqui seria prometer que TODAS sus cabeceras compilan a
+# ese estandar, y solo se ha comprobado con las que prueba su test).
+target_link_libraries(ABDShared_LutDSP INTERFACE ABDShared::DspCore)
+
+# Standalone unit tests for the module (no JUCE), same switch convention as
+# SynthCore / DspCore / DspEffects. Lo que guardan: que el miembro LUT sea de la
+# familia (el rasgo lo comprueba al compilar), que lea la tabla medida con sus
+# numeros y su interpolacion —no una curva aproximada— y que sin tabla no sea una
+# averia sino el analitico de la familia, dicho por hasTable().
+option(ABDSHAREDCODE_BUILD_LUTDSP_TESTS "Build LutDSP standalone tests" ON)
+if(ABDSHAREDCODE_BUILD_LUTDSP_TESTS)
+    add_executable(ABDShared_LutDSP_Tests
+        LutDSP/LutDSPTests.cpp
+    )
+    target_link_libraries(ABDShared_LutDSP_Tests PRIVATE ABDShared_LutDSP)
+    # El test se compila a 17 a proposito: es el estandar del sustrato (DspCore) y
+    # el que un consumidor viejo puede estar usando, asi que la familia tiene que
+    # valer ahi. El project() raiz va a 20 y no estorba: las features solo suben.
+    target_compile_features(ABDShared_LutDSP_Tests PRIVATE cxx_std_17)
+endif()
 
 # --- nlohmann_json: una sola resolucion para todo el repo -------------------------
 # Dos cabeceras de este repo incluyen <nlohmann/json.hpp> y las dos son Superficie
