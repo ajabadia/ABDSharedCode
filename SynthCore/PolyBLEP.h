@@ -17,12 +17,46 @@ public:
      * @param dt Phase increment per sample (frequency / sampleRate)
      * @return BLEP correction value to subtract/add to naive waveform
      */
-    static float getResidual(float t, float dt) noexcept;
+    static inline float getResidual(float t, float dt) noexcept
+    {
+        if (dt <= 0.0f) return 0.0f;
+
+        // 0 <= t < dt (Just after discontinuity)
+        if (t < dt)
+        {
+            float ratio = t / dt;
+            return ratio + ratio - ratio * ratio - 1.0f;
+        }
+        // 1 - dt < t <= 1 (Just before discontinuity)
+        else if (t > 1.0f - dt)
+        {
+            float ratio = (t - 1.0f) / dt;
+            return ratio * ratio + ratio + ratio + 1.0f;
+        }
+
+        return 0.0f;
+    }
 
     /**
      * @brief Computes PolyBLAMP residual for integrated step (used in Triangle wave).
      */
-    static float getResidualIntegrated(float t, float dt) noexcept;
+    static inline float getResidualIntegrated(float t, float dt) noexcept
+    {
+        if (dt <= 0.0f) return 0.0f;
+
+        if (t < dt)
+        {
+            float ratio = t / dt;
+            return (dt / 3.0f) * (ratio * ratio * ratio - 3.0f * ratio * ratio + 3.0f * ratio - 1.0f);
+        }
+        else if (t > 1.0f - dt)
+        {
+            float ratio = (t - 1.0f) / dt;
+            return (dt / 3.0f) * (ratio * ratio * ratio + 3.0f * ratio * ratio + 3.0f * ratio + 1.0f);
+        }
+
+        return 0.0f;
+    }
 };
 
 } // namespace abd::synth

@@ -39,6 +39,16 @@
          RELATIVO para exp2/pow, porque sobre 2^19 un error de 1 ulp ya son
          0.1 absolutos.
 
+     10. LA FAMILIA DE FILTROS: que sus miembros honren el contrato (el rasgo
+         IsFilterStage, que lo comprueba al compilar), que el idioma de sus
+         parametros sea el mismo para todos (curva de corte y curva de Q, con su
+         ida y vuelta, que es lo que necesita el miembro LUT), que el miembro TPT
+         filtre de verdad en sus tres modos, que coincida a 1e-12 con la etapa
+         compartida a resonancia 0 (la repeticion de las ecuaciones esta
+         VIGILADA), y que el miembro de ecuacion sea una escalera de verdad: pasa
+         la continua, cae 4 polos, la resonancia alarga la cola y a tope el tanh
+         la asienta en vez de dejarla crecer.
+
     Uso: ABDShared_DspCore_Tests  (no toma argumentos; 0 = OK)
 
   ==============================================================================
@@ -57,9 +67,23 @@
 namespace
 {
 
+using abd::dsp::cutoffHzFromNormalized;
+using abd::dsp::FilterEquation;
+using abd::dsp::FilterKind;
+using abd::dsp::filterMaxCutoffHz;
+using abd::dsp::filterMaxQ;
+using abd::dsp::filterMinCutoffHz;
+using abd::dsp::filterMinQ;
+using abd::dsp::FilterMode;
+using abd::dsp::filterQToResonance;
+using abd::dsp::filterResonanceToQ;
+using abd::dsp::FilterTpt;
 using abd::dsp::ignoreUnused;
+using abd::dsp::IsFilterStage;
 using abd::dsp::jmax;
 using abd::dsp::MathConstants;
+using abd::dsp::normalizedFromCutoffHz;
+using abd::dsp::processBlock;
 using abd::dsp::ResonantFilterStage;
 
 int gChecks   = 0;
@@ -1358,6 +1382,531 @@ void testResonantFilterResetAndDenormals()
           "la etapa sigue auto-oscilando despues de un reset");
 }
 
+//==============================================================================
+// LA FAMILIA DE FILTROS (DspCore/DspFilterFamily.h y sus dos miembros de este
+// modulo). Lo que se blinda aqui no es un sonido: es que los miembros sean
+// INTERCAMBIABLES y que filtren de verdad. Un miembro que se sale del contrato,
+// o que deja de atenuar lo que dice atenuar, es un fallo que en un synth se oye
+// como "ese filtro no hace nada" y se tarda una tarde en encontrar.
+//==============================================================================
+
+/** La energia (RMS) de la COLA de una senal filtrada: se descartan las primeras
+    muestras para no medir el transitorio de encendido, que es distinto en cada
+    topologia y no es lo que se esta comparando. */
+template <typename FilterStage>
+double filteredRms(FilterStage& filter, double freqHz, double sampleRate, int total, int measureTail)
+{
+    const auto step = 2.0 * MathConstants<double>::pi * freqHz / sampleRate;
+
+    double sum  = 0.0;
+    int counted = 0;
+
+    for (int i = 0; i < total; ++i)
+    {
+        const auto y = filter.processSample(std::sin(step * (double)i));
+
+        if (i >= total - measureTail)
+        {
+            sum += y * y;
+            ++counted;
+        }
+    }
+
+    return counted > 0 ? std::sqrt(sum / (double)counted) : 0.0;
+}
+
+//==============================================================================
+/** El contrato: los miembros lo honran, el rasgo lo comprueba al compilar y un
+    tipo que no es un filtro no pasa por la puerta. */
+void testFilterFamilyContract()
+{
+    static_assert(IsFilterStage<FilterTpt>::value,
+                  "FilterTpt tiene que honrar el contrato de la familia");
+    static_assert(IsFilterStage<FilterEquation>::value,
+                  "FilterEquation tiene que honrar el contrato de la familia");
+
+    check(IsFilterStage<FilterTpt>::value, "el miembro TPT es de la familia");
+    check(IsFilterStage<FilterEquation>::value, "el miembro de ecuacion es de la familia");
+    check(!IsFilterStage<int>::value, "un int no es un filtro: el rasgo no dice que si a todo");
+    check(FilterTpt::kind == FilterKind::Tpt, "el miembro TPT se declara TPT");
+    check(FilterEquation::kind == FilterKind::Equation, "el miembro de ecuacion se declara ecuacion");
+
+    // Los modos: el TPT los hace todos (son tres taps del mismo par de estados) y
+    // la escalera solo el paso bajo. Y quien no puede, lo DICE: setMode devuelve
+    // false y no cambia nada, en vez de devolver un paso bajo disfrazado.
+    FilterTpt tpt;
+    tpt.prepare(48000.0);
+
+    check(tpt.setMode(FilterMode::HighPass), "el TPT honra el paso alto");
+    check(tpt.getMode() == FilterMode::HighPass, "y lo deja puesto");
+    check(FilterTpt::supportsMode(FilterMode::BandPass), "y anuncia la banda antes de que se la pidan");
+
+    FilterEquation equation;
+    equation.prepare(48000.0);
+
+    check(FilterEquation::supportsMode(FilterMode::LowPass), "la escalera si honra el paso bajo");
+    check(!FilterEquation::supportsMode(FilterMode::HighPass), "la escalera no honra el paso alto: lo dice");
+    check(!equation.setMode(FilterMode::BandPass), "y setMode devuelve false cuando no puede");
+    check(equation.getMode() == FilterMode::LowPass, "y NO cambia el modo al decir que no");
+}
+
+//==============================================================================
+/** El idioma de los parametros, que es la mitad de la familia: si este cambia,
+    cambiar de filtro cambia la afinacion del panel y la familia no sirve de
+    nada aunque los metodos coincidan. */
+void testFilterFamilyParameterLanguage()
+{
+    check(std::abs(cutoffHzFromNormalized(0.0) - filterMinCutoffHz) < 1.0e-9,
+          "corte 0 son 20 Hz, el extremo de la familia");
+    // Los extremos, con la precision de la FAMILIA: las trascendentes son las
+    // float deterministicas de DspMath (la invariante de paridad nativo <-> WASM),
+    // asi que el tope es 20 kHz dentro de una diezmilesima, que son 0.17 cents.
+    // Musicalmente exacto y sin prometer la ultima cifra de un polinomio.
+    check(std::abs(cutoffHzFromNormalized(1.0) - filterMaxCutoffHz) < filterMaxCutoffHz * 1.0e-4,
+          "corte 1 son 20 kHz, el otro extremo");
+
+    auto monotonic = true;
+    auto previous  = cutoffHzFromNormalized(0.0);
+
+    for (int i = 1; i <= 100; ++i)
+    {
+        const auto hz = cutoffHzFromNormalized((double)i / 100.0);
+
+        if (!(hz > previous))
+            monotonic = false;
+
+        previous = hz;
+    }
+
+    check(monotonic, "la curva de corte crece en todo el recorrido: no hay escalones ni valles");
+
+    // El ida y vuelta Hz -> posicion -> Hz es lo que necesita el miembro LUT: le
+    // piden Hz y busca por POSICION de mando en la tabla.
+    auto roundTrip = true;
+
+    for (int i = 0; i <= 20; ++i)
+    {
+        const auto hz   = cutoffHzFromNormalized((double)i / 20.0);
+        const auto back = cutoffHzFromNormalized(normalizedFromCutoffHz(hz));
+
+        if (std::abs(back - hz) > hz * 1.0e-4)
+            roundTrip = false;
+    }
+
+    check(roundTrip, "Hz -> posicion -> Hz vuelve al mismo sitio (1e-4 relativo)");
+
+    check(std::abs(filterResonanceToQ(0.0) - filterMinQ) < 1.0e-12,
+          "resonancia 0 da la Q minima de la familia, sin realce");
+    check(std::abs(filterResonanceToQ(1.0) - filterMaxQ) < filterMaxQ * 1.0e-4,
+          "resonancia 1 da la Q del borde");
+
+    auto qRoundTrip = true;
+
+    for (int i = 0; i <= 20; ++i)
+    {
+        const auto q    = filterResonanceToQ((double)i / 20.0);
+        const auto back = filterResonanceToQ(filterQToResonance(q));
+
+        if (std::abs(back - q) > q * 1.0e-4)
+            qRoundTrip = false;
+    }
+
+    check(qRoundTrip, "resonancia -> Q -> resonancia vuelve al mismo sitio (lo usa el miembro LUT)");
+}
+
+//==============================================================================
+/** El miembro TPT filtra, y filtra lo que dice su modo: los tres taps, no tres
+    nombres para la misma salida. */
+void testFilterTptIsTheFamilyFilter()
+{
+    constexpr double fs = 48000.0;
+
+    {
+        FilterTpt filter;
+        filter.prepare(fs);
+        filter.setMode(FilterMode::LowPass);
+        filter.setCutoff(1000.0);
+        filter.setResonance(0.2);
+
+        const auto low = filteredRms(filter, 100.0, fs, 9600, 4800);
+        filter.reset();
+        const auto high = filteredRms(filter, 8000.0, fs, 9600, 4800);
+
+        check(high < low * 0.2, "el paso bajo atenua los agudos mucho mas que los graves");
+    }
+
+    {
+        FilterTpt filter;
+        filter.prepare(fs);
+        filter.setMode(FilterMode::HighPass);
+        filter.setCutoff(1000.0);
+        filter.setResonance(0.2);
+
+        const auto low = filteredRms(filter, 100.0, fs, 9600, 4800);
+        filter.reset();
+        const auto high = filteredRms(filter, 8000.0, fs, 9600, 4800);
+
+        check(low < high * 0.2, "el paso alto atenua los graves mucho mas que los agudos");
+    }
+
+    {
+        FilterTpt filter;
+        filter.prepare(fs);
+        filter.setMode(FilterMode::BandPass);
+        filter.setCutoff(1000.0);
+        filter.setResonance(0.5);
+
+        const auto atCutoff = filteredRms(filter, 1000.0, fs, 9600, 4800);
+        filter.reset();
+        const auto farLow = filteredRms(filter, 50.0, fs, 9600, 4800);
+        filter.reset();
+        const auto farHigh = filteredRms(filter, 16000.0, fs, 9600, 4800);
+
+        check(atCutoff > farLow * 5.0, "la banda pasa el corte y no lo que hay debajo");
+        check(atCutoff > farHigh * 5.0, "ni lo que hay muy por encima");
+    }
+
+    {
+        FilterTpt filter;
+        filter.prepare(fs);
+        filter.setMode(FilterMode::LowPass);
+        filter.setResonance(0.0);
+        filter.setCutoff(500.0);
+
+        const auto dark = filteredRms(filter, 4000.0, fs, 9600, 4800);
+
+        filter.reset();
+        filter.setCutoff(8000.0);
+
+        const auto bright = filteredRms(filter, 4000.0, fs, 9600, 4800);
+
+        check(bright > dark * 3.0, "subir el corte deja pasar mas agudos: el mando hace lo que dice");
+    }
+}
+
+//==============================================================================
+/** El miembro TPT y la ETAPA COMPARTIDA son el mismo filtro a resonancia 0,
+    cuando a la etapa se le apaga su control de nivel (que es lo unico que las
+    separa).
+
+    Esto es lo que hace honesta la repeticion de las ecuaciones: el miembro TPT
+    repite a proposito la formulacion de DspResonantFilter.h para no tocar el
+    comportamiento de una pieza que los productos ya usan, y este test es el que
+    impide que la repeticion se convierta en dos filtros parecidos. Si alguien
+    cambia la Q minima de la familia sin cambiar baseQ de la etapa (o al reves),
+    cae aqui antes de que caiga en el oido. */
+void testFilterTptAgreesWithTheSharedStage()
+{
+    constexpr double fs = 48000.0;
+
+    ResonantFilterStage stage;
+    stage.prepare(fs);
+    stage.setCutoff(1000.0);
+    stage.setResonance(0.0);
+    stage.setLevelControl(0.0); // AGC apagada: k = k0 = 1/baseQ
+
+    FilterTpt familyMember;
+    familyMember.prepare(fs);
+    familyMember.setCutoff(1000.0);
+    familyMember.setResonance(0.0);
+    familyMember.setMode(FilterMode::LowPass);
+
+    auto worst = 0.0;
+
+    for (int i = 0; i < 4800; ++i)
+    {
+        const auto x = std::sin(2.0 * MathConstants<double>::pi * 300.0 * (double)i / fs);
+        const auto a = stage.processSample(x);
+        const auto b = familyMember.processSample(x);
+
+        worst = std::max(worst, std::abs(a - b));
+    }
+
+    check(worst < 1.0e-12,
+          "el miembro TPT y la etapa compartida dan la misma salida a resonancia 0 (1e-12)");
+}
+
+//==============================================================================
+/** El miembro de ecuacion: una escalera de cuatro polos de verdad. Pasa la
+    continua, cae 24 dB por octava, la resonancia alarga la cola y a tope NO se
+    desmadra, que es lo que el tanh del lazo garantiza. */
+void testFilterEquationIsANonlinearLadder()
+{
+    constexpr double fs = 48000.0;
+
+    {
+        FilterEquation filter;
+        filter.prepare(fs);
+        filter.setCutoff(1000.0);
+        filter.setResonance(0.0);
+
+        auto dc = 0.0;
+
+        for (int i = 0; i < 4800; ++i)
+            dc = filter.processSample(0.5);
+
+        check(std::abs(dc - 0.5) < 1.0e-3, "a resonancia 0 la escalera pasa la continua con ganancia 1");
+
+        filter.reset();
+        const auto low = filteredRms(filter, 100.0, fs, 9600, 4800);
+
+        filter.reset();
+        const auto high = filteredRms(filter, 8000.0, fs, 9600, 4800);
+
+        check(high < low * 0.1, "la escalera atenua los agudos mucho mas que los graves (4 polos)");
+    }
+
+    // La cola de un golpe, a resonancia 0 y a tope. A 0 la escalera se apaga en
+    // unos milisegundos; a tope sigue sonando. La comparacion es entre las dos, no
+    // contra un numero: cuanto dura de verdad la cola es una decision de la
+    // topologia, lo que NO puede pasar es que la resonancia no haga nada.
+    const auto tailRms = [fs](double resonance) {
+        FilterEquation filter;
+        filter.prepare(fs);
+        filter.setCutoff(400.0);
+        filter.setResonance(resonance);
+
+        double sum = 0.0;
+
+        for (int i = 0; i < 24000; ++i)
+        {
+            const auto y = filter.processSample(i == 0 ? 1.0 : 0.0);
+
+            if (i >= 12000)
+                sum += y * y;
+        }
+
+        return std::sqrt(sum / 12000.0);
+    };
+
+    check(tailRms(1.0) > tailRms(0.0) * 10.0,
+          "a tope la cola del golpe es mucho mas larga que a cero: la resonancia hace algo");
+
+    {
+        FilterEquation filter;
+        filter.prepare(fs);
+        filter.setCutoff(400.0);
+        filter.setResonance(1.0);
+
+        auto finite = true;
+        auto peak   = 0.0;
+
+        for (int i = 0; i < 96000; ++i)
+        {
+            const auto y = filter.processSample(i == 0 ? 1.0 : 0.0);
+
+            if (!std::isfinite(y))
+                finite = false;
+
+            peak = std::max(peak, std::abs(y));
+        }
+
+        check(finite, "a resonancia 1 y con un golpe, la escalera no produce NaN ni infinito");
+        check(peak < 8.0, "y se asienta: el pico se queda acotado en vez de crecer sin tope");
+        // Y a tope CANTA de verdad, que es lo que un mando de resonancia al tope
+        // tiene que hacer. Este check es el que obligo a poner el tope del
+        // recorrido por encima del umbral lineal de 4.0: con k = 4.0 exacto el
+        // tanh del lazo la apaga y la comprobacion cae (medido, no supuesto).
+        check(peak > 0.1, "y a tope la escalera canta: el golpe la deja oscilando");
+    }
+}
+
+//==============================================================================
+/** El bloque es de la familia, asi que tiene que dar lo mismo que la muestra a
+    muestra y tratar los dos formatos de buffer (y un puntero nulo sin caerse). */
+void testFilterFamilyBlockProcessing()
+{
+    constexpr double fs = 48000.0;
+    constexpr int n     = 512;
+
+    std::vector<double> source((size_t)n);
+
+    for (int i = 0; i < n; ++i)
+        source[(size_t)i] = std::sin(2.0 * MathConstants<double>::pi * 440.0 * (double)i / fs);
+
+    {
+        FilterTpt bySample;
+        bySample.prepare(fs);
+        bySample.setCutoff(2000.0);
+
+        FilterTpt inBlock;
+        inBlock.prepare(fs);
+        inBlock.setCutoff(2000.0);
+
+        std::vector<float> buffer((size_t)n);
+
+        for (int i = 0; i < n; ++i)
+            buffer[(size_t)i] = static_cast<float>(source[(size_t)i]);
+
+        processBlock(inBlock, buffer.data(), n);
+
+        auto worst = 0.0;
+
+        for (int i = 0; i < n; ++i)
+        {
+            const auto reference = bySample.processSample(source[(size_t)i]);
+
+            worst = std::max(worst, std::abs((double)buffer[(size_t)i] - reference));
+        }
+
+        check(buffer[(size_t)(n - 1)] != 0.0f, "el bloque escribio de verdad en el buffer");
+        check(worst < 1.0e-6, "el bloque float da lo mismo que la muestra a muestra (precision float)");
+    }
+
+    {
+        FilterEquation bySample;
+        bySample.prepare(fs);
+        bySample.setCutoff(2000.0);
+        bySample.setResonance(0.3);
+
+        FilterEquation inBlock;
+        inBlock.prepare(fs);
+        inBlock.setCutoff(2000.0);
+        inBlock.setResonance(0.3);
+
+        std::vector<double> buffer = source;
+
+        processBlock(inBlock, buffer.data(), n);
+
+        auto worst = 0.0;
+
+        for (int i = 0; i < n; ++i)
+        {
+            const auto reference = bySample.processSample(source[(size_t)i]);
+
+            worst = std::max(worst, std::abs(buffer[(size_t)i] - reference));
+        }
+
+        check(worst < 1.0e-15, "el bloque double es EXACTAMENTE la muestra a muestra de la escalera");
+
+        processBlock(inBlock, static_cast<double*>(nullptr), 16);
+
+        check(inBlock.getCutoff() > 0.0, "un bloque con puntero nulo no hace nada y no se lleva el filtro por delante");
+    }
+}
+
+void testJunoHPF()
+{
+    // 1. Tablas de frecuencias conmutadas
+    check(abd::dsp::getJuno60HPFFreq(0) == 0.0f, "J60 HPF pos 0 es FLAT (0 Hz)");
+    check(std::abs(abd::dsp::getJuno60HPFFreq(1) - 122.0f) < 1.0f, "J60 HPF pos 1 es ~122 Hz");
+    check(std::abs(abd::dsp::getJuno60HPFFreq(2) - 269.0f) < 1.0f, "J60 HPF pos 2 es ~269 Hz");
+    check(std::abs(abd::dsp::getJuno60HPFFreq(3) - 571.0f) < 1.0f, "J60 HPF pos 3 es ~571 Hz");
+
+    check(abd::dsp::getJuno106HPFFreq(0) == -1.0f, "J106 HPF pos 0 es centinela Bass Boost (-1 Hz)");
+    check(abd::dsp::getJuno106HPFFreq(1) == 0.0f,  "J106 HPF pos 1 es FLAT (0 Hz)");
+    check(std::abs(abd::dsp::getJuno106HPFFreq(2) - 236.0f) < 1.0f, "J106 HPF pos 2 es ~236 Hz");
+    check(std::abs(abd::dsp::getJuno106HPFFreq(3) - 754.0f) < 1.0f, "J106 HPF pos 3 es ~754 Hz");
+
+    // 2. Curva continua PCHIP
+    check(std::abs(abd::dsp::getJuno6HPFFreqPCHIP(0.0f) - 38.6f) < 0.01f, "PCHIP en 0.0 es 38.6 Hz");
+    check(std::abs(abd::dsp::getJuno6HPFFreqPCHIP(1.0f) - 1394.2f) < 0.01f, "PCHIP en 1.0 es 1394.2 Hz");
+    bool pchipMonotonic = true;
+    float prevVal = abd::dsp::getJuno6HPFFreqPCHIP(0.0f);
+    for (int step = 1; step <= 100; ++step)
+    {
+        float val = abd::dsp::getJuno6HPFFreqPCHIP(static_cast<float>(step) / 100.0f);
+        if (val < prevVal) { pchipMonotonic = false; break; }
+        prevVal = val;
+    }
+    check(pchipMonotonic, "PCHIP es estrictamente monotona en todo el recorrido [0..1]");
+
+    // 3. BassBoostFilter
+    {
+        abd::dsp::BassBoostFilter bb;
+        bb.init(44100.0f);
+        check(std::isfinite(bb.b0) && std::isfinite(bb.a1), "BassBoostFilter coeficientes finitos a 44.1kHz");
+        float out = bb.process(1.0f);
+        check(std::isfinite(out) && !std::isnan(out), "BassBoostFilter salida finita en impulso");
+        bb.reset();
+        check(bb.z1 == 0.0 && bb.z2 == 0.0, "BassBoostFilter reset limpia estados");
+    }
+
+    // 4. JunoHPFSwitched
+    {
+        abd::dsp::JunoHPFSwitched hpf;
+        hpf.prepare(44100.0);
+        hpf.setMode(abd::dsp::HPFMode::J106);
+
+        // Pos 1: Flat bypass
+        hpf.setPosition(1);
+        check(hpf.currentFreqHz == 0.0f, "J106 pos 1 fija freq a 0 Hz");
+        check(std::abs(hpf.process(0.5f) - 0.5f) < 1.0e-5f, "J106 pos 1 (flat) es bypass transparente");
+
+        // Pos 0: Bass boost
+        hpf.setPosition(0, 0.f, 0.f, 0.f, 1.5f);
+        check(hpf.currentFreqHz == -1.0f, "J106 pos 0 fija centinela -1 Hz");
+        float bbOut = hpf.process(0.5f);
+        check(std::isfinite(bbOut) && std::abs(bbOut) > 0.0f, "J106 pos 0 procesa con boost");
+
+        // Pos 2: 236 Hz TPT HPF
+        hpf.setPosition(2);
+        check(std::abs(hpf.currentFreqHz - 236.0f) < 1.0f, "J106 pos 2 fija freq ~236 Hz");
+
+        // Block processing vs sample processing parity
+        abd::dsp::JunoHPFSwitched hpfSample, hpfBlock;
+        hpfSample.prepare(44100.0);
+        hpfBlock.prepare(44100.0);
+        hpfSample.setPosition(3);
+        hpfBlock.setPosition(3);
+
+        float blockData[32];
+        float sampleData[32];
+        for (int i = 0; i < 32; ++i)
+        {
+            blockData[i] = sampleData[i] = std::sin(2.0f * 3.14159265f * 440.0f * static_cast<float>(i) / 44100.0f);
+        }
+        hpfBlock.processBlock(blockData, 32);
+        for (int i = 0; i < 32; ++i) sampleData[i] = hpfSample.process(sampleData[i]);
+
+        float worstDiff = 0.0f;
+        for (int i = 0; i < 32; ++i) worstDiff = std::max(worstDiff, std::abs(blockData[i] - sampleData[i]));
+        check(worstDiff < 1.0e-6f, "JunoHPFSwitched processBlock coincide con process muestra a muestra");
+    }
+
+    // 5. JunoHPFContinuous
+    {
+        abd::dsp::JunoHPFContinuous hpf;
+        hpf.prepare(44100.0);
+
+        // Flat
+        hpf.setCutoff(0.0f);
+        check(std::abs(hpf.process(0.7f) - 0.7f) < 1.0e-5f, "JunoHPFContinuous cutoff 0 es bypass transparente");
+
+        // Cutoff activo + bass boost independiente
+        hpf.setCutoff(500.0f);
+        hpf.setBassBoostActive(true);
+        hpf.setBassBoostGain(2.0f);
+        check(hpf.bassBoostActive, "bassBoostActive se activa");
+        check(hpf.bassBoostGain == 2.0f, "bassBoostGain se fija");
+
+        float out = hpf.process(0.5f);
+        check(std::isfinite(out), "JunoHPFContinuous genera salida finita con corte y boost");
+
+        // Block processing parity
+        abd::dsp::JunoHPFContinuous hpfS, hpfB;
+        hpfS.prepare(44100.0);
+        hpfB.prepare(44100.0);
+        hpfS.setCutoff(400.0f);
+        hpfB.setCutoff(400.0f);
+        hpfS.setBassBoostActive(true);
+        hpfB.setBassBoostActive(true);
+
+        float bBuf[32];
+        float sBuf[32];
+        for (int i = 0; i < 32; ++i)
+        {
+            bBuf[i] = sBuf[i] = std::sin(2.0f * 3.14159265f * 100.0f * static_cast<float>(i) / 44100.0f);
+        }
+        hpfB.processBlock(bBuf, 32);
+        for (int i = 0; i < 32; ++i) sBuf[i] = hpfS.process(sBuf[i]);
+
+        float worst = 0.0f;
+        for (int i = 0; i < 32; ++i) worst = std::max(worst, std::abs(bBuf[i] - sBuf[i]));
+        check(worst < 1.0e-6f, "JunoHPFContinuous processBlock coincide con process muestra a muestra");
+    }
+}
+
 } // namespace
 
 //==============================================================================
@@ -1383,6 +1932,13 @@ int main()
     testResonantFilterRetuneHasNoClick();
     testResonantFilterClampsHostileInput();
     testResonantFilterResetAndDenormals();
+    testFilterFamilyContract();
+    testFilterFamilyParameterLanguage();
+    testFilterTptIsTheFamilyFilter();
+    testFilterTptAgreesWithTheSharedStage();
+    testFilterEquationIsANonlinearLadder();
+    testFilterFamilyBlockProcessing();
+    testJunoHPF();
 
     if (gFailures == 0)
     {

@@ -78,6 +78,31 @@ inline float randomBipolar(uint32_t& state) noexcept
     return (static_cast<float>(state) * (2.0f / 4294967295.0f)) - 1.0f;
 }
 
+// Sawtooth curvature — adds a parabolic bulge to a linear ramp [0, 1).
+// At curvature = 0: pure linear ramp (ideal mathematical saw).
+// At curvature > 0: the ramp is slightly bowed upward, being steeper near the
+// midpoint and flatter near the ends. Models the slight nonlinearity of
+// analog RC integration circuits (Juno-106, DeepMind, etc.).
+inline float sawCurvature(float phase, float curvature) noexcept
+{
+    return phase * (1.0f + curvature * (1.0f - phase));
+}
+
+// Simple 1-pole exponential smoother for slew limiting.
+inline float slewLimit(float current, float target, float coeff) noexcept
+{
+    return current + (target - current) * coeff;
+}
+
+// Convert a smoothing time constant (in seconds) to the per-sample
+// coefficient of a 1-pole exponential smoother.
+// tau = -1/ln(1-c) samples -> c(tau, sr) = 1 - exp(-1/(tau·sr)).
+inline float slewCoeffFromTimeConstant(float tauSeconds, double sampleRate) noexcept
+{
+    const double sr = std::max(1.0, sampleRate);
+    return 1.0f - static_cast<float>(std::exp(-1.0 / (static_cast<double>(tauSeconds) * sr)));
+}
+
 template <typename T = float>
 class LinearSmoother
 {

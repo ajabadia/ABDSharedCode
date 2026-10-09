@@ -18,6 +18,11 @@
 #include "DSPUtils.h"
 #include "EnvelopeCurves.h"
 #include "LFO.h"
+#include "OscHalfbandDecimator.h"
+#include "OscPolyBlep.h"
+#include "OscVcoCa72.h"
+#include "OscVcoCa72Profile.h"
+#include "OscillatorFamily.h"
 #include "PolyBLEP.h"
 #include "PortamentoGlide.h"
 #include "VoiceAllocator.h"
@@ -54,7 +59,16 @@ static void check(bool condition, const char* testName)
 // La matriz de modulacion tiene su propio .inc: es un bloque autocontenido
 // (incluye una COPIA LITERAL de la implementacion previa de ABDEep para el
 // test de equivalencia, que no debe contaminar los includes de los demas).
-#include "tests/ModMatrixTests.inc"
+#include "tests/ModMatrixTests.inc"#include "tests/ModMatrixTests.inc"
+
+// Los motores del nucleo compartido tienen su propio bloque: arpeggio, secuencia,
+// LFO analogico, envolvente analogica y ruido determinista. Cada .inc es
+// autocontenido y solo depende de la cabecera de SynthCore que prueba.
+#include "tests/ArpeggiatorTests.inc"
+#include "tests/ControlSequencerTests.inc"
+#include "tests/LFOAnalogTests.inc"
+#include "tests/EnvelopeAnalogTests.inc"
+#include "tests/DriftEngineTests.inc"
 
 // El catalogo del S950 tambien va en su propio .inc: es un bloque de datos con
 // sus propias reglas, y mezclarlo con el resto haria mas dificil ver que se
@@ -64,6 +78,11 @@ static void check(bool condition, const char* testName)
 #include "tests/S950DiskTests.inc"
 #include "tests/S950EnvelopeBenchTests.inc"
 #include "tests/S950PatchFieldsTests.inc"
+
+// La familia de osciladores tiene el suyo: el contrato (rasgo incluido), el
+// idioma de los parametros y las dos piezas (el VCO de rampa y el de fase) con
+// su fidelidad medida.
+#include "tests/OscillatorFamilyTests.inc"
 
 // ─────────────────────────── DSPUtils ───────────────────────────
 
@@ -441,8 +460,43 @@ int main()
     abd::synth::tests::testS950Calibration();
     abd::synth::tests::testS950EnvelopeBench();
     abd::synth::tests::testS950CalibrationRender();
+    abd::synth::tests::testOscillatorFamilyContract();
 
-    printf("\n=== Results: %d passed, %d failed ===\n",
+// ─────────────────────────── OscReference (prototipo de referencia de la familia) ───────────────────────────
+//
+// Este bloque se incluye DESPUES del de la familia porque el contrato usa
+// OscVcoCa72 y OscPolyBlep como miembros de referencia. El bloque incluye su propia
+// cabecera (#include "OscReference.h") antes de declarar sus funciones, para que la
+// inclusion del .inc sea autocontenida y el archivo de prueba principal no tenga que
+// recordar el orden.
+#include "tests/OscReferenceTests.inc"
+
+    abd::synth::tests::testOscHalfbandDecimator();
+    abd::synth::tests::testOscVcoCa72Frequency();
+    abd::synth::tests::testOscVcoCa72Waveforms();
+    abd::synth::tests::testOscVcoCa72BandLimiting();
+    abd::synth::tests::testOscPolyBlep();
+    abd::synth::tests::testOscillatorFamilyLanguage();
+
+    printf(    abd::synth::tests::testArpeggiatorModes();
+    abd::synth::tests::testArpeggiatorGateAndHold();
+    abd::synth::tests::testArpeggiatorDeterminism();
+
+    abd::synth::tests::testControlSequencerBipolarSteps();
+    abd::synth::tests::testControlSequencerClockTable();
+    abd::synth::tests::testControlSequencerSwingAndSlew();
+
+    abd::synth::tests::testLFOAnalogWaveforms();
+    abd::synth::tests::testLFOAnalogBipolarEndpoints();
+    abd::synth::tests::testLFOAnalogSyncNoteTable();
+
+    abd::synth::tests::testEnvelopeAnalogCurves();
+    abd::synth::tests::testEnvelopeAnalogPhases();
+
+    abd::synth::tests::testDriftEngineDeterminism();
+    abd::synth::tests::testDriftEngineAmplitudeScaling();
+
+"\n=== Results: %d passed, %d failed ===\n",
            abd::synth::tests::testsPassed, abd::synth::tests::testsFailed);
     return abd::synth::tests::testsFailed == 0 ? 0 : 1;
 }

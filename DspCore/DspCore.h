@@ -2550,3 +2550,18 @@ private:
 // pow/exp2 deterministas en vez de la libm de cada plataforma, que es la
 // invariante de paridad nativo <-> WASM del modulo (ver DspMath.h).
 #include "DspResonantFilter.h"
+// Y LA FAMILIA DE FILTROS va despues de la etapa resonante, por el mismo motivo
+// y por uno mas: el contrato (DspFilterFamily.h) fija la curva de corte y la de
+// resonancia con esas mismas trascendentes, y el miembro de ecuacion
+// (DspFilterEquation.h) satura el lazo con el tanh deterministico. El orden
+// importa porque el miembro TPT usa el idioma de la familia, y el de ecuacion
+// usa el de la familia y el sustrato.
+//
+// Los tres ficheros van AQUI y no fuera del sustrato porque su contrato es del
+// sustrato: un filtro del sustrato que no pudiera declararse de la familia seria
+// un filtro que no se puede cambiar por otro, que es justo lo que la familia
+// existe para evitar.
+#include "DspFilterEquation.h"
+#include "DspFilterFamily.h"
+#include "DspFilterTpt.h"
+#include "DspJunoHPF.h"
