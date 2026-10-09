@@ -158,11 +158,18 @@ namespace abd::synth
                 for (int i = 0; i < cuantas; ++i)
                 {
                     // Si la misma nota sigue sonando, se apaga antes: es un
-                    // retrigger, no una voz superpuesta.
+                    // retrigger, no una voz superpuesta. Se QUITA de la lista:
+                    // la que queda sonando es la nueva, y el flush final apaga
+                    // exactamente una vez lo que realmente suena (sin repetidos).
                     for (int k = 0; k < soundingCount; ++k)
                     {
                         if (sounding[k] == notas[i].note)
+                        {
                             consumeEvent(NoteEvent { pos, notas[i].note, 0.0f, false });
+                            sounding[k] = sounding[soundingCount - 1];
+                            --soundingCount;
+                            break;
+                        }
                     }
 
                     consumeEvent(NoteEvent { pos, notas[i].note, notas[i].velocity, true });
