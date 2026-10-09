@@ -2052,6 +2052,71 @@ void testAnalogModeledFilters()
     }
 }
 
+void testJunoVCF()
+{
+    const double sr = 44100.0;
+    abd::dsp::JunoVCF_ZDF vcf;
+    vcf.prepare(sr);
+
+    // 1. Modos y configuraciones iniciales
+    check(vcf.getMode() == abd::dsp::JunoVCF_ZDF::Mode::DeepMind, "JunoVCF_ZDF modo por defecto es DeepMind");
+    check(vcf.getPoleMode() == abd::dsp::JunoVCF_ZDF::PoleMode::FourPole, "JunoVCF_ZDF pole mode por defecto es 4-pole");
+    check(vcf.getOversample() == 1, "JunoVCF_ZDF oversample por defecto es 1");
+
+    // 2. Curva de resonancia y soft-clip
+    float k0 = abd::dsp::JunoVCF_ZDF::ResK_J106(0.0f);
+    float kMid = abd::dsp::JunoVCF_ZDF::ResK_J106(0.5f);
+    float kMax = abd::dsp::JunoVCF_ZDF::ResK_J106(1.0f);
+    check(std::abs(k0) < 1.0e-5f, "ResK_J106 a 0 es 0");
+    check(kMid > 0.5f && kMid < 3.0f, "ResK_J106 a 0.5 es suave");
+    check(kMax > 4.0f, "ResK_J106 a 1.0 supera 4.0");
+
+    float clipped = abd::dsp::JunoVCF_ZDF::SoftClipK(10.0f);
+    check(clipped <= 6.6f, "SoftClipK limita k a max 6.6");
+
+    // 3. Procesamiento en modo 4-pole y 2-pole
+    float out4 = 0.0f;
+    for (int i = 0; i < 512; ++i)
+        out4 = vcf.process(0.5f, 0.2f, 0.0f);
+    check(std::isfinite(out4), "JunoVCF_ZDF 4-pole salida DC es finita");
+
+    vcf.setPoleMode(abd::dsp::JunoVCF_ZDF::PoleMode::TwoPole);
+    float out2 = 0.0f;
+    for (int i = 0; i < 512; ++i)
+        out2 = vcf.process(0.5f, 0.2f, 0.0f);
+    check(std::isfinite(out2), "JunoVCF_ZDF 2-pole salida DC es finita");
+
+    // 4. Conmutación a modo Juno106
+    vcf.setMode(abd::dsp::JunoVCF_ZDF::Mode::Juno106);
+    check(vcf.getMode() == abd::dsp::JunoVCF_ZDF::Mode::Juno106, "JunoVCF_ZDF setMode Juno106");
+    float outJuno = vcf.process(0.5f, 0.2f, 0.5f);
+    check(std::isfinite(outJuno), "JunoVCF_ZDF modo Juno106 produce salida finita");
+
+    // 5. Sobremuestreo 2x y 4x
+    vcf.setOversample(2);
+    check(vcf.getOversample() == 2, "JunoVCF_ZDF setOversample 2x");
+    float out2x = vcf.process(0.5f, 0.2f, 0.5f);
+    check(std::isfinite(out2x), "JunoVCF_ZDF salida 2x es finita");
+
+    vcf.setOversample(4);
+    check(vcf.getOversample() == 4, "JunoVCF_ZDF setOversample 4x");
+    float out4x = vcf.process(0.5f, 0.2f, 0.5f);
+    check(std::isfinite(out4x), "JunoVCF_ZDF salida 4x es finita");
+
+    // 6. Resamplers independientes
+    abd::dsp::Upsampler2x up;
+    abd::dsp::Downsampler2x down;
+    up.setCoefs(abd::dsp::kResamplerCoefs2x);
+    down.setCoefs(abd::dsp::kResamplerCoefs2x);
+    up.clearBuffers();
+    down.clearBuffers();
+
+    float upSpl[2];
+    up.processSample(upSpl[0], upSpl[1], 0.8f);
+    float recombined = down.processSample(upSpl);
+    check(std::isfinite(recombined), "Polyphase IIR up/downsample produce salida finita");
+}
+
 } // namespace
 
 //==============================================================================
@@ -2085,6 +2150,7 @@ int main()
     testFilterFamilyBlockProcessing();
     testJunoHPF();
     testAnalogModeledFilters();
+    testJunoVCF();
 
     if (gFailures == 0)
     {

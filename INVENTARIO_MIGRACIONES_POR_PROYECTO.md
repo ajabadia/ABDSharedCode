@@ -93,7 +93,7 @@ Recordatorio de regla:
 
 ### 3.2 Candidatos restantes / por revisar
 - Evaluación de generalización de decodificación de cinta / FSK hacia `HardwareDrivers`.
-- Evaluación de `JunoVCF_ZDF` frente a un futuro módulo transversal de filtros.
+- Adopción de `DspJunoVCF.h` (promovido a `DspCore`, libre de JUCE) para unificar la implementación de `JunoVCF`.
 
 ---
 
@@ -104,11 +104,11 @@ Recordatorio de regla:
 - Enlaza `ABDShared::SynthCore`, `ABDShared::DspCore`, `ABDShared::DspEffects`.
 - **Unidades C++20 promovidas a SynthCore**: `VoiceAllocator`, `DriftEngine`, `EnvelopeAnalog`, `LfoAnalog`, `Arpeggiator`, `ControlSequencer`.
 - **Alineación de osciladores**: `DSPHelpers.h` consume el `PolyBLEP.h` canónico de `SynthCore` y utilidades de `DSPUtils.h`.
-- **`DspJunoHPF` migrado y verificado**: `Source/DSP/JunoHPF.h` es shim sobre `DspJunoHPF.h`.
-- **Paridad WASM completa**: `wasm/CMakeLists.txt` enlaza directamente las unidades de `SynthCore`, con generación exitosa de `abdeep_dsp.js/.wasm` y 5.084 tests de WebUI pasando al 100%.
+- **Filtros modelados migrados y verificados**: `DspJunoHPF.h`, `DspJunoVCF.h` (`VcfVoicing.h`), `DspVAOnePole.h`, `DspMoogLadder.h`, `DspKorgMS20.h`. Todos delegados mediante shims sin duplicidad algorítmica.
+- **Paridad WASM completa**: `wasm/CMakeLists.txt` enlaza directamente las unidades de `SynthCore` y `DspCore`, con generación exitosa de `abdeep_dsp.js/.wasm` y 5.084 tests de WebUI pasando al 100%.
 
 ### 4.2 Candidatos restantes / activos
-- **Filtros modelados locales**: `MoogLadderVCF`, `KorgMS20VCF`, `VAOnePoleFilter` (candidatos activos de promoción hacia `DspCore` o `ABDShared::Filters`).
+- Ningún DSP pendiente en `Source/DSP/`: todo componente algorítmico reutilizable ha sido promovido canónicamente a `ABDSharedCode`.
 
 ---
 

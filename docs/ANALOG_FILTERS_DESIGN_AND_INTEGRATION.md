@@ -4,6 +4,8 @@
 > **Espacio de nombres:** `abd::dsp`  
 > **Target CMake:** `ABDShared::DspCore`  
 > **Cabeceras Canónicas:**  
+> • `ABDSharedCode/DspCore/DspJunoVCF.h`  
+> • `ABDSharedCode/DspCore/DspVcfVoicing.h`  
 > • `ABDSharedCode/DspCore/DspVAOnePole.h`  
 > • `ABDSharedCode/DspCore/DspMoogLadder.h`  
 > • `ABDSharedCode/DspCore/DspKorgMS20.h`  
@@ -15,12 +17,13 @@
 
 ## 1. Contexto y Objetivos
 
-Dentro del ecosistema ABDSynths (especialmente en **ABDEep** modelo AbyssMind y extensiones multi-modelo para **ABDMS2000** y **ABDCZ101**), los sintetizadores incorporan modelos alternativos de filtrado analógico virtual para complementar los filtros clásicos OTA:
-1. **Filtro de Escalera de Transistores Moog (MoogLadderVCF):** Emulación de la clásica topología de escalera de 4 polos con saturación no lineal diferencial y compensación de pérdida de graves por resonancia.
-2. **Filtro Sallen-Key Korg MS-20 (KorgMS20VCF):** Emulación de la topología Korg35 basada en pares Sallen-Key con saturación en el lazo de realimentación modelada mediante recorte por diodos.
-3. **Bloque Primario TPT ZDF de 1 Polo (`VAOnePoleFilter`):** El bloque integrador elemental utilizado para construir ambas topologías.
+Dentro del ecosistema ABDSynths (especialmente en **ABDEep** y extensiones multi-modelo para **ABDJUNiO601**, **ABDMS2000** y **ABDCZ101**), los sintetizadores incorporan modelos avanzados de filtrado analógico virtual:
+1. **Filtro OTA IR3109 / 80017A en Cascada ZDF (`JunoVCF_ZDF` + `VcfVoicing`):** Emulación de la clásica topología de 4 polos OTA con sobremuestreo polifásico IIR (2x/4x), aproximación Padé 3/3 de saturación $\tanh$, solucionador no lineal Newton-Raphson de 1 paso y perfiles de sonoridad inyectados (Juno-106 vs DeepMind).
+2. **Filtro de Escalera de Transistores Moog (`MoogLadderVCF`):** Emulación de la clásica topología de escalera de 4 polos con saturación no lineal diferencial y compensación de pérdida de graves por resonancia.
+3. **Filtro Sallen-Key Korg MS-20 (`KorgMS20VCF`):** Emulación de la topología Korg35 basada en pares Sallen-Key con saturación en el lazo de realimentación modelada mediante recorte por diodos.
+4. **Bloque Primario TPT ZDF de 1 Polo (`VAOnePoleFilter`):** El bloque integrador elemental utilizado para construir las topologías Moog y MS-20.
 
-Originalmente estos tres componentes residían localmente en `ABDEep/Source/DSP/`. El objetivo de esta promoción es:
+Originalmente estos componentes residían localmente en `ABDEep/Source/DSP/`. El objetivo de esta promoción es:
 * Elevar estos bloques a **`ABDSharedCode/DspCore`** como parte del sustrato analógico compartido.
 * Desvincularlos de tipos JUCE o dependencias de plataforma (100% C++ estándar).
 * Mantener precisión numérica con acumuladores `double` y protección anti-denormales.
@@ -33,12 +36,17 @@ Originalmente estos tres componentes residían localmente en `ABDEep/Source/DSP/
 ```mermaid
 graph TD
     subgraph "ABDSharedCode/DspCore"
+        VOICING["DspVcfVoicing.h<br/>abd::dsp::VcfVoicing<br/>• Curvas de resonancia / ganancia<br/>• Calibración analógica DeepMind vs J106"]
+
+        JUNOVCF["DspJunoVCF.h<br/>abd::dsp::JunoVCF_ZDF<br/>• Resamplers IIR 2x/4x<br/>• Solver Newton-Raphson Padé 3/3<br/>• Modos J106 / DeepMind<br/>• 4-pole / 2-pole"]
+
         POLE["DspVAOnePole.h<br/>abd::dsp::VAOnePoleFilter<br/>• TPT ZDF 1-pole<br/>• Prewarp g = tan(pi fc / fs)<br/>• Subtractive lp + hp = in"]
         
         MOOG["DspMoogLadder.h<br/>abd::dsp::MoogLadderVCF<br/>• 4x VAOnePoleFilter en cascada<br/>• Saturación tanh en entrada<br/>• Passband compensation 1/(1+k)<br/>• 4-pole (24dB) / 2-pole (12dB)<br/>• Submodos: LP, BP, HP"]
         
         KORG["DspKorgMS20.h<br/>abd::dsp::KorgMS20VCF<br/>• Sallen-Key K35 (LP/HP cascada)<br/>• Diodo tanh en realimentación<br/>• k = 0.1 .. 6.1 auto-oscilación<br/>• 24dB / 12dB rolloff<br/>• Submodos: K35 LP / K35 HP"]
         
+        VOICING --> JUNOVCF
         POLE --> MOOG
         POLE --> KORG
     end
@@ -46,12 +54,16 @@ graph TD
     subgraph "ABDEep (Consumidor)"
         FILTER_BASE["Filter.h (Polimórfico)<br/>virtual void setCutoff / process"]
         
+        SHIM_JUNO["Source/DSP/JunoVCF_ZDF.h<br/>using JunoVCF_ZDF = abd::dsp::JunoVCF_ZDF;"]
+        SHIM_VOICE["Source/DSP/VcfVoicing.h<br/>using VcfVoicing = abd::dsp::VcfVoicing;"]
         SHIM_POLE["Source/DSP/VAOnePoleFilter.h<br/>using VAOnePoleFilter = abd::dsp::VAOnePoleFilter;"]
         SHIM_MOOG["Source/DSP/MoogLadderVCF.h<br/>class MoogLadderVCF : public Filter<br/>{ mFilter: abd::dsp::MoogLadderVCF }"]
         SHIM_KORG["Source/DSP/KorgMS20VCF.h<br/>class KorgMS20VCF : public Filter<br/>{ mFilter: abd::dsp::KorgMS20VCF }"]
         
         FILTER_BASE --> SHIM_MOOG
         FILTER_BASE --> SHIM_KORG
+        JUNOVCF -.-> SHIM_JUNO
+        VOICING -.-> SHIM_VOICE
         MOOG -.-> SHIM_MOOG
         KORG -.-> SHIM_KORG
         POLE -.-> SHIM_POLE
@@ -62,7 +74,25 @@ graph TD
 
 ## 3. Fundamentos Matemáticos y Algorítmicos
 
-### 3.1. Integrador Elemental TPT ZDF (`VAOnePoleFilter`)
+### 3.1. Filtro OTA IR3109 / 80017A ZDF (`JunoVCF_ZDF` + `VcfVoicing`)
+
+* **Aproximación Padé [3/3] de Saturación OTA:**
+  Para modelar la transconductancia no lineal del chip IR3109 / 80017A sin el alto coste de funciones trascendentes por etapa:
+  $$\text{OTASat}(x) \approx x \frac{27 + x^2}{27 + 9 x^2} \quad (|x| \le 3.0)$$
+  $$\text{OTASatDeriv}(x) \approx \frac{27 (27 - 3 x^2)}{(27 + 9 x^2)^2}$$
+* **Solucionador no lineal Newton-Raphson de 1 paso:**
+  Cada una de las 4 etapas integra $s$ resolviendo el lazo implícito:
+  $$y = s + g_1 (x - s), \quad f = y - s - g \cdot \frac{\text{OTASat}(sd)}{\text{otaScale}}$$
+  $$y \leftarrow y - \frac{f}{1 + g \cdot \text{OTASatDeriv}(sd)}, \quad s \leftarrow 2y - s$$
+* **Sobremuestreo Polifásico IIR (Laurent de Soras):**
+  Filtros alógenos de fase mínima con 12 coeficientes optimizados para subida y bajada 2x/4x sin ringing en fase de audio.
+* **Perfiles Inyectados (`VcfVoicing`):**
+  * **Juno-106:** Curva polinómica de 4º orden $ResK\_J106(res)$, ganancia unitaria, saturación estándar.
+  * **DeepMind 12:** Curva $ResK\_J106(res)$ combinada con compensación de ganancia $1 / (1 + 2 res^2)$ y saturación de etapa en $0.70$.
+
+---
+
+### 3.2. Integrador Elemental TPT ZDF (`VAOnePoleFilter`)
 
 Basado en la transformada conservadora de topología (*Topology-Preserving Transform*):
 * **Fórmula de pre-warping bilineal:**

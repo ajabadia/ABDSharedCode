@@ -104,20 +104,18 @@ Esto está formalmente delegado al compartido y consumido activamente:
 - **Osciladores PolyBLEP:** ✅ **Completado**: Delegados al algoritmo unificado en `SynthCore/PolyBLEP.h`.
 - Contrato de efectos proyectado directamente desde el contrato compartido.
 
-### 2.4 Candidato activo a ir a ABDSharedCode
+### 2.4 Promovido a ABDSharedCode
+ 
+- **Filtros modelados (`JunoVCF_ZDF`, `VcfVoicing`, `MoogLadderVCF`, `KorgMS20VCF`, `VAOnePoleFilter`):**
+  ✅ **Completado**: Promovidos a `ABDSharedCode/DspCore/` (`DspJunoVCF.h`, `DspVcfVoicing.h`, `DspMoogLadder.h`, `DspKorgMS20.h`, `DspVAOnePole.h`) en C++20 puro, zero-alloc y zero-JUCE. Consumidos en `ABDEep` mediante shims limpios y disponibles para `ABDJUNiO601` y `ABDMS2000`.
 
-- **Filtros modelados (`MoogLadderVCF`, `KorgMS20VCF`, `VAOnePoleFilter`):**
-  Actualmente residen en `ABDEep/Source/DSP/`. Son candidatos directos para ser promovidos a `ABDSharedCode/DspCore/` (o módulo de filtros compartido), siguiendo el mismo patrón de `DspJunoHPF` (C++20 puro, zero-alloc, zero-JUCE) para ser consumidos por `ABDEep`, `ABDMS2000` y `ABDAudioLab`.
-
-### 2.5 Propio / por confirmar
+### 2.5 Propio / Arquitectura de producto (debe quedarse en ABDEep)
 
 Parece propio o con alta carga de producto:
-- DCO, VCF OTA cascade, matriz de modificación específica del DeepMind, secuenciador de control,
+- DCOs específicos de voz (`OSC1`, `OSC2`), orquestación de polifonía de 12 voces (`SynthEngine`, `SynthVoice`),
 - Calibration Lab y herramientas de audio A/B,
 - serialización XML/JUCE y bridge nativo+Juce,
 - frontend de la WebUI de DeepMind y lógica de bridge específica.
-
-Esto parece que no sale del proyecto sin generalización deliberada.
 
 ---
 

@@ -2568,3 +2568,5 @@ private:
 #include "DspVAOnePole.h"
 #include "DspMoogLadder.h"
 #include "DspKorgMS20.h"
+#include "DspVcfVoicing.h"
+#include "DspJunoVCF.h"

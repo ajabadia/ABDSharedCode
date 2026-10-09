@@ -39,6 +39,8 @@ ABDSharedCode/
 │   ├── DspFilterTpt.h              ← miembro TPT (paso bajo / alto / banda)
 │   ├── DspFilterEquation.h         ← miembro de ecuación (escalera de 4 polos)
 │   ├── DspJunoHPF.h                ← filtro paso alto Juno-60/106 (conmutado y continuo)
+│   ├── DspJunoVCF.h                ← filtro OTA IR3109/80017A en cascada ZDF con resampler 2x/4x
+│   ├── DspVcfVoicing.h             ← calibración de voicing analógico (Juno-106 vs DeepMind)
 │   ├── DspVAOnePole.h              ← integrador elemental TPT ZDF de 1 polo
 │   ├── DspMoogLadder.h             ← filtro de escalera de transistores Moog (24/12 dB, LP/BP/HP)
 │   ├── DspKorgMS20.h               ← filtro Sallen-Key Korg MS-20 K35 (LP/HP, diodo tanh)

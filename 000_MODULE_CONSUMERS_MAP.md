@@ -86,7 +86,7 @@ Estos son los que la guía de integración documenta como integrables desde otro
 - `DspEffects` parece documentado como módulo, pero **no fue verificado como existente en este barrido**; cualquier afirmación de consumo debe leerse como “consumo documentado/centrado en CMake/docs”, no como “módulo de efectos disponible y comprobado archivo a archivo”.
 
 **Archivos notables (parte verificada y parte documentada):**
-- `DspCore/DspCore.h`, `DspCore/DspMath.h`, `DspCore/DspFilterFamily.h`, `DspCore/DspFilterTpt.h`, `DspCore/DspFilterEquation.h`, `DspCore/DspJunoHPF.h` — verificados/partialmente visibles en este árbol.
+- `DspCore/DspCore.h`, `DspCore/DspMath.h`, `DspCore/DspFilterFamily.h`, `DspCore/DspFilterTpt.h`, `DspCore/DspFilterEquation.h`, `DspCore/DspJunoHPF.h`, `DspCore/DspJunoVCF.h`, `DspCore/DspVcfVoicing.h`, `DspCore/DspVAOnePole.h`, `DspCore/DspMoogLadder.h`, `DspCore/DspKorgMS20.h` — verificados en este árbol con tests nativos pasando.
 - `DspEffects/...` — descritos en docs como `FxEngine.h`, `FxSlot.h`, `FxRegistry.h`, `FxDefaultCatalogue.h`, `DspChorus.h`, `DspDelay.h`, `DspReverb.h`, `DspSchroederReverb.h`, `DspSaturation.h`, `JunoBBD.h`, `ShelfFilter.h`, `MultiHeadEcho.h`, `RingMod.h`, etc. **Estos nombres salen de los documentos existentes, no de un recuento verificado en este barrido**.
 
 **Obs:** Este par es el ejemplo más explícito del contrato "JUCE-free y libm-free" del repo en los documentos, y de que la paridad se comprueba en el consumidor. `DspJunoHPF.h` está completamente integrado en ABDEep y ABDJUNiO601 con 100% de paridad y tests pasando.
