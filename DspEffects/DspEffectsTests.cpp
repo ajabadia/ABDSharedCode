@@ -101,6 +101,20 @@
 #include "DspEffects/DspDecimDelay.h"
 #include "DspEffects/DspModDelayRev.h"
 #include "DspEffects/DspShimmerDelay.h"
+#include "DspEffects/DspFdnReverb.h"
+#include "DspEffects/DspZitaReverb.h"
+#include "DspEffects/DspPitchShifter.h"
+#include "DspEffects/DspFrequencyShifter.h"
+#include "DspEffects/DspEdison.h"
+#include "DspEffects/DspEnhancer.h"
+#include "DspEffects/DspResonator.h"
+#include "DspEffects/DspCombulator.h"
+#include "DspEffects/DspGranularDelay.h"
+#include "DspEffects/DspPatternFreeze.h"
+#include "DspEffects/DspSpectralDelay.h"
+#include "DspEffects/DspNimbus.h"
+#include "DspEffects/DspBonsai.h"
+#include "DspEffects/DspTreemonster.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6348,6 +6362,163 @@ int main()
         check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspShimmerDelay produce muestras finitas");
 
         std::printf("  [fase 5] motores DspStereoDelay, DspMultiTapDelay, DspTapeDelay, DspAnalogTapeDelay, DspDuckingDelay, DspDecimDelay, DspModDelayRev y DspShimmerDelay comprobados\n");
+    }
+
+    // Fase 6A: Reverbs FDN/Zita y Pitch/Frequency Shifters
+    {
+        const float inL[64] = { 0.5f, -0.3f, 0.2f, -0.1f };
+        const float inR[64] = { -0.4f, 0.25f, -0.15f, 0.35f };
+        float outL[64] = {};
+        float outR[64] = {};
+
+        // 1. DspFdnReverb
+        abd::dsp::DspFdnReverb fdn;
+        fdn.prepare(44100.0);
+        fdn.setSizeNorm(0.5f);
+        fdn.setDecayNorm(0.6f);
+        fdn.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspFdnReverb produce muestras finitas");
+
+        // 2. DspZitaReverb
+        abd::dsp::DspZitaReverb zita;
+        zita.prepare(44100.0);
+        zita.setSizeNorm(0.5f);
+        zita.setDecayNorm(0.5f);
+        zita.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspZitaReverb produce muestras finitas");
+
+        // 3. DspPitchShifter (Dual & Vintage)
+        abd::dsp::DspPitchShifter psDual(false);
+        psDual.prepare(44100.0);
+        psDual.setSemi1Norm(0.7f); // +5 st
+        psDual.setSemi2Norm(0.3f); // -5 st
+        psDual.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspPitchShifter (Dual) produce muestras finitas");
+
+        abd::dsp::DspPitchShifter psVint(true);
+        psVint.prepare(44100.0);
+        psVint.setSemi1Norm(0.8f);
+        psVint.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspPitchShifter (Vintage) produce muestras finitas");
+
+        // 4. DspFrequencyShifter
+        abd::dsp::DspFrequencyShifter fs;
+        fs.prepare(44100.0);
+        fs.setShiftNorm(0.6f); // +400 Hz
+        fs.setFeedbackNorm(0.2f);
+        fs.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspFrequencyShifter produce muestras finitas");
+
+        std::printf("  [fase 6A] motores DspFdnReverb, DspZitaReverb, DspPitchShifter y DspFrequencyShifter comprobados\n");
+    }
+
+    // Fase 6B: Procesadores M/S, Excitador y Resonadores
+    {
+        const float inL[64] = { 0.5f, -0.3f, 0.2f, -0.1f };
+        const float inR[64] = { -0.4f, 0.25f, -0.15f, 0.35f };
+        float outL[64] = {};
+        float outR[64] = {};
+
+        // 1. DspEdison
+        abd::dsp::DspEdison edison;
+        edison.prepare(44100.0);
+        edison.setParameter(3, 0.7f); // stSpread
+        edison.setParameter(4, 0.6f); // lmfSpread
+        edison.setParameter(6, 0.5f); // cntrDist
+        edison.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspEdison produce muestras finitas");
+
+        // 2. DspEnhancer
+        abd::dsp::DspEnhancer enhancer;
+        enhancer.prepare(44100.0);
+        enhancer.setParameter(2, 0.6f); // bassGain
+        enhancer.setParameter(4, 0.5f); // midGain
+        enhancer.setParameter(6, 0.7f); // hiGain
+        enhancer.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspEnhancer produce muestras finitas");
+
+        // 3. DspResonator
+        abd::dsp::DspResonator resonator;
+        resonator.prepare(44100.0);
+        resonator.setParameter(1, 0.4f); // frequency
+        resonator.setParameter(2, 0.7f); // resonance
+        resonator.setParameter(4, 0.2f); // harmonic mode
+        resonator.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspResonator produce muestras finitas");
+
+        // 4. DspCombulator
+        abd::dsp::DspCombulator combulator;
+        combulator.prepare(44100.0);
+        combulator.setParameter(1, 0.3f); // delayL
+        combulator.setParameter(2, 0.4f); // delayR
+        combulator.setParameter(3, 0.6f); // feedback
+        combulator.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspCombulator produce muestras finitas");
+
+        std::printf("  [fase 6B] motores DspEdison, DspEnhancer, DspResonator y DspCombulator comprobados\n");
+    }
+
+    // Fase 6C: Procesadores Granulares, Congelación y Síntesis Experimental
+    {
+        const float inL[64] = { 0.5f, -0.3f, 0.2f, -0.1f };
+        const float inR[64] = { -0.4f, 0.25f, -0.15f, 0.35f };
+        float outL[64] = {};
+        float outR[64] = {};
+
+        // 1. DspGranularDelay
+        abd::dsp::DspGranularDelay gran;
+        gran.prepare(44100.0);
+        gran.setParameter(1, 0.4f); // time
+        gran.setParameter(2, 0.6f); // density
+        gran.setParameter(4, 0.5f); // pitch
+        gran.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspGranularDelay produce muestras finitas");
+
+        // 2. DspPatternFreeze
+        abd::dsp::DspPatternFreeze freeze;
+        freeze.prepare(44100.0);
+        freeze.setParameter(1, 0.3f); // length
+        freeze.setParameter(2, 0.7f); // feedback
+        freeze.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspPatternFreeze produce muestras finitas");
+
+        // 3. DspSpectralDelay
+        abd::dsp::DspSpectralDelay spec;
+        spec.prepare(44100.0);
+        spec.setParameter(1, 0.4f); // time
+        spec.setParameter(2, 0.5f); // bandwidth
+        spec.setParameter(3, 0.4f); // feedback
+        spec.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspSpectralDelay produce muestras finitas");
+
+        // 4. DspNimbus
+        abd::dsp::DspNimbus nimbus;
+        nimbus.prepare(44100.0);
+        nimbus.setParameter(0, 0.4f); // grainSize
+        nimbus.setParameter(1, 0.6f); // density
+        nimbus.setParameter(3, 0.5f); // pitch
+        nimbus.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspNimbus produce muestras finitas");
+
+        // 5. DspBonsai
+        abd::dsp::DspBonsai bonsai;
+        bonsai.prepare(44100.0);
+        bonsai.setParameter(0, 0.5f); // pitch
+        bonsai.setParameter(1, 0.4f); // lofi
+        bonsai.setParameter(2, 0.3f); // drive
+        bonsai.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspBonsai produce muestras finitas");
+
+        // 6. DspTreemonster
+        abd::dsp::DspTreemonster tree;
+        tree.prepare(44100.0);
+        tree.setParameter(0, 0.4f); // speed
+        tree.setParameter(1, 0.5f); // depth
+        tree.setParameter(3, 0.6f); // tracking
+        tree.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspTreemonster produce muestras finitas");
+
+        std::printf("  [fase 6C] motores DspGranularDelay, DspPatternFreeze, DspSpectralDelay, DspNimbus, DspBonsai y DspTreemonster comprobados\n");
     }
 
     if (gFailures == 0)

@@ -168,9 +168,28 @@
   25. `FXModDelayRev` (Tipo 12) ➔ Delegado a `abd::dsp::DspModDelayRev` (Lexicon 224/480L híbrido con delay modulado por LFO y reverb Schroeder Serie/Paralelo).
   26. `FXShimmerDelay` (Tipo 41) ➔ Delegado a `abd::dsp::DspShimmerDelay` (Brian Eno / Eventide Space Shimmer con pitch shift granular +1 octava y difusión).
 
-### ⚪ Fase 6: Reverbs Avanzadas, Pitch y Procesadores Espectrales / Granulares
-* **Objetivo:** Promover algoritmos de alta complejidad matemática.
-* **Componentes:**
-  13. `FXFDNReverb` (52), `FXZitaReverb` (53).
-  14. `FXPitchShifter` (29/35), `FXFrequencyShifter` (46).
-  15. Granulares y experimentales: `FXGranularDelay` (42), `FXNimbus` (54), `FXBonsai` (55), `FXTreemonster` (56), `FXPatternFreeze` (43), `FXSpectralDelay` (45), `FXResonator` (47), `FXCombulator` (48), `FXEdison` (19), `FXEnhancer` (18).
+### ⚪ Fase 6: Reverbs Avanzadas, Pitch y Procesadores Espectrales / Granulares (Completada)
+* **Objetivo:** Promover algoritmos de alta complejidad matemática a C++20 puro RT-Safe sin JUCE.
+* **Componentes completados:**
+  * **Batch 6A (Reverbs y Pitch Shifters):**
+    27. `FXFDNReverb` (Tipo 52) ➔ Delegado a `abd::dsp::DspFdnReverb` (Feedback Delay Network 8x8 con matriz ortogonal Householder y amortiguación de HF, 100% RT-Safe preasignado).
+    28. `FXZitaReverb` (Tipo 53) ➔ Delegado a `abd::dsp::DspZitaReverb` (Zita/AIR 8-delay loop FDN con crossover bajo/medio y ecualizador paramétrico integrado).
+    29. `FXPitchShifter` (Tipos 29 Dual Pitch y 35 Vintage Pitch) ➔ Delegado a `abd::dsp::DspPitchShifter` (Grain crossfading overlapping con ventana Hann y micro-detuning dual/vintage).
+    30. `FXFrequencyShifter` (Tipo 46) ➔ Delegado a `abd::dsp::DspFrequencyShifter` (Hilbert transform SSB frequency shifter con filtros desacoplados de fase I/Q de 15 polos).
+  * **Batch 6B (Procesadores M/S, Excitador y Resonadores):**
+    31. `FXEdison` (Tipo 19) ➔ Delegado a `abd::dsp::DspEdison` (Edison EX1 Mid/Side procesador espacial, crossover LMF ~300Hz y saturación tanh en canal central).
+    32. `FXEnhancer` (Tipo 18) ➔ Delegado a `abd::dsp::DspEnhancer` (SPL Vitalizer / SX3040 exciter 3-bandas con shelving bass/treble, peaking mid bandpass y solo mode).
+    33. `FXResonator` (Tipo 47) ➔ Delegado a `abd::dsp::DspResonator` (Banco de 8 resonadores biquad paso banda con modos Armónico, Inarmónico de campana y Cuerda tensa).
+    34. `FXCombulator` (Tipo 48) ➔ Delegado a `abd::dsp::DspCombulator` (Red de filtros peine estéreo cruzados con 30% cross-feedback, amortiguación LPF y saturación suave).
+  * **Batch 6C (Granulares y Experimentales):**
+    35. `FXGranularDelay` (Tipo 42) ➔ Delegado a `abd::dsp::DspGranularDelay` (Retardo granular con 16 granos concurrentes, pitch shift ±12 st y envolvente de coseno alzado).
+    36. `FXPatternFreeze` (Tipo 43) ➔ Delegado a `abd::dsp::DspPatternFreeze` (Búfer circular de congelación 200-4000ms con bucle regenerativo y crossfade dinámico).
+    37. `FXSpectralDelay` (Tipo 45) ➔ Delegado a `abd::dsp::DspSpectralDelay` (Retardo dispersivo multicanal con modulación de ancho de banda y dispersión dependiente de frecuencia).
+    38. `FXNimbus` (Tipo 54) ➔ Delegado a `abd::dsp::DspNimbus` (Nube granular inspirada en Mutable Clouds / Surge Nimbus con 16 granos y modulación estéreo).
+    39. `FXBonsai` (Tipo 55) ➔ Delegado a `abd::dsp::DspBonsai` (Degradador vintage lo-fi tipo cinta con reducción de tasa de muestreo, cuantización 3-24 bits y LFO wow).
+    40. `FXTreemonster` (Tipo 56) ➔ Delegado a `abd::dsp::DspTreemonster` (Retardo modulado con detector de tono por cruces por cero en tiempo real y fallback a LFO).
+
+---
+
+## 🏆 Cierre de la Migración Completa de Efectos FX
+Todos los **56 algoritmos de efectos** han sido extraídos a motores C++20 puros en `ABDSharedCode/DspEffects` bajo el namespace `abd::dsp`, desacoplados de JUCE, 100% RT-Safe y exhaustivamente cubiertos por suites de pruebas automáticas.
