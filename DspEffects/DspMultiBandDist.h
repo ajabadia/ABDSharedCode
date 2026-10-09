@@ -54,10 +54,10 @@ public:
         updateCrossoverCoeffs();
 
         const float cabFreq = 4000.0f;
-        cabCoeff_ = static_cast<float>(cabFreq / (cabFreq + sampleRate_ * 0.3));
+        cabCoeff_           = static_cast<float>(cabFreq / (cabFreq + sampleRate_ * 0.3));
 
         const float postFreq = 5513.0f;
-        postCoeff_ = static_cast<float>(postFreq / (postFreq + sampleRate_ * 0.5));
+        postCoeff_           = static_cast<float>(postFreq / (postFreq + sampleRate_ * 0.5));
 
         reset();
     }
@@ -70,23 +70,31 @@ public:
         postL_ = postR_ = 0.0f;
     }
 
-    void setInGainNorm(float norm) noexcept       { inGain_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setDistType(int type) noexcept           { distType_ = std::clamp(type, 0, 5); }
-    void setLowLevelNorm(float norm) noexcept     { lowLevel_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setLowDriveNorm(float norm) noexcept     { lowDrive_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setXoverLowMidNorm(float norm) noexcept  { xoverLowMid_ = std::clamp(norm, 0.0f, 1.0f); updateCrossoverCoeffs(); }
-    void setMidLevelNorm(float norm) noexcept     { midLevel_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setMidDriveNorm(float norm) noexcept     { midDrive_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setXoverMidHiNorm(float norm) noexcept   { xoverMidHi_ = std::clamp(norm, 0.0f, 1.0f); updateCrossoverCoeffs(); }
-    void setHiLevelNorm(float norm) noexcept      { hiLevel_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setHiDriveNorm(float norm) noexcept      { hiDrive_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setCabinetType(int type) noexcept        { cabinetType_ = std::clamp(type, 0, 11); }
-    void setOutGainNorm(float norm) noexcept      { outGain_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setInGainNorm(float norm) noexcept { inGain_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setDistType(int type) noexcept { distType_ = std::clamp(type, 0, 5); }
+    void setLowLevelNorm(float norm) noexcept { lowLevel_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setLowDriveNorm(float norm) noexcept { lowDrive_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setXoverLowMidNorm(float norm) noexcept
+    {
+        xoverLowMid_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCrossoverCoeffs();
+    }
+    void setMidLevelNorm(float norm) noexcept { midLevel_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setMidDriveNorm(float norm) noexcept { midDrive_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setXoverMidHiNorm(float norm) noexcept
+    {
+        xoverMidHi_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCrossoverCoeffs();
+    }
+    void setHiLevelNorm(float norm) noexcept { hiLevel_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setHiDriveNorm(float norm) noexcept { hiDrive_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setCabinetType(int type) noexcept { cabinetType_ = std::clamp(type, 0, 11); }
+    void setOutGainNorm(float norm) noexcept { outGain_ = std::clamp(norm, 0.0f, 1.0f); }
 
     static float applyDistType(float sample, int type, float drive) noexcept
     {
         const float gain = 1.0f + drive * 15.0f; // 1x a 16x
-        const float x = sample * gain;
+        const float x    = sample * gain;
 
         switch (type)
         {
@@ -96,7 +104,7 @@ public:
             case 1: // Saturate: recorte con codo suave (knee)
             {
                 constexpr float knee = 0.5f;
-                const float absX = std::abs(x);
+                const float absX     = std::abs(x);
                 if (absX < knee)
                     return x;
                 const float soft = knee + std::tanh(absX - knee);
@@ -126,17 +134,17 @@ public:
                  int numSamples) noexcept
     {
         const float inGainLin = std::pow(10.0f, (inGain_ * 48.0f - 24.0f) / 20.0f);
-        auto mapLevel = [](float norm) -> float {
+        auto mapLevel         = [](float norm) -> float {
             return std::pow(10.0f, (norm * 24.0f - 12.0f) / 20.0f);
         };
 
-        const float lowGain = mapLevel(lowLevel_);
-        const float midGain = mapLevel(midLevel_);
-        const float hiGain  = mapLevel(hiLevel_);
+        const float lowGain    = mapLevel(lowLevel_);
+        const float midGain    = mapLevel(midLevel_);
+        const float hiGain     = mapLevel(hiLevel_);
         const float outGainLin = mapLevel(outGain_);
 
         const bool usePostFilter = (distType_ >= 3);
-        const int baseDistType = (distType_ >= 3) ? (distType_ - 3) : distType_;
+        const int baseDistType   = (distType_ >= 3) ? (distType_ - 3) : distType_;
 
         for (int s = 0; s < numSamples; ++s)
         {
@@ -214,22 +222,22 @@ private:
     }
 
     double sampleRate_ = 44100.0;
-    float inGain_ = 0.5f;
-    int distType_ = 0;
-    float lowLevel_ = 0.5f;
-    float lowDrive_ = 0.3f;
+    float inGain_      = 0.5f;
+    int distType_      = 0;
+    float lowLevel_    = 0.5f;
+    float lowDrive_    = 0.3f;
     float xoverLowMid_ = 0.3f;
-    float midLevel_ = 0.5f;
-    float midDrive_ = 0.3f;
-    float xoverMidHi_ = 0.7f;
-    float hiLevel_ = 0.5f;
-    float hiDrive_ = 0.3f;
-    int cabinetType_ = 0;
-    float outGain_ = 0.5f;
+    float midLevel_    = 0.5f;
+    float midDrive_    = 0.3f;
+    float xoverMidHi_  = 0.7f;
+    float hiLevel_     = 0.5f;
+    float hiDrive_     = 0.3f;
+    int cabinetType_   = 0;
+    float outGain_     = 0.5f;
 
-    float xv1Coeff_ = 0.05f;
-    float xv2Coeff_ = 0.2f;
-    float cabCoeff_ = 0.2f;
+    float xv1Coeff_  = 0.05f;
+    float xv2Coeff_  = 0.2f;
+    float cabCoeff_  = 0.2f;
     float postCoeff_ = 0.2f;
 
     float xv1LowL_ = 0.0f, xv1LowR_ = 0.0f;

@@ -48,12 +48,23 @@ public:
         value = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: paramMix = value; break;
-            case 1: paramFrequency = value; break;
-            case 2: paramResonance = value; break;
-            case 3: paramDamping = value; break;
-            case 4: paramMode = value; break;
-            default: break;
+            case 0:
+                paramMix = value;
+                break;
+            case 1:
+                paramFrequency = value;
+                break;
+            case 2:
+                paramResonance = value;
+                break;
+            case 3:
+                paramDamping = value;
+                break;
+            case 4:
+                paramMode = value;
+                break;
+            default:
+                break;
         }
     }
 
@@ -61,12 +72,18 @@ public:
     {
         switch (index)
         {
-            case 0: return paramMix;
-            case 1: return paramFrequency;
-            case 2: return paramResonance;
-            case 3: return paramDamping;
-            case 4: return paramMode;
-            default: return 0.0f;
+            case 0:
+                return paramMix;
+            case 1:
+                return paramFrequency;
+            case 2:
+                return paramResonance;
+            case 3:
+                return paramDamping;
+            case 4:
+                return paramMode;
+            default:
+                return 0.0f;
         }
     }
 
@@ -74,11 +91,11 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float mix = paramMix;
+        const float mix      = paramMix;
         const float baseFreq = exponentialMap(paramFrequency, 50.0f, 5000.0f);
-        const float q = 1.0f + paramResonance * 49.0f;
-        const float damping = paramDamping;
-        const float mode = paramMode;
+        const float q        = 1.0f + paramResonance * 49.0f;
+        const float damping  = paramDamping;
+        const float mode     = paramMode;
 
         // Compute modal ratios
         std::array<float, kNumResonators> ratios{};
@@ -94,15 +111,14 @@ public:
             {
                 // Inharmonic: bell-like ratios
                 static constexpr std::array<float, 8> bellRatios = {
-                    1.0f, 2.4f, 3.76f, 5.12f, 6.8f, 8.3f, 10.6f, 12.9f
-                };
+                    1.0f, 2.4f, 3.76f, 5.12f, 6.8f, 8.3f, 10.6f, 12.9f};
                 ratios[i] = bellRatios[i];
             }
             else
             {
                 // Stretched: harmonic with inharmonicity factor
                 const float B = 0.01f * paramResonance;
-                ratios[i] = n * std::sqrt(1.0f + B * n * n);
+                ratios[i]     = n * std::sqrt(1.0f + B * n * n);
             }
         }
 
@@ -147,12 +163,11 @@ private:
 
     static float processBiquad(ResonatorState& res, float input) noexcept
     {
-        const float y = res.b0 * input + res.b1 * res.x1 + res.b2 * res.x2
-                      - res.a1 * res.y1 - res.a2 * res.y2;
-        res.x2 = res.x1;
-        res.x1 = input;
-        res.y2 = res.y1;
-        res.y1 = y;
+        const float y = res.b0 * input + res.b1 * res.x1 + res.b2 * res.x2 - res.a1 * res.y1 - res.a2 * res.y2;
+        res.x2        = res.x1;
+        res.x1        = input;
+        res.y2        = res.y1;
+        res.y1        = y;
         return y;
     }
 
@@ -162,10 +177,10 @@ private:
         if (freq >= nyq) freq = nyq * 0.95f;
         if (freq < 1.0f) freq = 1.0f;
 
-        const float w0 = 6.283185307179586f * freq / static_cast<float>(sampleRate);
+        const float w0    = 6.283185307179586f * freq / static_cast<float>(sampleRate);
         const float alpha = std::sin(w0) / (2.0f * q);
         const float cosw0 = std::cos(w0);
-        const float a0 = 1.0f + alpha;
+        const float a0    = 1.0f + alpha;
 
         res.b0 = alpha / a0;
         res.b1 = 0.0f;
@@ -183,12 +198,12 @@ private:
         return minHz * std::pow(maxHz / minHz, normalized);
     }
 
-    double sampleRate = 44100.0;
-    float paramMix = 0.5f;
+    double sampleRate    = 44100.0;
+    float paramMix       = 0.5f;
     float paramFrequency = 0.3f;
     float paramResonance = 0.5f;
-    float paramDamping = 0.3f;
-    float paramMode = 0.0f;
+    float paramDamping   = 0.3f;
+    float paramMode      = 0.0f;
 
     std::array<ResonatorState, kNumResonators> resonatorsL{};
     std::array<ResonatorState, kNumResonators> resonatorsR{};

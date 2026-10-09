@@ -21,7 +21,7 @@ namespace abd::dsp
 class DspGranularDelay
 {
 public:
-    static constexpr int kMaxGrains = 16;
+    static constexpr int kMaxGrains   = 16;
     static constexpr int kCaptureSize = 131072; // Power of 2 (2^17 > 88200)
 
     DspGranularDelay()
@@ -50,15 +50,15 @@ public:
         std::fill(captureBufR.begin(), captureBufR.end(), 0.0f);
         capturePos = 0;
         grainAccum = 0.0f;
-        noiseSeed = 0x98765432u;
+        noiseSeed  = 0x98765432u;
         for (auto& g : grains)
         {
-            g.active = false;
-            g.age = 0.0f;
-            g.maxAge = 1.0f;
-            g.readPos = 0.0f;
+            g.active     = false;
+            g.age        = 0.0f;
+            g.maxAge     = 1.0f;
+            g.readPos    = 0.0f;
             g.pitchRatio = 1.0f;
-            g.gain = 1.0f;
+            g.gain       = 1.0f;
         }
     }
 
@@ -67,12 +67,23 @@ public:
         const float v = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: paramMix = v; break;
-            case 1: paramTime = v; break;
-            case 2: paramDensity = v; break;
-            case 3: paramSize = v; break;
-            case 4: paramPitch = v; break;
-            default: break;
+            case 0:
+                paramMix = v;
+                break;
+            case 1:
+                paramTime = v;
+                break;
+            case 2:
+                paramDensity = v;
+                break;
+            case 3:
+                paramSize = v;
+                break;
+            case 4:
+                paramPitch = v;
+                break;
+            default:
+                break;
         }
     }
 
@@ -80,12 +91,18 @@ public:
     {
         switch (index)
         {
-            case 0: return paramMix;
-            case 1: return paramTime;
-            case 2: return paramDensity;
-            case 3: return paramSize;
-            case 4: return paramPitch;
-            default: return 0.0f;
+            case 0:
+                return paramMix;
+            case 1:
+                return paramTime;
+            case 2:
+                return paramDensity;
+            case 3:
+                return paramSize;
+            case 4:
+                return paramPitch;
+            default:
+                return 0.0f;
         }
     }
 
@@ -93,17 +110,17 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float grainSizeMs = 20.0f + paramTime * 180.0f;
+        const float grainSizeMs    = 20.0f + paramTime * 180.0f;
         const float grainSizeSamps = grainSizeMs * static_cast<float>(sampleRate) * 0.001f;
-        const float grainRate = 1.0f + paramDensity * 4.0f;
-        const float softness = paramSize;
-        const float pitchSpread = paramPitch * 12.0f;
+        const float grainRate      = 1.0f + paramDensity * 4.0f;
+        const float softness       = paramSize;
+        const float pitchSpread    = paramPitch * 12.0f;
 
         for (int i = 0; i < numSamples; ++i)
         {
             captureBufL[capturePos] = inL[i];
             captureBufR[capturePos] = inR[i];
-            capturePos = (capturePos + 1) & captureMask;
+            capturePos              = (capturePos + 1) & captureMask;
 
             grainAccum += grainRate;
             while (grainAccum >= grainSizeSamps && grainAccum >= 1.0f)
@@ -114,14 +131,14 @@ public:
                 {
                     if (!g.active)
                     {
-                        g.active = true;
-                        g.age = 0.0f;
-                        g.maxAge = grainSizeSamps;
+                        g.active  = true;
+                        g.age     = 0.0f;
+                        g.maxAge  = grainSizeSamps;
                         g.readPos = static_cast<float>(capturePos);
 
                         const float semitones = pitchSpread * (noiseGenerate() * 2.0f);
-                        g.pitchRatio = std::pow(2.0f, semitones / 12.0f);
-                        g.gain = 0.5f + 0.5f * std::abs(noiseGenerate());
+                        g.pitchRatio          = std::pow(2.0f, semitones / 12.0f);
+                        g.gain                = 0.5f + 0.5f * std::abs(noiseGenerate());
                         break;
                     }
                 }
@@ -135,7 +152,7 @@ public:
                 if (!g.active)
                     continue;
 
-                const float env = grainEnvelope(g.age, g.maxAge, softness);
+                const float env   = grainEnvelope(g.age, g.maxAge, softness);
                 const int readIdx = static_cast<int>(g.readPos) & captureMask;
                 const float sampL = captureBufL[readIdx];
                 const float sampR = captureBufR[readIdx];
@@ -168,35 +185,35 @@ private:
         if (t < 0.0f || t > 1.0f)
             return 0.0f;
         const float windowWidth = 0.3f + softness * 0.7f;
-        constexpr float center = 0.5f;
-        const float dist = std::abs(t - center) / (windowWidth * 0.5f);
+        constexpr float center  = 0.5f;
+        const float dist        = std::abs(t - center) / (windowWidth * 0.5f);
         return std::clamp(1.0f - dist, 0.0f, 1.0f);
     }
 
     struct Grain
     {
-        float readPos = 0.0f;
+        float readPos    = 0.0f;
         float pitchRatio = 1.0f;
-        float gain = 1.0f;
-        float age = 0.0f;
-        float maxAge = 1.0f;
-        bool active = false;
+        float gain       = 1.0f;
+        float age        = 0.0f;
+        float maxAge     = 1.0f;
+        bool active      = false;
     };
 
-    double sampleRate = 44100.0;
-    float paramMix = 0.4f;
-    float paramTime = 0.4f;
+    double sampleRate  = 44100.0;
+    float paramMix     = 0.4f;
+    float paramTime    = 0.4f;
     float paramDensity = 0.5f;
-    float paramSize = 0.5f;
-    float paramPitch = 0.3f;
+    float paramSize    = 0.5f;
+    float paramPitch   = 0.3f;
 
     std::vector<float> captureBufL;
     std::vector<float> captureBufR;
     int captureMask = 0;
-    int capturePos = 0;
+    int capturePos  = 0;
 
     std::array<Grain, kMaxGrains> grains{};
-    float grainAccum = 0.0f;
+    float grainAccum   = 0.0f;
     uint32_t noiseSeed = 0x98765432u;
 };
 

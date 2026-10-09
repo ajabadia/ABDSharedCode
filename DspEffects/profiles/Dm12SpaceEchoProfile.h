@@ -45,18 +45,17 @@ struct Dm12SpaceEchoProfile
     static constexpr int numModes = 5;
 
     static constexpr Mode modes[5] =
-    {
-        // Modo A (0): Cabezal 1 solo
-        { {true,  false, false}, true, {0.33f, 0.00f, 0.00f}, {1.0f, 0.0f, 0.0f} },
-        // Modo B (1): Cabezal 1 + 2
-        { {true,  true,  false}, true, {0.25f, 0.50f, 0.00f}, {0.8f, 0.7f, 0.0f} },
-        // Modo C (2): Cabezal 1 + 3
-        { {true,  false, true }, true, {0.20f, 0.00f, 0.65f}, {0.9f, 0.0f, 0.6f} },
-        // Modo D (3): Cabezal 2 + 3
-        { {false, true,  true }, true, {0.00f, 0.35f, 0.55f}, {0.0f, 0.8f, 0.7f} },
-        // Modo E (4): Cabezales 1 + 2 + 3
-        { {true,  true,  true }, true, {0.15f, 0.35f, 0.60f}, {0.7f, 0.7f, 0.6f} }
-    };
+        {
+            // Modo A (0): Cabezal 1 solo
+            {{true, false, false}, true, {0.33f, 0.00f, 0.00f}, {1.0f, 0.0f, 0.0f}},
+            // Modo B (1): Cabezal 1 + 2
+            {{true, true, false}, true, {0.25f, 0.50f, 0.00f}, {0.8f, 0.7f, 0.0f}},
+            // Modo C (2): Cabezal 1 + 3
+            {{true, false, true}, true, {0.20f, 0.00f, 0.65f}, {0.9f, 0.0f, 0.6f}},
+            // Modo D (3): Cabezal 2 + 3
+            {{false, true, true}, true, {0.00f, 0.35f, 0.55f}, {0.0f, 0.8f, 0.7f}},
+            // Modo E (4): Cabezales 1 + 2 + 3
+            {{true, true, true}, true, {0.15f, 0.35f, 0.60f}, {0.7f, 0.7f, 0.6f}}};
 
     static float getHeadRatio(int mode, int head) noexcept
     {
@@ -68,7 +67,7 @@ struct Dm12SpaceEchoProfile
         return modes[mode].headGain[head];
     }
 
-    static constexpr float headRatio[3] = {0.33f, 0.50f, 0.65f};
+    static constexpr float headRatio[3]      = {0.33f, 0.50f, 0.65f};
     static constexpr float headRightScale[3] = {0.95f, 0.90f, 0.92f};
 
     // Recorrido de tiempo de retardo: 120 ms a 1500 ms escalado por techo de 1.5

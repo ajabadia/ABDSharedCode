@@ -70,25 +70,41 @@ public:
         cabState2L_ = cabState2R_ = 0.0f;
     }
 
-    void setPreAmpNorm(float norm) noexcept   { preAmp_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setBuzzNorm(float norm) noexcept     { buzz_ = std::clamp(norm, 0.0f, 1.0f); updateEQCoeffs(); }
-    void setPunchNorm(float norm) noexcept    { punch_ = std::clamp(norm, 0.0f, 1.0f); updateEQCoeffs(); }
-    void setCrunchNorm(float norm) noexcept   { crunch_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setDriveNorm(float norm) noexcept    { drive_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setLevelNorm(float norm) noexcept    { level_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setLowEQNorm(float norm) noexcept    { lowEQ_ = std::clamp(norm, 0.0f, 1.0f); updateEQCoeffs(); }
-    void setHighEQNorm(float norm) noexcept   { highEQ_ = std::clamp(norm, 0.0f, 1.0f); updateEQCoeffs(); }
-    void setCabinet(bool on) noexcept         { cabinet_ = on ? 1.0f : 0.0f; }
+    void setPreAmpNorm(float norm) noexcept { preAmp_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setBuzzNorm(float norm) noexcept
+    {
+        buzz_ = std::clamp(norm, 0.0f, 1.0f);
+        updateEQCoeffs();
+    }
+    void setPunchNorm(float norm) noexcept
+    {
+        punch_ = std::clamp(norm, 0.0f, 1.0f);
+        updateEQCoeffs();
+    }
+    void setCrunchNorm(float norm) noexcept { crunch_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setDriveNorm(float norm) noexcept { drive_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setLevelNorm(float norm) noexcept { level_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setLowEQNorm(float norm) noexcept
+    {
+        lowEQ_ = std::clamp(norm, 0.0f, 1.0f);
+        updateEQCoeffs();
+    }
+    void setHighEQNorm(float norm) noexcept
+    {
+        highEQ_ = std::clamp(norm, 0.0f, 1.0f);
+        updateEQCoeffs();
+    }
+    void setCabinet(bool on) noexcept { cabinet_ = on ? 1.0f : 0.0f; }
 
     static float applyDistortion(float sample, float driveAmt, float crunchAmt) noexcept
     {
         const float preGain = 1.0f + driveAmt * 20.0f; // 1x a 21x
-        float shaped = sample * preGain;
+        float shaped        = sample * preGain;
 
         if (crunchAmt > 0.01f)
         {
             const float crunchGain = 1.0f + crunchAmt * 15.0f;
-            const float crunchSig = sample * crunchGain;
+            const float crunchSig  = sample * crunchGain;
             if (crunchSig > 0.0f)
                 shaped += std::tanh(crunchSig * 0.5f) * crunchAmt;
             else
@@ -106,7 +122,7 @@ public:
                  int numSamples) noexcept
     {
         const float preAmpGain = 1.0f + preAmp_ * 10.0f;
-        const float levelGain = 0.3f + level_ * 0.7f;
+        const float levelGain  = 0.3f + level_ * 0.7f;
 
         for (int s = 0; s < numSamples; ++s)
         {
@@ -150,38 +166,38 @@ private:
     void updateEQCoeffs() noexcept
     {
         const float lowFreq = 200.0f;
-        lowCoeff_ = static_cast<float>(lowFreq / (lowFreq + sampleRate_ * 0.5));
-        lowBoost_ = (lowEQ_ - 0.5f) * 2.0f + (punch_ * 2.0f) * 0.2f;
+        lowCoeff_           = static_cast<float>(lowFreq / (lowFreq + sampleRate_ * 0.5));
+        lowBoost_           = (lowEQ_ - 0.5f) * 2.0f + (punch_ * 2.0f) * 0.2f;
 
         const float highFreq = 5000.0f;
-        highCoeff_ = static_cast<float>(highFreq / (highFreq + sampleRate_ * 0.5));
-        highBoost_ = (highEQ_ - 0.5f) * 2.0f + (buzz_ * 2.0f) * 0.3f;
+        highCoeff_           = static_cast<float>(highFreq / (highFreq + sampleRate_ * 0.5));
+        highBoost_           = (highEQ_ - 0.5f) * 2.0f + (buzz_ * 2.0f) * 0.3f;
     }
 
     void updateCabinetCoeffs() noexcept
     {
         const float cabFreq = 3500.0f;
-        cabCoeff_ = static_cast<float>(cabFreq / (cabFreq + sampleRate_ * 0.3));
-        cabRes_ = 0.2f;
+        cabCoeff_           = static_cast<float>(cabFreq / (cabFreq + sampleRate_ * 0.3));
+        cabRes_             = 0.2f;
     }
 
     double sampleRate_ = 44100.0;
-    float preAmp_ = 0.3f;
-    float buzz_ = 0.3f;
-    float punch_ = 0.3f;
-    float crunch_ = 0.2f;
-    float drive_ = 0.3f;
-    float level_ = 0.5f;
-    float lowEQ_ = 0.5f;
-    float highEQ_ = 0.5f;
-    float cabinet_ = 1.0f;
+    float preAmp_      = 0.3f;
+    float buzz_        = 0.3f;
+    float punch_       = 0.3f;
+    float crunch_      = 0.2f;
+    float drive_       = 0.3f;
+    float level_       = 0.5f;
+    float lowEQ_       = 0.5f;
+    float highEQ_      = 0.5f;
+    float cabinet_     = 1.0f;
 
-    float lowCoeff_ = 0.05f;
-    float lowBoost_ = 0.0f;
+    float lowCoeff_  = 0.05f;
+    float lowBoost_  = 0.0f;
     float highCoeff_ = 0.2f;
     float highBoost_ = 0.0f;
-    float cabCoeff_ = 0.2f;
-    float cabRes_ = 0.2f;
+    float cabCoeff_  = 0.2f;
+    float cabRes_    = 0.2f;
 
     float lowStateL_ = 0.0f, lowStateR_ = 0.0f;
     float highStateL_ = 0.0f, highStateR_ = 0.0f;

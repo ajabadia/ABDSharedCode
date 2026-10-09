@@ -91,19 +91,19 @@ public:
         // 0.33 a 0.66: foldback a sin-based
         // 0.66 a 1.00: sin-based puro
         const float softClip = std::tanh(y);
-        const float fold = 2.0f * std::abs(2.0f * (y * 0.5f - std::floor(y * 0.5f + 0.5f))) - 1.0f;
+        const float fold     = 2.0f * std::abs(2.0f * (y * 0.5f - std::floor(y * 0.5f + 0.5f))) - 1.0f;
         const float sinBased = std::sin(y * 1.5707963267948966f); // sin(pi/2 * y)
 
         float result = 0.0f;
         if (shape_ < 0.33f)
         {
             const float t = shape_ / 0.33f;
-            result = softClip * (1.0f - t) + fold * t;
+            result        = softClip * (1.0f - t) + fold * t;
         }
         else if (shape_ < 0.66f)
         {
             const float t = (shape_ - 0.33f) / 0.33f;
-            result = fold * (1.0f - t) + sinBased * t;
+            result        = fold * (1.0f - t) + sinBased * t;
         }
         else
         {
@@ -141,11 +141,11 @@ public:
 
 private:
     double sampleRate_ = 44100.0;
-    float shape_ = 0.3f;
-    float symmetry_ = 0.5f;
-    float gainParam_ = 0.5f;
-    float toneParam_ = 0.5f;
-    float mix_ = 0.4f;
+    float shape_       = 0.3f;
+    float symmetry_    = 0.5f;
+    float gainParam_   = 0.5f;
+    float toneParam_   = 0.5f;
+    float mix_         = 0.4f;
 
     float toneL_ = 0.0f;
     float toneR_ = 0.0f;

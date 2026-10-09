@@ -148,8 +148,8 @@ public:
                 maxRatio = jmax(maxRatio, Profile::getHeadRatio(m, h));
 
         const float maxMod = 1.0f + Profile::wowAmount + Profile::flutterAmount;
-        delaySamples_ = static_cast<int>(sampleRate * Profile::maxDelaySeconds * maxRatio * maxMod) + 32;
-        tankSamples_  = static_cast<int>(sampleRate * Profile::maxDelaySeconds) + 1;
+        delaySamples_      = static_cast<int>(sampleRate * Profile::maxDelaySeconds * maxRatio * maxMod) + 32;
+        tankSamples_       = static_cast<int>(sampleRate * Profile::maxDelaySeconds) + 1;
 
         tapeBuffer.setSize(2, delaySamples_, false, false, true);
         tankBuffer.setSize(2, tankSamples_, false, false, true);
@@ -208,9 +208,9 @@ public:
 
         // El retardo pedido, recortado al rango de MAQUINA. Es un recorte de
         // la maquina y no de politica: por eso va aqui y no en el consumidor.
-        const float clampedDelay = jlimit(Profile::minDelaySeconds,
-                                          Profile::maxDelaySeconds,
-                                          delaySeconds);
+        const float clampedDelay     = jlimit(Profile::minDelaySeconds,
+                                              Profile::maxDelaySeconds,
+                                              delaySeconds);
         const float baseDelaySamples = clampedDelay * static_cast<float>(sampleRate_);
 
         // Deriva de la cinta: la lectura se alarga o se acorta con ella. Las

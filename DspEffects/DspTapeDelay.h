@@ -45,7 +45,7 @@ public:
     void prepare(double sampleRate)
     {
         sampleRate_ = (sampleRate > 1000.0) ? sampleRate : 44100.0;
-        
+
         // Máximo 2 segundos
         const int maxSamples = static_cast<int>(sampleRate_ * 2.0) + 1024;
         bufL_.assign(static_cast<size_t>(maxSamples), 0.0f);
@@ -62,28 +62,47 @@ public:
         std::fill(bufR_.begin(), bufR_.end(), 0.0f);
         writePosL_ = 0;
         writePosR_ = 0;
-        lfoPhase_ = 0.0;
-        lpfL_ = 0.0f;
-        lpfR_ = 0.0f;
+        lfoPhase_  = 0.0;
+        lpfL_      = 0.0f;
+        lpfR_      = 0.0f;
     }
 
-    void setMixNorm(float norm) noexcept     { mix_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setDelayNorm(float norm) noexcept   { delayPct_ = std::clamp(norm, 0.0f, 1.0f); updateDelay(); }
+    void setMixNorm(float norm) noexcept { mix_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setDelayNorm(float norm) noexcept
+    {
+        delayPct_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelay();
+    }
     void setSustainNorm(float norm) noexcept { sustain_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setWobbleNorm(float norm) noexcept  { wobble_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setToneNorm(float norm) noexcept    { tone_ = std::clamp(norm, 0.0f, 1.0f); updateDelay(); }
+    void setWobbleNorm(float norm) noexcept { wobble_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setToneNorm(float norm) noexcept
+    {
+        tone_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelay();
+    }
 
     void setParameter(int index, float value) noexcept
     {
         const float val = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: setMixNorm(val); break;
-            case 1: setDelayNorm(val); break;
-            case 2: setSustainNorm(val); break;
-            case 3: setWobbleNorm(val); break;
-            case 4: setToneNorm(val); break;
-            default: break;
+            case 0:
+                setMixNorm(val);
+                break;
+            case 1:
+                setDelayNorm(val);
+                break;
+            case 2:
+                setSustainNorm(val);
+                break;
+            case 3:
+                setWobbleNorm(val);
+                break;
+            case 4:
+                setToneNorm(val);
+                break;
+            default:
+                break;
         }
     }
 
@@ -97,8 +116,8 @@ public:
         float* dL = bufL_.data();
         float* dR = bufR_.data();
 
-        const float wetMix = mix_;
-        const float susGain = sustain_ * 0.97f;
+        const float wetMix      = mix_;
+        const float susGain     = sustain_ * 0.97f;
         constexpr double kTwoPi = 6.28318530717958647692;
 
         for (int s = 0; s < numSamples; ++s)
@@ -118,16 +137,16 @@ public:
 
             float readPosL = static_cast<float>(writePosL_) - baseDelay - wobOffset;
             if (readPosL < 0.0f) readPosL += static_cast<float>(bufSize);
-            const int idxL = static_cast<int>(readPosL) % bufSize;
-            const int nextL = (idxL + 1) % bufSize;
-            const float fracL = readPosL - static_cast<float>(static_cast<int>(readPosL));
+            const int idxL       = static_cast<int>(readPosL) % bufSize;
+            const int nextL      = (idxL + 1) % bufSize;
+            const float fracL    = readPosL - static_cast<float>(static_cast<int>(readPosL));
             const float delayedL = dL[idxL] * (1.0f - fracL) + dL[nextL] * fracL;
 
             float readPosR = static_cast<float>(writePosR_) - baseDelay - wobOffset;
             if (readPosR < 0.0f) readPosR += static_cast<float>(bufSize);
-            const int idxR = static_cast<int>(readPosR) % bufSize;
-            const int nextR = (idxR + 1) % bufSize;
-            const float fracR = readPosR - static_cast<float>(static_cast<int>(readPosR));
+            const int idxR       = static_cast<int>(readPosR) % bufSize;
+            const int nextR      = (idxR + 1) % bufSize;
+            const float fracR    = readPosR - static_cast<float>(static_cast<int>(readPosR));
             const float delayedR = dR[idxR] * (1.0f - fracR) + dR[nextR] * fracR;
 
             // Tone filter on feedback
@@ -139,8 +158,8 @@ public:
             // Write to buffer (input + feedback)
             dL[writePosL_] = satL + fbL;
             dR[writePosR_] = satR + fbR;
-            writePosL_ = (writePosL_ + 1) % bufSize;
-            writePosR_ = (writePosR_ + 1) % bufSize;
+            writePosL_     = (writePosL_ + 1) % bufSize;
+            writePosR_     = (writePosR_ + 1) % bufSize;
 
             // Mix
             outL[s] = inL[s] * (1.0f - wetMix) + delayedL * wetMix;
@@ -152,14 +171,14 @@ private:
     void updateDelay() noexcept
     {
         // 0-100% -> 20ms - 1500ms
-        const float ms = 20.0f + 1480.0f * delayPct_;
+        const float ms            = 20.0f + 1480.0f * delayPct_;
         const int maxDelaySamples = static_cast<int>(bufL_.size());
-        delaySamples_ = static_cast<int>(sampleRate_ * ms / 1000.0);
+        delaySamples_             = static_cast<int>(sampleRate_ * ms / 1000.0);
         if (maxDelaySamples > 1)
             delaySamples_ = std::max(1, std::min(delaySamples_, maxDelaySamples - 1));
-        lfoInc_ = (4.0 + wobble_ * 2.0) / sampleRate_; // 4-6 Hz wobble
+        lfoInc_            = (4.0 + wobble_ * 2.0) / sampleRate_; // 4-6 Hz wobble
         const float toneHz = tone_ * 19000.0f + 1000.0f;
-        toneCoeff_ = static_cast<float>(toneHz / (toneHz + sampleRate_ * 0.5));
+        toneCoeff_         = static_cast<float>(toneHz / (toneHz + sampleRate_ * 0.5));
     }
 
     double sampleRate_ = 44100.0;
@@ -171,15 +190,15 @@ private:
 
     std::vector<float> bufL_;
     std::vector<float> bufR_;
-    int writePosL_     = 0;
-    int writePosR_     = 0;
-    int delaySamples_  = 1000;
+    int writePosL_    = 0;
+    int writePosR_    = 0;
+    int delaySamples_ = 1000;
 
-    double lfoPhase_   = 0.0;
-    double lfoInc_     = 0.0;
-    float lpfL_        = 0.0f;
-    float lpfR_        = 0.0f;
-    float toneCoeff_   = 0.5f;
+    double lfoPhase_ = 0.0;
+    double lfoInc_   = 0.0;
+    float lpfL_      = 0.0f;
+    float lpfR_      = 0.0f;
+    float toneCoeff_ = 0.5f;
 };
 
 } // namespace abd::dsp

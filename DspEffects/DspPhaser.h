@@ -64,8 +64,8 @@ public:
         std::fill(std::begin(stateR_), std::end(stateR_), 0.0f);
         std::fill(std::begin(delayL_), std::end(delayL_), 0.0f);
         std::fill(std::begin(delayR_), std::end(delayR_), 0.0f);
-        fbStateL_ = 0.0f;
-        fbStateR_ = 0.0f;
+        fbStateL_  = 0.0f;
+        fbStateR_  = 0.0f;
         lfoPhaseL_ = 0.0;
         lfoPhaseR_ = 0.0;
         envFollowerL_.reset();
@@ -144,14 +144,14 @@ public:
             const float env  = (envL + envR) * 0.5f;
 
             float effectiveDepth = depthNorm_ * (1.0f + envMod_ * env);
-            effectiveDepth = std::clamp(effectiveDepth, 0.0f, 1.0f);
+            effectiveDepth       = std::clamp(effectiveDepth, 0.0f, 1.0f);
 
             // 2. Avance de osciladores LFO
             lfoPhaseL_ += lfoInc_;
             if (lfoPhaseL_ >= 1.0) lfoPhaseL_ -= 1.0;
 
             const double phaseOffset = static_cast<double>(stereoPhaseNorm_ * 0.5f);
-            lfoPhaseR_ = lfoPhaseL_ + phaseOffset;
+            lfoPhaseR_               = lfoPhaseL_ + phaseOffset;
             if (lfoPhaseR_ >= 1.0) lfoPhaseR_ -= 1.0;
 
             // 3. Frecuencia de corte modulada
@@ -196,7 +196,7 @@ private:
     void updateLFOIncrement() noexcept
     {
         const float freqHz = 0.05f + 4.95f * rateNorm_;
-        lfoInc_ = freqHz / sampleRate_;
+        lfoInc_            = freqHz / sampleRate_;
     }
 
     void updateFreqRange() noexcept
@@ -215,16 +215,16 @@ private:
     float calcAllpassCoeff(float cutoffHz) const noexcept
     {
         if (cutoffHz <= 0.0f) return 0.0f;
-        const float nyq = static_cast<float>(sampleRate_) * 0.49f;
-        const float f = std::clamp(cutoffHz, 10.0f, nyq);
-        const float wd = std::tan(3.14159265358979323846f * f / static_cast<float>(sampleRate_));
+        const float nyq       = static_cast<float>(sampleRate_) * 0.49f;
+        const float f         = std::clamp(cutoffHz, 10.0f, nyq);
+        const float wd        = std::tan(3.14159265358979323846f * f / static_cast<float>(sampleRate_));
         const float clampedWd = std::clamp(wd, 0.001f, 100.0f);
         return (1.0f - clampedWd) / (1.0f + clampedWd);
     }
 
     float computeLFOWave(double phase) const noexcept
     {
-        float lfo = static_cast<float>(std::sin(6.283185307179586 * phase));
+        float lfo     = static_cast<float>(std::sin(6.283185307179586 * phase));
         const float w = (waveNorm_ - 0.5f) * 2.0f;
 
         if (std::abs(w) > 0.01f)
@@ -237,30 +237,30 @@ private:
         return lfo;
     }
 
-    double sampleRate_ { 44100.0 };
+    double sampleRate_{44100.0};
 
-    float rateNorm_        { 0.2f };
-    float depthNorm_       { 0.5f };
-    float feedback_        { 0.21f }; // 30% * 0.70
-    float baseNorm_        { 0.3f };
-    int   stages_          { 6 };
-    float waveNorm_        { 0.5f };
-    float stereoPhaseNorm_ { 0.0f };
-    float envMod_          { 0.0f };
-    float attackNorm_      { 0.02f };
-    float releaseNorm_     { 0.02f };
+    float rateNorm_{0.2f};
+    float depthNorm_{0.5f};
+    float feedback_{0.21f}; // 30% * 0.70
+    float baseNorm_{0.3f};
+    int stages_{6};
+    float waveNorm_{0.5f};
+    float stereoPhaseNorm_{0.0f};
+    float envMod_{0.0f};
+    float attackNorm_{0.02f};
+    float releaseNorm_{0.02f};
 
-    float baseHz_          { 200.0f };
-    double lfoPhaseL_      { 0.0 };
-    double lfoPhaseR_      { 0.0 };
-    double lfoInc_         { 0.0 };
+    float baseHz_{200.0f};
+    double lfoPhaseL_{0.0};
+    double lfoPhaseR_{0.0};
+    double lfoInc_{0.0};
 
-    float stateL_[kMaxStages] {};
-    float stateR_[kMaxStages] {};
-    float delayL_[kMaxStages] {};
-    float delayR_[kMaxStages] {};
-    float fbStateL_        { 0.0f };
-    float fbStateR_        { 0.0f };
+    float stateL_[kMaxStages]{};
+    float stateR_[kMaxStages]{};
+    float delayL_[kMaxStages]{};
+    float delayR_[kMaxStages]{};
+    float fbStateL_{0.0f};
+    float fbStateR_{0.0f};
 
     EnvelopeFollower envFollowerL_;
     EnvelopeFollower envFollowerR_;

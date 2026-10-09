@@ -47,26 +47,26 @@ class DspFairComp
 public:
     enum Mode
     {
-        kBypass = 0,
-        kStereo = 1,
+        kBypass   = 0,
+        kStereo   = 1,
         kDualMono = 2,
-        kMidSide = 3
+        kMidSide  = 3
     };
 
     struct ChannelDetector
     {
-        float inputGainNorm = 1.0f;
-        float thresholdNorm = 0.5f;
+        float inputGainNorm    = 1.0f;
+        float thresholdNorm    = 0.5f;
         float timeConstantNorm = 0.0f; // 1 a 6
-        float dcBiasNorm = 0.5f;
-        float outputGainNorm = 0.75f;
+        float dcBiasNorm       = 0.5f;
+        float outputGainNorm   = 0.75f;
 
         // Constantes calculadas
-        float attackTimeSec = 0.0002f;
+        float attackTimeSec  = 0.0002f;
         float releaseTimeSec = 0.3f;
-        float ratio = 4.0f;
-        float kneeDb = 10.0f;
-        float envelope = 0.0f;
+        float ratio          = 4.0f;
+        float kneeDb         = 10.0f;
+        float envelope       = 0.0f;
 
         void reset() noexcept
         {
@@ -78,25 +78,46 @@ public:
             const int tc = 1 + static_cast<int>(timeConstantNorm * 5.0f);
             switch (tc)
             {
-                case 1: attackTimeSec = 0.0002f; releaseTimeSec = 0.3f; break;
-                case 2: attackTimeSec = 0.0002f; releaseTimeSec = 0.8f; break;
-                case 3: attackTimeSec = 0.0004f; releaseTimeSec = 2.0f; break;
-                case 4: attackTimeSec = 0.0008f; releaseTimeSec = 5.0f; break;
-                case 5: attackTimeSec = 0.0002f; releaseTimeSec = 8.0f; break;
-                case 6: attackTimeSec = 0.0004f; releaseTimeSec = 15.0f; break;
-                default: attackTimeSec = 0.0002f; releaseTimeSec = 0.3f; break;
+                case 1:
+                    attackTimeSec  = 0.0002f;
+                    releaseTimeSec = 0.3f;
+                    break;
+                case 2:
+                    attackTimeSec  = 0.0002f;
+                    releaseTimeSec = 0.8f;
+                    break;
+                case 3:
+                    attackTimeSec  = 0.0004f;
+                    releaseTimeSec = 2.0f;
+                    break;
+                case 4:
+                    attackTimeSec  = 0.0008f;
+                    releaseTimeSec = 5.0f;
+                    break;
+                case 5:
+                    attackTimeSec  = 0.0002f;
+                    releaseTimeSec = 8.0f;
+                    break;
+                case 6:
+                    attackTimeSec  = 0.0004f;
+                    releaseTimeSec = 15.0f;
+                    break;
+                default:
+                    attackTimeSec  = 0.0002f;
+                    releaseTimeSec = 0.3f;
+                    break;
             }
 
-            ratio = 2.0f + dcBiasNorm * 28.0f;
+            ratio  = 2.0f + dcBiasNorm * 28.0f;
             kneeDb = 20.0f - dcBiasNorm * 18.0f;
         }
 
         float processSample(float inputSample, double sampleRate) noexcept
         {
-            const float inGainDb = -20.0f + inputGainNorm * 20.0f; // -20 dB a 0 dB
+            const float inGainDb     = -20.0f + inputGainNorm * 20.0f; // -20 dB a 0 dB
             const float inputGainLin = std::pow(10.0f, inGainDb / 20.0f);
-            const float x = inputSample * inputGainLin;
-            const float absX = std::abs(x);
+            const float x            = inputSample * inputGainLin;
+            const float absX         = std::abs(x);
 
             const float attCoeff = static_cast<float>(1.0 - std::exp(-1.0 / (attackTimeSec * sampleRate)));
             const float relCoeff = static_cast<float>(1.0 - std::exp(-1.0 / (releaseTimeSec * sampleRate)));
@@ -106,11 +127,11 @@ public:
             else
                 envelope += relCoeff * (absX - envelope);
 
-            const float envDb = 20.0f * std::log10(std::max(1e-5f, envelope));
+            const float envDb       = 20.0f * std::log10(std::max(1e-5f, envelope));
             const float thresholdDb = -40.0f + thresholdNorm * 40.0f; // -40 dB a 0 dB
 
             float gainReductionDb = 0.0f;
-            const float halfKnee = kneeDb * 0.5f;
+            const float halfKnee  = kneeDb * 0.5f;
 
             if (envDb > thresholdDb - halfKnee)
             {
@@ -118,7 +139,7 @@ public:
                 {
                     // Región parabólica del codo (soft knee)
                     const float kneeDiff = envDb - (thresholdDb - halfKnee);
-                    gainReductionDb = (1.0f - 1.0f / ratio) * (kneeDiff * kneeDiff) / (2.0f * kneeDb);
+                    gainReductionDb      = (1.0f - 1.0f / ratio) * (kneeDiff * kneeDiff) / (2.0f * kneeDb);
                 }
                 else
                 {
@@ -127,7 +148,7 @@ public:
                 }
             }
 
-            float gainDb = -gainReductionDb;
+            float gainDb          = -gainReductionDb;
             const float outGainDb = -18.0f + outputGainNorm * 24.0f; // -18 dB a +6 dB
             gainDb += outGainDb;
 
@@ -240,11 +261,11 @@ public:
         // En modo estéreo, el canal RS refleja los parámetros del canal LM
         if (mode_ == kStereo)
         {
-            chanRS_.inputGainNorm = chanLM_.inputGainNorm;
-            chanRS_.thresholdNorm = chanLM_.thresholdNorm;
+            chanRS_.inputGainNorm    = chanLM_.inputGainNorm;
+            chanRS_.thresholdNorm    = chanLM_.thresholdNorm;
             chanRS_.timeConstantNorm = chanLM_.timeConstantNorm;
-            chanRS_.dcBiasNorm = chanLM_.dcBiasNorm;
-            chanRS_.outputGainNorm = chanLM_.outputGainNorm;
+            chanRS_.dcBiasNorm       = chanLM_.dcBiasNorm;
+            chanRS_.outputGainNorm   = chanLM_.outputGainNorm;
             chanRS_.update(sampleRate_);
         }
 
@@ -255,10 +276,10 @@ public:
 
             if (mode_ == kMidSide)
             {
-                const float mid = (l + r) * 0.5f;
+                const float mid  = (l + r) * 0.5f;
                 const float side = (l - r) * 0.5f;
 
-                const float midProc = chanLM_.processSample(mid, sampleRate_);
+                const float midProc  = chanLM_.processSample(mid, sampleRate_);
                 const float sideProc = chanRS_.processSample(side, sampleRate_);
 
                 outL[s] = midProc + sideProc;
@@ -274,8 +295,8 @@ public:
 
 private:
     double sampleRate_ = 44100.0;
-    int mode_ = kStereo;
-    float biasBal_ = 0.5f;
+    int mode_          = kStereo;
+    float biasBal_     = 0.5f;
 
     ChannelDetector chanLM_;
     ChannelDetector chanRS_;

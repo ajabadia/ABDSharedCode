@@ -47,7 +47,7 @@ class DspChorusD
 {
 public:
     static constexpr int kMaxDelaySamples = 16384; // >80ms a 192 kHz
-    static constexpr int kDelayMask = kMaxDelaySamples - 1;
+    static constexpr int kDelayMask       = kMaxDelaySamples - 1;
 
     DspChorusD() noexcept
     {
@@ -65,16 +65,16 @@ public:
     {
         delayBufL_.fill(0.0f);
         delayBufR_.fill(0.0f);
-        writePos_ = 0;
+        writePos_   = 0;
         lfoPhaseL1_ = 0.0;
         lfoPhaseR1_ = 0.25; // 90°
         lfoPhaseL2_ = 0.0;
         lfoPhaseR2_ = 0.75; // 270°
     }
 
-    void setOn(bool on) noexcept               { on_ = on; }
-    void setMonoMode(bool mono) noexcept       { monoMode_ = mono; }
-    void setMixNorm(float norm) noexcept       { mix_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setOn(bool on) noexcept { on_ = on; }
+    void setMonoMode(bool mono) noexcept { monoMode_ = mono; }
+    void setMixNorm(float norm) noexcept { mix_ = std::clamp(norm, 0.0f, 1.0f); }
     void setPreset(int idx, bool active) noexcept
     {
         if (idx >= 0 && idx < 4)
@@ -108,21 +108,33 @@ public:
         float depthMs = 2.0f;
         switch (presetIdx)
         {
-            case 1: depthMs = 2.0f; break;
-            case 2: depthMs = 3.0f; break;
-            case 3: depthMs = 4.0f; break;
-            case 4: depthMs = 6.0f; break;
+            case 1:
+                depthMs = 2.0f;
+                break;
+            case 2:
+                depthMs = 3.0f;
+                break;
+            case 3:
+                depthMs = 4.0f;
+                break;
+            case 4:
+                depthMs = 6.0f;
+                break;
         }
 
         const float baseDelaySamples = static_cast<float>(sampleRate_ * 0.015f); // 15ms
-        const float modDepthSamples = static_cast<float>(sampleRate_ * 0.001f * depthMs);
+        const float modDepthSamples  = static_cast<float>(sampleRate_ * 0.001f * depthMs);
 
         for (int s = 0; s < numSamples; ++s)
         {
-            lfoPhaseL1_ += lfoInc1_; if (lfoPhaseL1_ >= 1.0) lfoPhaseL1_ -= 1.0;
-            lfoPhaseR1_ += lfoInc1_; if (lfoPhaseR1_ >= 1.0) lfoPhaseR1_ -= 1.0;
-            lfoPhaseL2_ += lfoInc2_; if (lfoPhaseL2_ >= 1.0) lfoPhaseL2_ -= 1.0;
-            lfoPhaseR2_ += lfoInc2_; if (lfoPhaseR2_ >= 1.0) lfoPhaseR2_ -= 1.0;
+            lfoPhaseL1_ += lfoInc1_;
+            if (lfoPhaseL1_ >= 1.0) lfoPhaseL1_ -= 1.0;
+            lfoPhaseR1_ += lfoInc1_;
+            if (lfoPhaseR1_ >= 1.0) lfoPhaseR1_ -= 1.0;
+            lfoPhaseL2_ += lfoInc2_;
+            if (lfoPhaseL2_ >= 1.0) lfoPhaseL2_ -= 1.0;
+            lfoPhaseR2_ += lfoInc2_;
+            if (lfoPhaseR2_ >= 1.0) lfoPhaseR2_ -= 1.0;
 
             float dryL = inL[s];
             float dryR = inR[s];
@@ -130,8 +142,8 @@ public:
             if (monoMode_)
             {
                 const float mono = (dryL + dryR) * 0.5f;
-                dryL = mono;
-                dryR = mono;
+                dryL             = mono;
+                dryR             = mono;
             }
 
             const float modValL = static_cast<float>(
@@ -152,7 +164,7 @@ public:
             // Escritura en buffer de delay
             delayBufL_[writePos_] = dryL;
             delayBufR_[writePos_] = dryR;
-            writePos_ = (writePos_ + 1) & kDelayMask;
+            writePos_             = (writePos_ + 1) & kDelayMask;
 
             // Spatial cross-mixing con fase invertida (amplitud estéreo Dimension D)
             const float wetL = delayedL - delayedR * 0.4f;
@@ -178,10 +190,22 @@ private:
 
         switch (presetIdx)
         {
-            case 1: speed1 = 0.25f; speed2 = 0.35f; break;
-            case 2: speed1 = 0.50f; speed2 = 0.65f; break;
-            case 3: speed1 = 0.80f; speed2 = 1.00f; break;
-            case 4: speed1 = 1.20f; speed2 = 1.50f; break;
+            case 1:
+                speed1 = 0.25f;
+                speed2 = 0.35f;
+                break;
+            case 2:
+                speed1 = 0.50f;
+                speed2 = 0.65f;
+                break;
+            case 3:
+                speed1 = 0.80f;
+                speed2 = 1.00f;
+                break;
+            case 4:
+                speed1 = 1.20f;
+                speed2 = 1.50f;
+                break;
         }
 
         lfoInc1_ = speed1 / sampleRate_;
@@ -191,21 +215,21 @@ private:
     static inline float readDelay(const std::array<float, kMaxDelaySamples>& buf, int writePos, float delaySamples) noexcept
     {
         const float clampedDel = std::clamp(delaySamples, 0.0f, static_cast<float>(kMaxDelaySamples - 2));
-        float readPos = static_cast<float>(writePos) - clampedDel;
+        float readPos          = static_cast<float>(writePos) - clampedDel;
         if (readPos < 0.0f) readPos += static_cast<float>(kMaxDelaySamples);
 
-        const int idx = static_cast<int>(readPos) & kDelayMask;
-        const int next = (idx + 1) & kDelayMask;
+        const int idx    = static_cast<int>(readPos) & kDelayMask;
+        const int next   = (idx + 1) & kDelayMask;
         const float frac = readPos - static_cast<float>(static_cast<int>(readPos));
 
         return buf[idx] * (1.0f - frac) + buf[next] * frac;
     }
 
     double sampleRate_ = 44100.0;
-    bool on_ = true;
-    bool monoMode_ = false;
-    float mix_ = 0.5f;
-    bool sw_[4] = { true, false, false, false };
+    bool on_           = true;
+    bool monoMode_     = false;
+    float mix_         = 0.5f;
+    bool sw_[4]        = {true, false, false, false};
 
     double lfoPhaseL1_ = 0.0, lfoPhaseR1_ = 0.25;
     double lfoPhaseL2_ = 0.0, lfoPhaseR2_ = 0.75;

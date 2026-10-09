@@ -32,7 +32,7 @@ public:
 
     void prepare(double sr)
     {
-        sampleRate = std::max(1.0, sr);
+        sampleRate  = std::max(1.0, sr);
         int bufSize = 1;
         while (bufSize < kMaxDelay)
             bufSize *= 2;
@@ -46,9 +46,9 @@ public:
     {
         std::fill(bufL.begin(), bufL.end(), 0.0f);
         std::fill(bufR.begin(), bufR.end(), 0.0f);
-        readPosL = 0.0f;
-        readPosR = 0.0f;
-        lfoPhase = 0.0f;
+        readPosL   = 0.0f;
+        readPosR   = 0.0f;
+        lfoPhase   = 0.0f;
         lofiAccumL = 0.0f;
         lofiAccumR = 0.0f;
     }
@@ -58,12 +58,23 @@ public:
         const float v = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: pitchParam = v; break;
-            case 1: lofiParam = v; break;
-            case 2: driveParam = v; break;
-            case 3: wowParam = v; break;
-            case 4: mix = v; break;
-            default: break;
+            case 0:
+                pitchParam = v;
+                break;
+            case 1:
+                lofiParam = v;
+                break;
+            case 2:
+                driveParam = v;
+                break;
+            case 3:
+                wowParam = v;
+                break;
+            case 4:
+                mix = v;
+                break;
+            default:
+                break;
         }
     }
 
@@ -71,12 +82,18 @@ public:
     {
         switch (index)
         {
-            case 0: return pitchParam;
-            case 1: return lofiParam;
-            case 2: return driveParam;
-            case 3: return wowParam;
-            case 4: return mix;
-            default: return 0.0f;
+            case 0:
+                return pitchParam;
+            case 1:
+                return lofiParam;
+            case 2:
+                return driveParam;
+            case 3:
+                return wowParam;
+            case 4:
+                return mix;
+            default:
+                return 0.0f;
         }
     }
 
@@ -95,8 +112,8 @@ public:
         }
 
         const float pitchRatio = std::pow(2.0f, (pitchParam - 0.5f) * 2.0f);
-        const float lfoInc = (0.5f + wowParam * 3.0f) / static_cast<float>(sampleRate);
-        const float wowDepth = wowParam * 0.02f;
+        const float lfoInc     = (0.5f + wowParam * 3.0f) / static_cast<float>(sampleRate);
+        const float wowDepth   = wowParam * 0.02f;
 
         int srFactor = 1;
         if (lofiParam > 0.3f)
@@ -110,13 +127,13 @@ public:
             const float xR = inR[s];
 
             const int writeIdx = static_cast<int>(readPosL) & bufMask;
-            bufL[writeIdx] = xL;
-            bufR[writeIdx] = xR;
+            bufL[writeIdx]     = xL;
+            bufR[writeIdx]     = xR;
 
             lfoPhase += lfoInc;
             if (lfoPhase >= 1.0f)
                 lfoPhase -= 1.0f;
-            const float wow = std::sin(6.283185307179586f * lfoPhase) * wowDepth;
+            const float wow          = std::sin(6.283185307179586f * lfoPhase) * wowDepth;
             const float currentRatio = pitchRatio + wow;
 
             readPosL += currentRatio;
@@ -129,12 +146,12 @@ public:
 
             const int readIdxL = static_cast<int>(readPosL) & bufMask;
             const int nextIdxL = (readIdxL + 1) & bufMask;
-            const float fracL = readPosL - static_cast<float>(static_cast<int>(readPosL));
+            const float fracL  = readPosL - static_cast<float>(static_cast<int>(readPosL));
             const float pitchL = bufL[readIdxL] * (1.0f - fracL) + bufL[nextIdxL] * fracL;
 
             const int readIdxR = static_cast<int>(readPosR) & bufMask;
             const int nextIdxR = (readIdxR + 1) & bufMask;
-            const float fracR = readPosR - static_cast<float>(static_cast<int>(readPosR));
+            const float fracR  = readPosR - static_cast<float>(static_cast<int>(readPosR));
             const float pitchR = bufR[readIdxR] * (1.0f - fracR) + bufR[nextIdxR] * fracR;
 
             float srL, srR;
@@ -168,7 +185,7 @@ public:
 private:
     [[nodiscard]] float driveShape(float x) const noexcept
     {
-        const float g = 1.0f + driveParam * 6.0f;
+        const float g   = 1.0f + driveParam * 6.0f;
         const float den = std::tanh(g);
         if (std::abs(den) < 1e-6f)
             return x;
@@ -179,21 +196,21 @@ private:
     {
         if (lofiParam < 0.01f)
             return x;
-        const float bits = 24.0f - lofiParam * 21.0f;
+        const float bits   = 24.0f - lofiParam * 21.0f;
         const float levels = std::pow(2.0f, bits);
         return std::round(x * levels) / levels;
     }
 
     double sampleRate = 44100.0;
-    float pitchParam = 0.5f;
-    float lofiParam = 0.0f;
-    float driveParam = 0.0f;
-    float wowParam = 0.0f;
-    float mix = 0.4f;
+    float pitchParam  = 0.5f;
+    float lofiParam   = 0.0f;
+    float driveParam  = 0.0f;
+    float wowParam    = 0.0f;
+    float mix         = 0.4f;
 
-    float readPosL = 0.0f;
-    float readPosR = 0.0f;
-    float lfoPhase = 0.0f;
+    float readPosL   = 0.0f;
+    float readPosR   = 0.0f;
+    float lfoPhase   = 0.0f;
     float lofiAccumL = 0.0f;
     float lofiAccumR = 0.0f;
 

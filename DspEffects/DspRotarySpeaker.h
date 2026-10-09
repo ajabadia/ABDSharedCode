@@ -55,35 +55,47 @@ public:
 
     void reset() noexcept
     {
-        hornPhase_   = 0.0;
-        rotorPhase_  = 0.0;
-        hornSpeed_   = 0.0;
-        rotorSpeed_  = 0.0;
-        hornTarget_  = 0.0;
-        rotorTarget_ = 0.0;
-        hornDelayL_  = 0.0f;
-        hornDelayR_  = 0.0f;
-        rotorDelayL_ = 0.0f;
-        rotorDelayR_ = 0.0f;
-        xoverStateL_ = 0.0f;
-        xoverStateR_ = 0.0f;
+        hornPhase_    = 0.0;
+        rotorPhase_   = 0.0;
+        hornSpeed_    = 0.0;
+        rotorSpeed_   = 0.0;
+        hornTarget_   = 0.0;
+        rotorTarget_  = 0.0;
+        hornDelayL_   = 0.0f;
+        hornDelayR_   = 0.0f;
+        rotorDelayL_  = 0.0f;
+        rotorDelayR_  = 0.0f;
+        xoverStateL_  = 0.0f;
+        xoverStateR_  = 0.0f;
         motorRunning_ = true;
-        targetSpeed_ = 0.0f; // SLOW
+        targetSpeed_  = 0.0f; // SLOW
         updateTargets();
     }
 
-    void setLoSpeedNorm(float norm) noexcept  { loSpeed_ = std::clamp(norm, 0.0f, 1.0f); updateTargets(); }
-    void setHiSpeedNorm(float norm) noexcept  { hiSpeed_ = std::clamp(norm, 0.0f, 1.0f); updateTargets(); }
-    void setAccelNorm(float norm) noexcept    { accel_   = std::clamp(norm, 0.0f, 1.0f); updateAccelRate(); }
+    void setLoSpeedNorm(float norm) noexcept
+    {
+        loSpeed_ = std::clamp(norm, 0.0f, 1.0f);
+        updateTargets();
+    }
+    void setHiSpeedNorm(float norm) noexcept
+    {
+        hiSpeed_ = std::clamp(norm, 0.0f, 1.0f);
+        updateTargets();
+    }
+    void setAccelNorm(float norm) noexcept
+    {
+        accel_ = std::clamp(norm, 0.0f, 1.0f);
+        updateAccelRate();
+    }
     void setDistanceNorm(float norm) noexcept { distance_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setBalanceNorm(float norm) noexcept  { balance_  = std::clamp(norm, 0.0f, 1.0f); }
+    void setBalanceNorm(float norm) noexcept { balance_ = std::clamp(norm, 0.0f, 1.0f); }
 
     void setMotorRunning(bool run) noexcept
     {
         motorRunning_ = run;
         if (!motorRunning_)
         {
-            hornTarget_ = 0.0;
+            hornTarget_  = 0.0;
             rotorTarget_ = 0.0;
         }
         else
@@ -107,13 +119,13 @@ public:
         for (int s = 0; s < numSamples; ++s)
         {
             // 1. Aceleración inercial suave de cada rotor
-            hornSpeed_  += (hornTarget_ - hornSpeed_) * accelRate_;
+            hornSpeed_ += (hornTarget_ - hornSpeed_) * accelRate_;
             rotorSpeed_ += (rotorTarget_ - rotorSpeed_) * accelRate_;
 
             // 2. Avance de fase de rotación
-            hornPhase_  += hornSpeed_ / sampleRate_;
+            hornPhase_ += hornSpeed_ / sampleRate_;
             rotorPhase_ += rotorSpeed_ / sampleRate_;
-            if (hornPhase_ >= 1.0)  hornPhase_  -= 1.0;
+            if (hornPhase_ >= 1.0) hornPhase_ -= 1.0;
             if (rotorPhase_ >= 1.0) rotorPhase_ -= 1.0;
 
             // 3. Separación acústica por Crossover (~800 Hz)
@@ -130,24 +142,24 @@ public:
 
             // 4. Modulación Doppler (desplazamiento de tono por movimiento de la fuente)
             const float hornPhaseOffset = static_cast<float>(std::sin(kTwoPi * hornPhase_));
-            const float dopplerHorn = hornPhaseOffset * distance_ * 0.05f;
+            const float dopplerHorn     = hornPhaseOffset * distance_ * 0.05f;
 
             const float rotorPhaseOffset = static_cast<float>(std::sin(kTwoPi * rotorPhase_));
-            const float dopplerRotor = rotorPhaseOffset * distance_ * 0.03f;
+            const float dopplerRotor     = rotorPhaseOffset * distance_ * 0.03f;
 
             float hornOutL = hornSignalL + dopplerHorn * hornDelayL_;
             float hornOutR = hornSignalR + dopplerHorn * hornDelayR_;
-            hornDelayL_ = hornSignalL;
-            hornDelayR_ = hornSignalR;
+            hornDelayL_    = hornSignalL;
+            hornDelayR_    = hornSignalR;
 
             float rotorOutL = rotorSignalL + dopplerRotor * rotorDelayL_;
             float rotorOutR = rotorSignalR + dopplerRotor * rotorDelayR_;
-            rotorDelayL_ = rotorSignalL;
-            rotorDelayR_ = rotorSignalR;
+            rotorDelayL_    = rotorSignalL;
+            rotorDelayR_    = rotorSignalR;
 
             // 5. Modulación de amplitud estéreo (Tremolo espacial en antifase de 180°)
-            const float hornTremL = getDistanceAtten(distance_, hornPhase_);
-            const float hornTremR = getDistanceAtten(distance_, hornPhase_ + 0.5);
+            const float hornTremL  = getDistanceAtten(distance_, hornPhase_);
+            const float hornTremR  = getDistanceAtten(distance_, hornPhase_ + 0.5);
             const float rotorTremL = getDistanceAtten(distance_ * 0.5f, rotorPhase_);
             const float rotorTremR = getDistanceAtten(distance_ * 0.5f, rotorPhase_ + 0.5);
 
@@ -157,7 +169,7 @@ public:
             rotorOutR *= rotorTremR;
 
             // 6. Balance y ganancia de motor
-            const float hornGain = balance_;
+            const float hornGain  = balance_;
             const float rotorGain = 1.0f - balance_;
             const float motorGain = motorRunning_ ? 1.0f : 0.0f;
 
@@ -171,7 +183,7 @@ private:
     {
         if (!motorRunning_)
         {
-            hornTarget_ = 0.0;
+            hornTarget_  = 0.0;
             rotorTarget_ = 0.0;
             return;
         }
@@ -196,8 +208,8 @@ private:
     static inline float getDistanceAtten(float distanceNorm, double phase) noexcept
     {
         constexpr double kTwoPi = 6.28318530717958647692;
-        const float doppler = static_cast<float>(std::sin(kTwoPi * phase));
-        const float modAmount = distanceNorm * 0.3f;
+        const float doppler     = static_cast<float>(std::sin(kTwoPi * phase));
+        const float modAmount   = distanceNorm * 0.3f;
         return 1.0f + doppler * modAmount;
     }
 
@@ -209,11 +221,11 @@ private:
     float balance_     = 0.5f;
     float targetSpeed_ = 0.0f;
 
-    double hornPhase_   = 0.0;
-    double rotorPhase_  = 0.0;
-    double hornSpeed_   = 0.0;
-    double rotorSpeed_  = 0.0;
-    bool motorRunning_  = true;
+    double hornPhase_  = 0.0;
+    double rotorPhase_ = 0.0;
+    double hornSpeed_  = 0.0;
+    double rotorSpeed_ = 0.0;
+    bool motorRunning_ = true;
 
     double hornTarget_  = 0.0;
     double rotorTarget_ = 0.0;

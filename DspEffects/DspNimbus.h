@@ -23,7 +23,7 @@ namespace abd::dsp
 class DspNimbus
 {
 public:
-    static constexpr int kMaxGrains = 16;
+    static constexpr int kMaxGrains  = 16;
     static constexpr int kMaxBufSize = 192000; // ~2s at 96kHz, 4s at 48kHz
 
     DspNimbus()
@@ -33,7 +33,7 @@ public:
 
     void prepare(double sr)
     {
-        sampleRate = std::max(1.0, sr);
+        sampleRate        = std::max(1.0, sr);
         const int bufSize = std::min(kMaxBufSize, std::max(1024, static_cast<int>(sampleRate * 2.0)));
         ringBufL.assign(static_cast<size_t>(bufSize), 0.0f);
         ringBufR.assign(static_cast<size_t>(bufSize), 0.0f);
@@ -55,12 +55,23 @@ public:
         const float v = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: grainSizeParam = v; break;
-            case 1: densityParam = v; break;
-            case 2: feedbackParam = v; break;
-            case 3: pitchParam = v; break;
-            case 4: mix = v; break;
-            default: break;
+            case 0:
+                grainSizeParam = v;
+                break;
+            case 1:
+                densityParam = v;
+                break;
+            case 2:
+                feedbackParam = v;
+                break;
+            case 3:
+                pitchParam = v;
+                break;
+            case 4:
+                mix = v;
+                break;
+            default:
+                break;
         }
     }
 
@@ -68,12 +79,18 @@ public:
     {
         switch (index)
         {
-            case 0: return grainSizeParam;
-            case 1: return densityParam;
-            case 2: return feedbackParam;
-            case 3: return pitchParam;
-            case 4: return mix;
-            default: return 0.0f;
+            case 0:
+                return grainSizeParam;
+            case 1:
+                return densityParam;
+            case 2:
+                return feedbackParam;
+            case 3:
+                return pitchParam;
+            case 4:
+                return mix;
+            default:
+                return 0.0f;
         }
     }
 
@@ -91,15 +108,15 @@ public:
             return;
         }
 
-        const int bufLen = static_cast<int>(ringBufL.size());
+        const int bufLen        = static_cast<int>(ringBufL.size());
         const int maxGrainCount = 1 + static_cast<int>(densityParam * 7.0f);
-        const float spawnRate = 0.3f + densityParam * 0.7f;
-        int samplesPerGrain = static_cast<int>(sampleRate / (spawnRate * 4.0f + 1.0f));
+        const float spawnRate   = 0.3f + densityParam * 0.7f;
+        int samplesPerGrain     = static_cast<int>(sampleRate / (spawnRate * 4.0f + 1.0f));
         if (samplesPerGrain < 16)
             samplesPerGrain = 16;
 
         const float invMaxGrains = 1.0f / static_cast<float>(maxGrainCount);
-        const float fb = feedbackParam * 0.4f;
+        const float fb           = feedbackParam * 0.4f;
 
         for (int s = 0; s < numSamples; ++s)
         {
@@ -128,15 +145,15 @@ public:
                     continue;
 
                 const float readPosF = static_cast<float>(grains[g].readPos);
-                const int idx = static_cast<int>(readPosF) % bufLen;
-                const int next = (idx + 1) % bufLen;
-                const float frac = readPosF - static_cast<float>(idx);
+                const int idx        = static_cast<int>(readPosF) % bufLen;
+                const int next       = (idx + 1) % bufLen;
+                const float frac     = readPosF - static_cast<float>(idx);
 
                 const float sampL = ringBufL[idx] * (1.0f - frac) + ringBufL[next] * frac;
                 const float sampR = ringBufR[idx] * (1.0f - frac) + ringBufR[next] * frac;
 
-                const float progress = static_cast<float>(grains[g].age) / static_cast<float>(grains[g].length);
-                const float envelope = 0.5f * (1.0f + std::cos(3.141592653589793f * progress));
+                const float progress  = static_cast<float>(grains[g].age) / static_cast<float>(grains[g].length);
+                const float envelope  = 0.5f * (1.0f + std::cos(3.141592653589793f * progress));
                 const float grainGain = envelope * grains[g].gain;
 
                 wetL += sampL * grainGain;
@@ -164,19 +181,19 @@ public:
 private:
     struct Grain
     {
-        bool active = false;
-        int readPos = 0;
-        int length = 0;
-        int age = 0;
+        bool active      = false;
+        int readPos      = 0;
+        int length       = 0;
+        int age          = 0;
         float pitchRatio = 1.0f;
-        float pan = 0.5f;
-        float gain = 0.0f;
+        float pan        = 0.5f;
+        float gain       = 0.0f;
     };
 
     void spawnGrain(int bufLen) noexcept
     {
         const float grainDur = 0.02f + grainSizeParam * 0.18f;
-        int grainLen = static_cast<int>(sampleRate * grainDur);
+        int grainLen         = static_cast<int>(sampleRate * grainDur);
         if (grainLen < 16)
             grainLen = 16;
         if (grainLen > bufLen / 2)
@@ -184,23 +201,23 @@ private:
 
         const float pitchRatio = std::pow(2.0f, (pitchParam - 0.5f) * 2.0f);
 
-        grains[nextGrainIdx].active = true;
-        grains[nextGrainIdx].readPos = (ringWritePos - grainLen + bufLen * 2) % bufLen;
-        grains[nextGrainIdx].length = grainLen;
-        grains[nextGrainIdx].age = 0;
+        grains[nextGrainIdx].active     = true;
+        grains[nextGrainIdx].readPos    = (ringWritePos - grainLen + bufLen * 2) % bufLen;
+        grains[nextGrainIdx].length     = grainLen;
+        grains[nextGrainIdx].age        = 0;
         grains[nextGrainIdx].pitchRatio = pitchRatio;
-        grains[nextGrainIdx].pan = 0.2f + 0.6f * (static_cast<float>(nextGrainIdx % 3) * 0.5f);
-        grains[nextGrainIdx].gain = 0.5f + 0.5f * densityParam;
+        grains[nextGrainIdx].pan        = 0.2f + 0.6f * (static_cast<float>(nextGrainIdx % 3) * 0.5f);
+        grains[nextGrainIdx].gain       = 0.5f + 0.5f * densityParam;
 
         nextGrainIdx = (nextGrainIdx + 1) % kMaxGrains;
     }
 
-    double sampleRate = 44100.0;
+    double sampleRate    = 44100.0;
     float grainSizeParam = 0.5f;
-    float densityParam = 0.5f;
-    float feedbackParam = 0.3f;
-    float pitchParam = 0.5f;
-    float mix = 0.4f;
+    float densityParam   = 0.5f;
+    float feedbackParam  = 0.3f;
+    float pitchParam     = 0.5f;
+    float mix            = 0.4f;
 
     std::vector<float> ringBufL;
     std::vector<float> ringBufR;

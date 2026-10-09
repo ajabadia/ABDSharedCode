@@ -40,7 +40,7 @@ public:
     enum RoutingMode
     {
         kParallel = 0,
-        kSerial = 1
+        kSerial   = 1
     };
 
     DspModDelayRev()
@@ -79,7 +79,7 @@ public:
         std::fill(combBufR_.begin(), combBufR_.end(), 0.0f);
         writePosL_ = 0;
         writePosR_ = 0;
-        combPos_ = 0;
+        combPos_   = 0;
         for (int i = 0; i < 4; ++i)
         {
             combStateL_[i] = 0.0f;
@@ -91,8 +91,8 @@ public:
             apStateR_[i] = 0.0f;
         }
         lfoPhase_ = 0.0;
-        lpfL_ = 0.0f;
-        lpfR_ = 0.0f;
+        lpfL_     = 0.0f;
+        lpfR_     = 0.0f;
     }
 
     void setParameter(int index, float value) noexcept
@@ -100,19 +100,49 @@ public:
         const float val = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0:  time_ = val; updateParams(); break;
-            case 1:  factor_ = static_cast<int>(val * 3.99f); updateParams(); break;
-            case 2:  feedback_ = val; break;
-            case 3:  feedHC_ = val; updateParams(); break;
-            case 4:  depth_ = val; break;
-            case 5:  speed_ = val; updateParams(); break;
-            case 6:  mode_ = (val > 0.5f) ? 1 : 0; break;
-            case 7:  rType_ = static_cast<int>(val * 2.99f); break;
-            case 8:  decay_ = val; break;
-            case 9:  damping_ = val; updateParams(); break;
-            case 10: balance_ = val; break;
-            case 11: mix_ = val; break;
-            default: break;
+            case 0:
+                time_ = val;
+                updateParams();
+                break;
+            case 1:
+                factor_ = static_cast<int>(val * 3.99f);
+                updateParams();
+                break;
+            case 2:
+                feedback_ = val;
+                break;
+            case 3:
+                feedHC_ = val;
+                updateParams();
+                break;
+            case 4:
+                depth_ = val;
+                break;
+            case 5:
+                speed_ = val;
+                updateParams();
+                break;
+            case 6:
+                mode_ = (val > 0.5f) ? 1 : 0;
+                break;
+            case 7:
+                rType_ = static_cast<int>(val * 2.99f);
+                break;
+            case 8:
+                decay_ = val;
+                break;
+            case 9:
+                damping_ = val;
+                updateParams();
+                break;
+            case 10:
+                balance_ = val;
+                break;
+            case 11:
+                mix_ = val;
+                break;
+            default:
+                break;
         }
     }
 
@@ -123,11 +153,11 @@ public:
         const int maxDelaySamples = static_cast<int>(delayBufL_.size());
         if (maxDelaySamples <= 0 || combBufSize_ <= 0) return;
 
-        float* dBufL = delayBufL_.data();
-        float* dBufR = delayBufR_.data();
-        float* cBufL = combBufL_.data();
-        float* cBufR = combBufR_.data();
-        const float bal = (balance_ - 0.5f) * 2.0f;
+        float* dBufL            = delayBufL_.data();
+        float* dBufR            = delayBufR_.data();
+        float* cBufL            = combBufL_.data();
+        float* cBufR            = combBufR_.data();
+        const float bal         = (balance_ - 0.5f) * 2.0f;
         constexpr double kTwoPi = 6.28318530717958647692;
 
         for (int s = 0; s < numSamples; ++s)
@@ -138,13 +168,13 @@ public:
             // --- Modulated delay ---
             lfoPhase_ += lfoInc_;
             if (lfoPhase_ >= 1.0) lfoPhase_ -= 1.0;
-            const float mod = static_cast<float>(std::sin(kTwoPi * lfoPhase_)) * depth_ * 0.2f;
+            const float mod       = static_cast<float>(std::sin(kTwoPi * lfoPhase_)) * depth_ * 0.2f;
             const float delaySamp = static_cast<float>(delaySamples_) * (1.0f + mod);
 
             const int readPosL = ((writePosL_ - static_cast<int>(delaySamp)) % maxDelaySamples + maxDelaySamples) % maxDelaySamples;
-            const float dL = dBufL[readPosL];
+            const float dL     = dBufL[readPosL];
             const int readPosR = ((writePosR_ - static_cast<int>(delaySamp)) % maxDelaySamples + maxDelaySamples) % maxDelaySamples;
-            const float dR = dBufR[readPosR];
+            const float dR     = dBufR[readPosR];
 
             // High cut en feedback
             lpfL_ += hcCoeff_ * (dL - lpfL_);
@@ -152,14 +182,14 @@ public:
 
             dBufL[writePosL_] = dryL + lpfL_ * feedback_ * 0.95f;
             dBufR[writePosR_] = dryR + lpfR_ * feedback_ * 0.95f;
-            writePosL_ = (writePosL_ + 1) % maxDelaySamples;
-            writePosR_ = (writePosR_ + 1) % maxDelaySamples;
+            writePosL_        = (writePosL_ + 1) % maxDelaySamples;
+            writePosR_        = (writePosR_ + 1) % maxDelaySamples;
 
             const float delayOutL = dL;
 
             // --- Reverb (Schroeder simplificado) ---
-            const float revInL = dryL + dL * std::max(0.0f, bal);
-            const float revInR = dryR + dR * std::max(0.0f, -bal);
+            const float revInL    = dryL + dL * std::max(0.0f, bal);
+            const float revInR    = dryR + dR * std::max(0.0f, -bal);
             const float decayGain = 0.3f + decay_ * 0.6f;
 
             // Comb filters
@@ -167,34 +197,34 @@ public:
             {
                 int combRead = combPos_ - combDelay_[i];
                 if (combRead < 0) combRead += combBufSize_;
-                const float cL = cBufL[combRead];
-                const float cR = cBufR[combRead];
+                const float cL  = cBufL[combRead];
+                const float cR  = cBufR[combRead];
                 cBufL[combPos_] = revInL + cL * decayGain * dampCoeff_;
                 cBufR[combPos_] = revInR + cR * decayGain * dampCoeff_;
-                combStateL_[i] = cL;
-                combStateR_[i] = cR;
+                combStateL_[i]  = cL;
+                combStateR_[i]  = cR;
             }
             combPos_ = (combPos_ + 1) % combBufSize_;
 
             // Allpass filters
-            float revL = (combStateL_[0] + combStateL_[1] + combStateL_[2] + combStateL_[3]) * 0.25f;
-            float revR = (combStateR_[0] + combStateR_[1] + combStateR_[2] + combStateR_[3]) * 0.25f;
+            float revL             = (combStateL_[0] + combStateL_[1] + combStateL_[2] + combStateL_[3]) * 0.25f;
+            float revR             = (combStateR_[0] + combStateR_[1] + combStateR_[2] + combStateR_[3]) * 0.25f;
             constexpr float apGain = 0.5f;
             for (int i = 0; i < 3; ++i)
             {
                 const float apL = revL + apGain * apStateL_[i];
-                apStateL_[i] = revL - apGain * apL;
-                revL = apL;
+                apStateL_[i]    = revL - apGain * apL;
+                revL            = apL;
                 const float apR = revR + apGain * apStateR_[i];
-                apStateR_[i] = revR - apGain * apR;
-                revR = apR;
+                apStateR_[i]    = revR - apGain * apR;
+                revR            = apR;
             }
 
             // Balance delay/reverb
             const float mixDelay = delayOutL * (1.0f - std::abs(bal)) * mix_;
-            const float mixRev = revL * 0.3f * mix_;
-            const float wetL = mixDelay + mixRev;
-            const float wetR = mixDelay + mixRev; // mono reverb
+            const float mixRev   = revL * 0.3f * mix_;
+            const float wetL     = mixDelay + mixRev;
+            const float wetR     = mixDelay + mixRev; // mono reverb
 
             // Mix con dry
             outL[s] = dryL * (1.0f - mix_) + wetL * mix_;
@@ -205,21 +235,21 @@ public:
 private:
     void updateParams() noexcept
     {
-        const float baseMs = 1.0f + 1499.0f * time_;
-        static constexpr float factorTab[4] = { 1.0f, 0.5f, 0.667f, 1.5f };
-        const int maxDelaySamples = static_cast<int>(delayBufL_.size());
-        delaySamples_ = static_cast<int>(sampleRate_ * baseMs / 1000.0 * factorTab[std::clamp(factor_, 0, 3)]);
+        const float baseMs                  = 1.0f + 1499.0f * time_;
+        static constexpr float factorTab[4] = {1.0f, 0.5f, 0.667f, 1.5f};
+        const int maxDelaySamples           = static_cast<int>(delayBufL_.size());
+        delaySamples_                       = static_cast<int>(sampleRate_ * baseMs / 1000.0 * factorTab[std::clamp(factor_, 0, 3)]);
         if (maxDelaySamples > 1)
             delaySamples_ = std::max(1, std::min(delaySamples_, maxDelaySamples - 1));
 
         const float freqHz = 0.05f + 9.95f * speed_;
-        lfoInc_ = freqHz / sampleRate_;
+        lfoInc_            = freqHz / sampleRate_;
 
         const float hcHz = 200.0f + 19800.0f * feedHC_;
-        hcCoeff_ = static_cast<float>(hcHz / (hcHz + sampleRate_ * 0.5));
+        hcCoeff_         = static_cast<float>(hcHz / (hcHz + sampleRate_ * 0.5));
 
         const float dampHz = 1000.0f + 19000.0f * damping_;
-        dampCoeff_ = static_cast<float>(dampHz / (dampHz + sampleRate_ * 0.5));
+        dampCoeff_         = static_cast<float>(dampHz / (dampHz + sampleRate_ * 0.5));
     }
 
     double sampleRate_ = 44100.0;
@@ -238,26 +268,26 @@ private:
 
     std::vector<float> delayBufL_;
     std::vector<float> delayBufR_;
-    int writePosL_     = 0;
-    int writePosR_     = 0;
-    int delaySamples_  = 1000;
+    int writePosL_    = 0;
+    int writePosR_    = 0;
+    int delaySamples_ = 1000;
 
     std::vector<float> combBufL_;
     std::vector<float> combBufR_;
-    int combBufSize_   = 0;
-    int combPos_       = 0;
-    int combDelay_[4]  = { 0, 0, 0, 0 };
-    float combStateL_[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    float combStateR_[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    float apStateL_[3]   = { 0.0f, 0.0f, 0.0f };
-    float apStateR_[3]   = { 0.0f, 0.0f, 0.0f };
+    int combBufSize_     = 0;
+    int combPos_         = 0;
+    int combDelay_[4]    = {0, 0, 0, 0};
+    float combStateL_[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float combStateR_[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float apStateL_[3]   = {0.0f, 0.0f, 0.0f};
+    float apStateR_[3]   = {0.0f, 0.0f, 0.0f};
 
-    double lfoPhase_   = 0.0;
-    double lfoInc_     = 0.0;
-    float lpfL_        = 0.0f;
-    float lpfR_        = 0.0f;
-    float hcCoeff_     = 0.5f;
-    float dampCoeff_   = 0.5f;
+    double lfoPhase_ = 0.0;
+    double lfoInc_   = 0.0;
+    float lpfL_      = 0.0f;
+    float lpfR_      = 0.0f;
+    float hcCoeff_   = 0.5f;
+    float dampCoeff_ = 0.5f;
 };
 
 } // namespace abd::dsp

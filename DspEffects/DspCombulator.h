@@ -30,9 +30,9 @@ public:
 
     void prepare(double newSampleRate)
     {
-        sampleRate = std::max(1.0, newSampleRate);
+        sampleRate                = std::max(1.0, newSampleRate);
         const int requiredSamples = static_cast<int>(std::ceil(sampleRate * 0.055)) + 64;
-        maxDelay = std::max(5000, requiredSamples);
+        maxDelay                  = std::max(5000, requiredSamples);
 
         delayBufL.assign(static_cast<size_t>(maxDelay), 0.0f);
         delayBufR.assign(static_cast<size_t>(maxDelay), 0.0f);
@@ -58,12 +58,23 @@ public:
         value = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: paramMix = value; break;
-            case 1: paramDelayL = value; break;
-            case 2: paramDelayR = value; break;
-            case 3: paramFeedback = value; break;
-            case 4: paramDamping = value; break;
-            default: break;
+            case 0:
+                paramMix = value;
+                break;
+            case 1:
+                paramDelayL = value;
+                break;
+            case 2:
+                paramDelayR = value;
+                break;
+            case 3:
+                paramFeedback = value;
+                break;
+            case 4:
+                paramDamping = value;
+                break;
+            default:
+                break;
         }
     }
 
@@ -71,12 +82,18 @@ public:
     {
         switch (index)
         {
-            case 0: return paramMix;
-            case 1: return paramDelayL;
-            case 2: return paramDelayR;
-            case 3: return paramFeedback;
-            case 4: return paramDamping;
-            default: return 0.0f;
+            case 0:
+                return paramMix;
+            case 1:
+                return paramDelayL;
+            case 2:
+                return paramDelayR;
+            case 3:
+                return paramFeedback;
+            case 4:
+                return paramDamping;
+            default:
+                return 0.0f;
         }
     }
 
@@ -94,15 +111,15 @@ public:
             return;
         }
 
-        const float mix = paramMix;
+        const float mix      = paramMix;
         const float feedback = paramFeedback;
-        const float damping = paramDamping;
+        const float damping  = paramDamping;
 
-        float delaySamplesL = (paramDelayL * 49.0f + 1.0f) * static_cast<float>(sampleRate) * 0.001f;
-        float delaySamplesR = (paramDelayR * 49.0f + 1.0f) * static_cast<float>(sampleRate) * 0.001f;
+        float delaySamplesL      = (paramDelayL * 49.0f + 1.0f) * static_cast<float>(sampleRate) * 0.001f;
+        float delaySamplesR      = (paramDelayR * 49.0f + 1.0f) * static_cast<float>(sampleRate) * 0.001f;
         const float dampingCoeff = 1.0f - damping * 0.95f;
 
-        const int bufLen = maxDelay;
+        const int bufLen       = maxDelay;
         const int dSamplesLInt = static_cast<int>(delaySamplesL);
         const int dSamplesRInt = static_cast<int>(delaySamplesR);
 
@@ -136,21 +153,21 @@ public:
 
 private:
     double sampleRate = 44100.0;
-    int maxDelay = 5000;
+    int maxDelay      = 5000;
 
-    float paramMix = 0.4f;
-    float paramDelayL = 0.25f;
-    float paramDelayR = 0.35f;
+    float paramMix      = 0.4f;
+    float paramDelayL   = 0.25f;
+    float paramDelayR   = 0.35f;
     float paramFeedback = 0.5f;
-    float paramDamping = 0.3f;
+    float paramDamping  = 0.3f;
 
     std::vector<float> delayBufL;
     std::vector<float> delayBufR;
     int writePosL = 0;
     int writePosR = 0;
 
-    float lpfStateL = 0.0f;
-    float lpfStateR = 0.0f;
+    float lpfStateL    = 0.0f;
+    float lpfStateR    = 0.0f;
     uint32_t noiseSeed = 0xDEADBEEFu;
 };
 

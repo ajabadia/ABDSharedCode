@@ -43,21 +43,21 @@ class DspMoodFilter
 public:
     enum FilterType
     {
-        kLowpass = 0,
+        kLowpass  = 0,
         kHighpass = 1,
         kBandpass = 2,
-        kNotch = 3
+        kNotch    = 3
     };
 
     enum WaveShape
     {
         kTriangle = 0,
-        kSine = 1,
-        kSawUp = 2,
-        kSawDown = 3,
-        kRamp = 4,
-        kSquare = 5,
-        kRandom = 6
+        kSine     = 1,
+        kSawUp    = 2,
+        kSawDown  = 3,
+        kRamp     = 4,
+        kSquare   = 5,
+        kRandom   = 6
     };
 
     DspMoodFilter() noexcept
@@ -79,9 +79,9 @@ public:
         svfBandL_ = svfBandR_ = 0.0f;
         svfHighL_ = svfHighR_ = 0.0f;
         envStateL_ = envStateR_ = 0.0f;
-        lfoPhase_ = 0.0;
-        lfoValue_ = 0.0f;
-        rngState_ = 12345u;
+        lfoPhase_               = 0.0;
+        lfoValue_               = 0.0f;
+        rngState_               = 12345u;
     }
 
     void setSpeedNorm(float speedNorm) noexcept
@@ -149,9 +149,9 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float envAmt = (envMod_ - 0.5f) * 2.0f; // -1..+1
-        const float baseHz = 20.0f * std::pow(750.0f, baseFreq_);
-        const float modRange = baseHz * 4.0f;
+        const float envAmt       = (envMod_ - 0.5f) * 2.0f; // -1..+1
+        const float baseHz       = 20.0f * std::pow(750.0f, baseFreq_);
+        const float modRange     = baseHz * 4.0f;
         const float nyquistLimit = static_cast<float>(sampleRate_ * 0.45);
 
         for (int s = 0; s < numSamples; ++s)
@@ -164,17 +164,17 @@ public:
             // 2. Seguidor de envolvente
             const float absL = std::abs(inL[s]);
             const float absR = std::abs(inR[s]);
-            envStateL_ = (absL > envStateL_)
-                ? envStateL_ + envAttack_ * (absL - envStateL_)
-                : envStateL_ + envRelease_ * (absL - envStateL_);
-            envStateR_ = (absR > envStateR_)
-                ? envStateR_ + envAttack_ * (absR - envStateR_)
-                : envStateR_ + envRelease_ * (absR - envStateR_);
-            const float env = (envStateL_ + envStateR_) * 0.5f;
+            envStateL_       = (absL > envStateL_)
+                                   ? envStateL_ + envAttack_ * (absL - envStateL_)
+                                   : envStateL_ + envRelease_ * (absL - envStateL_);
+            envStateR_       = (absR > envStateR_)
+                                   ? envStateR_ + envAttack_ * (absR - envStateR_)
+                                   : envStateR_ + envRelease_ * (absR - envStateR_);
+            const float env  = (envStateL_ + envStateR_) * 0.5f;
 
             // 3. Modulación combinada (LFO + Envelope)
             float mod = (lfoValue_ * depth_) + (env * 4.0f * envAmt);
-            mod = std::clamp(mod, -1.0f, 1.0f);
+            mod       = std::clamp(mod, -1.0f, 1.0f);
 
             // 4. Cálculo de frecuencia de corte y coeficientes SVF
             const float freqHz = std::clamp(baseHz + mod * modRange, 20.0f, nyquistLimit);
@@ -194,11 +194,17 @@ public:
             switch (filterType_)
             {
                 case kLowpass:
-                    wetL = svfLowL_;  wetR = svfLowR_;  break;
+                    wetL = svfLowL_;
+                    wetR = svfLowR_;
+                    break;
                 case kHighpass:
-                    wetL = svfHighL_; wetR = svfHighR_; break;
+                    wetL = svfHighL_;
+                    wetR = svfHighR_;
+                    break;
                 case kBandpass:
-                    wetL = svfBandL_; wetR = svfBandR_; break;
+                    wetL = svfBandL_;
+                    wetR = svfBandR_;
+                    break;
                 case kNotch:
                 default:
                     wetL = svfLowL_ + svfHighL_;
@@ -215,7 +221,7 @@ private:
     void updateLFO() noexcept
     {
         const float freqHz = 0.05f + 19.95f * speed_;
-        lfoInc_ = freqHz / sampleRate_;
+        lfoInc_            = freqHz / sampleRate_;
     }
 
     void updateEnvCoeffs() noexcept
@@ -235,71 +241,79 @@ private:
         const double p = phase - std::floor(phase);
         switch (shape)
         {
-            case kTriangle: return static_cast<float>(4.0 * std::abs(p - 0.5) - 1.0);
-            case kSine:     return std::sin(static_cast<float>(6.28318530717958647692 * p));
-            case kSawUp:    return static_cast<float>(2.0 * p - 1.0);
-            case kSawDown:  return static_cast<float>(1.0 - 2.0 * p);
-            case kRamp:     return static_cast<float>(1.0 - 4.0 * std::abs(p - 0.5));
-            case kSquare:   return (p < 0.5) ? 1.0f : -1.0f;
-            case kRandom:   return fastRand() * 2.0f - 1.0f;
-            default:        return std::sin(static_cast<float>(6.28318530717958647692 * p));
+            case kTriangle:
+                return static_cast<float>(4.0 * std::abs(p - 0.5) - 1.0);
+            case kSine:
+                return std::sin(static_cast<float>(6.28318530717958647692 * p));
+            case kSawUp:
+                return static_cast<float>(2.0 * p - 1.0);
+            case kSawDown:
+                return static_cast<float>(1.0 - 2.0 * p);
+            case kRamp:
+                return static_cast<float>(1.0 - 4.0 * std::abs(p - 0.5));
+            case kSquare:
+                return (p < 0.5) ? 1.0f : -1.0f;
+            case kRandom:
+                return fastRand() * 2.0f - 1.0f;
+            default:
+                return std::sin(static_cast<float>(6.28318530717958647692 * p));
         }
     }
 
     void updateCoefficients(float freqHz) noexcept
     {
-        const float wd = static_cast<float>(6.28318530717958647692 * freqHz / sampleRate_);
-        gCoeff_ = std::min(std::tan(wd * 0.5f), 1.9f);
+        const float wd      = static_cast<float>(6.28318530717958647692 * freqHz / sampleRate_);
+        gCoeff_             = std::min(std::tan(wd * 0.5f), 1.9f);
         const float damping = 1.0f - reso_ * 0.95f;
-        rCoeff_ = std::min(1.0f / std::max(damping, 0.01f), 4.0f);
-        driveGain_ = 1.0f + drive_ * 5.0f;
+        rCoeff_             = std::min(1.0f / std::max(damping, 0.01f), 4.0f);
+        driveGain_          = 1.0f + drive_ * 5.0f;
     }
 
     inline void processSvfChannel(float in, float& low, float& band, float& high) noexcept
     {
         high = in - low - rCoeff_ * band;
         band = band + gCoeff_ * high;
-        low = low + gCoeff_ * band;
+        low  = low + gCoeff_ * band;
 
         band = std::tanh(band);
-        low = std::tanh(low);
+        low  = std::tanh(low);
 
         if (fourPole_)
         {
-            const float low2 = low + gCoeff_ * (band - low);
+            const float low2    = low + gCoeff_ * (band - low);
             const float low2Sat = std::tanh(low2);
-            band = std::tanh(band + gCoeff_ * (low2Sat - band));
-            low = low2Sat;
+            band                = std::tanh(band + gCoeff_ * (low2Sat - band));
+            low                 = low2Sat;
         }
     }
 
-    double sampleRate_ = 44100.0;
-    float speed_ = 0.3f;
-    float depth_ = 0.5f;
-    float reso_ = 0.2f;
-    float baseFreq_ = 0.5f;
-    int filterType_ = 0;
-    int waveShape_ = 0;
-    int fourPole_ = 0;
-    float envMod_ = 0.0f;
-    float drive_ = 0.0f;
-    float attackParam_ = 0.02f;
+    double sampleRate_  = 44100.0;
+    float speed_        = 0.3f;
+    float depth_        = 0.5f;
+    float reso_         = 0.2f;
+    float baseFreq_     = 0.5f;
+    int filterType_     = 0;
+    int waveShape_      = 0;
+    int fourPole_       = 0;
+    float envMod_       = 0.0f;
+    float drive_        = 0.0f;
+    float attackParam_  = 0.02f;
     float releaseParam_ = 0.002f;
 
     // Estado del LFO
     double lfoPhase_ = 0.0;
-    double lfoInc_ = 0.0;
-    float lfoValue_ = 0.0f;
+    double lfoInc_   = 0.0;
+    float lfoValue_  = 0.0f;
 
     // Coeficientes y ganancia
-    float gCoeff_ = 0.0f;
-    float rCoeff_ = 0.0f;
+    float gCoeff_    = 0.0f;
+    float rCoeff_    = 0.0f;
     float driveGain_ = 1.0f;
 
     // Estado del seguidor de envolvente
-    float envStateL_ = 0.0f;
-    float envStateR_ = 0.0f;
-    float envAttack_ = 0.01f;
+    float envStateL_  = 0.0f;
+    float envStateR_  = 0.0f;
+    float envAttack_  = 0.01f;
     float envRelease_ = 0.001f;
 
     // Variables de estado del filtro

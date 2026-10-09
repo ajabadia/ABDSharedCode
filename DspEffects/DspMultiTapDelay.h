@@ -47,10 +47,10 @@ public:
     explicit DspMultiTapDelay(int numTaps = 3)
         : numTaps_(numTaps)
     {
-        taps_[0] = { 1.0f, 0.7f, 0.0f };
-        taps_[1] = { 0.5f, 0.5f, -0.5f };
-        taps_[2] = { 0.75f, 0.5f, 0.5f };
-        taps_[3] = { 1.5f, 0.3f, 0.0f };
+        taps_[0] = {1.0f, 0.7f, 0.0f};
+        taps_[1] = {0.5f, 0.5f, -0.5f};
+        taps_[2] = {0.75f, 0.5f, 0.5f};
+        taps_[3] = {1.5f, 0.3f, 0.0f};
         reset();
     }
 
@@ -64,7 +64,7 @@ public:
     void prepare(double sampleRate)
     {
         sampleRate_ = (sampleRate > 1000.0) ? sampleRate : 44100.0;
-        
+
         // Máximo 4.6 segundos (1.5s * factor 3.0 + margen)
         const int maxDelaySamples = static_cast<int>(sampleRate_ * 4.6) + 1024;
         delayBufL_.assign(static_cast<size_t>(maxDelaySamples), 0.0f);
@@ -84,23 +84,33 @@ public:
     {
         switch (index)
         {
-            case 0: return 0.25f;
-            case 1: return 0.375f;
-            case 2: return 0.5f;
-            case 3: return 0.6667f;
-            case 4: return 1.0f;
-            case 5: return 1.3333f;
-            case 6: return 1.5f;
-            case 7: return 2.0f;
-            case 8: return 3.0f;
-            default: return 1.0f;
+            case 0:
+                return 0.25f;
+            case 1:
+                return 0.375f;
+            case 2:
+                return 0.5f;
+            case 3:
+                return 0.6667f;
+            case 4:
+                return 1.0f;
+            case 5:
+                return 1.3333f;
+            case 6:
+                return 1.5f;
+            case 7:
+                return 2.0f;
+            case 8:
+                return 3.0f;
+            default:
+                return 1.0f;
         }
     }
 
     void setMasterTimeNorm(float norm) noexcept { masterTime_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setFeedbackNorm(float norm) noexcept   { feedback_   = std::clamp(norm, 0.0f, 1.0f); }
-    void setXFeed(bool enabled) noexcept        { xFeed_      = enabled; }
-    void setMixNorm(float norm) noexcept        { mix_        = std::clamp(norm, 0.0f, 1.0f); }
+    void setFeedbackNorm(float norm) noexcept { feedback_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setXFeed(bool enabled) noexcept { xFeed_ = enabled; }
+    void setMixNorm(float norm) noexcept { mix_ = std::clamp(norm, 0.0f, 1.0f); }
     void setSpreadNorm(float norm) noexcept
     {
         spread_ = std::clamp(norm, 0.0f, 1.0f);
@@ -136,38 +146,88 @@ public:
         {
             switch (index)
             {
-                case 0:  masterTime_ = val; break;
-                case 1:  taps_[0].gain = val; break;
-                case 2:  taps_[0].pan = (val - 0.5f) * 2.0f; break;
-                case 3:  feedback_ = val; break;
-                case 4:  taps_[1].factor = getFactorFromIndex(static_cast<int>(val * 8.9f)); break;
-                case 5:  taps_[1].gain = val; break;
-                case 6:  taps_[1].pan = (val - 0.5f) * 2.0f; break;
-                case 7:  taps_[2].factor = getFactorFromIndex(static_cast<int>(val * 8.9f)); break;
-                case 8:  taps_[2].gain = val; break;
-                case 9:  taps_[2].pan = (val - 0.5f) * 2.0f; break;
-                case 10: xFeed_ = (val > 0.5f); break;
-                case 11: mix_ = val; break;
-                default: break;
+                case 0:
+                    masterTime_ = val;
+                    break;
+                case 1:
+                    taps_[0].gain = val;
+                    break;
+                case 2:
+                    taps_[0].pan = (val - 0.5f) * 2.0f;
+                    break;
+                case 3:
+                    feedback_ = val;
+                    break;
+                case 4:
+                    taps_[1].factor = getFactorFromIndex(static_cast<int>(val * 8.9f));
+                    break;
+                case 5:
+                    taps_[1].gain = val;
+                    break;
+                case 6:
+                    taps_[1].pan = (val - 0.5f) * 2.0f;
+                    break;
+                case 7:
+                    taps_[2].factor = getFactorFromIndex(static_cast<int>(val * 8.9f));
+                    break;
+                case 8:
+                    taps_[2].gain = val;
+                    break;
+                case 9:
+                    taps_[2].pan = (val - 0.5f) * 2.0f;
+                    break;
+                case 10:
+                    xFeed_ = (val > 0.5f);
+                    break;
+                case 11:
+                    mix_ = val;
+                    break;
+                default:
+                    break;
             }
         }
         else // 4-Tap
         {
             switch (index)
             {
-                case 0:  masterTime_ = val; break;
-                case 1:  taps_[0].gain = val; break;
-                case 2:  feedback_ = val; break;
-                case 3:  setSpreadNorm(val); break;
-                case 4:  taps_[1].factor = getFactorFromIndex(static_cast<int>(val * 8.9f)); break;
-                case 5:  taps_[1].gain = val; break;
-                case 6:  taps_[2].factor = getFactorFromIndex(static_cast<int>(val * 8.9f)); break;
-                case 7:  taps_[2].gain = val; break;
-                case 8:  taps_[3].factor = getFactorFromIndex(static_cast<int>(val * 8.9f)); break;
-                case 9:  taps_[3].gain = val; break;
-                case 10: xFeed_ = (val > 0.5f); break;
-                case 11: mix_ = val; break;
-                default: break;
+                case 0:
+                    masterTime_ = val;
+                    break;
+                case 1:
+                    taps_[0].gain = val;
+                    break;
+                case 2:
+                    feedback_ = val;
+                    break;
+                case 3:
+                    setSpreadNorm(val);
+                    break;
+                case 4:
+                    taps_[1].factor = getFactorFromIndex(static_cast<int>(val * 8.9f));
+                    break;
+                case 5:
+                    taps_[1].gain = val;
+                    break;
+                case 6:
+                    taps_[2].factor = getFactorFromIndex(static_cast<int>(val * 8.9f));
+                    break;
+                case 7:
+                    taps_[2].gain = val;
+                    break;
+                case 8:
+                    taps_[3].factor = getFactorFromIndex(static_cast<int>(val * 8.9f));
+                    break;
+                case 9:
+                    taps_[3].gain = val;
+                    break;
+                case 10:
+                    xFeed_ = (val > 0.5f);
+                    break;
+                case 11:
+                    mix_ = val;
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -182,9 +242,9 @@ public:
         float* dL = delayBufL_.data();
         float* dR = delayBufR_.data();
 
-        const float baseTimeMs = 1.0f + masterTime_ * 1499.0f;
+        const float baseTimeMs       = 1.0f + masterTime_ * 1499.0f;
         const float baseDelaySamples = static_cast<float>(sampleRate_ * 0.001f * baseTimeMs);
-        const int activeTaps = (numTaps_ == 3) ? 3 : 4;
+        const int activeTaps         = (numTaps_ == 3) ? 3 : 4;
 
         for (int s = 0; s < numSamples; ++s)
         {
@@ -197,21 +257,21 @@ public:
             for (int t = 0; t < activeTaps; ++t)
             {
                 const float delaySamples = baseDelaySamples * taps_[t].factor;
-                float readPos = static_cast<float>(writePos_) - delaySamples;
+                float readPos            = static_cast<float>(writePos_) - delaySamples;
 
                 while (readPos < 0.0f) readPos += static_cast<float>(maxDelaySamples);
                 while (readPos >= static_cast<float>(maxDelaySamples)) readPos -= static_cast<float>(maxDelaySamples);
 
-                const int idx = static_cast<int>(readPos);
+                const int idx     = static_cast<int>(readPos);
                 const int nextIdx = (idx + 1) % maxDelaySamples;
-                const float frac = readPos - static_cast<float>(idx);
+                const float frac  = readPos - static_cast<float>(idx);
 
                 const float tapValL = dL[idx] * (1.0f - frac) + dL[nextIdx] * frac;
                 const float tapValR = dR[idx] * (1.0f - frac) + dR[nextIdx] * frac;
 
                 const float panVal = taps_[t].pan;
-                const float gainL = std::clamp(1.0f - panVal, 0.0f, 1.0f) * taps_[t].gain;
-                const float gainR = std::clamp(1.0f + panVal, 0.0f, 1.0f) * taps_[t].gain;
+                const float gainL  = std::clamp(1.0f - panVal, 0.0f, 1.0f) * taps_[t].gain;
+                const float gainR  = std::clamp(1.0f + panVal, 0.0f, 1.0f) * taps_[t].gain;
 
                 accumL += tapValL * gainL;
                 accumR += tapValR * gainR;
@@ -225,11 +285,11 @@ public:
             float lastTapR = 0.0f;
             {
                 const float delaySamples = baseDelaySamples * taps_[activeTaps - 1].factor;
-                float readPos = static_cast<float>(writePos_) - delaySamples;
+                float readPos            = static_cast<float>(writePos_) - delaySamples;
                 if (readPos < 0.0f) readPos += static_cast<float>(maxDelaySamples);
                 const int idx = static_cast<int>(readPos) % maxDelaySamples;
-                lastTapL = dL[idx];
-                lastTapR = dR[idx];
+                lastTapL      = dL[idx];
+                lastTapR      = dR[idx];
             }
 
             if (xFeed_)
@@ -254,11 +314,11 @@ public:
     }
 
 private:
-    int numTaps_ = 3;
+    int numTaps_       = 3;
     double sampleRate_ = 44100.0;
     float masterTime_  = 0.3f;
     float feedback_    = 0.3f;
-    bool  xFeed_       = false;
+    bool xFeed_        = false;
     float mix_         = 0.5f;
     float spread_      = 0.5f;
 

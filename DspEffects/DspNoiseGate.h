@@ -41,9 +41,9 @@ class DspNoiseGate
 public:
     enum Mode
     {
-        kGate = 0,
+        kGate      = 0,
         kTransient = 1,
-        kDucker = 2
+        kDucker    = 2
     };
 
     DspNoiseGate() noexcept
@@ -78,21 +78,21 @@ public:
     void setAttackNorm(float norm) noexcept
     {
         const float v = std::clamp(norm, 0.0f, 1.0f);
-        attackMs_ = 0.5f + 19.5f * v;
+        attackMs_     = 0.5f + 19.5f * v;
         updateTimeCoeffs();
     }
 
     void setReleaseNorm(float norm) noexcept
     {
         const float v = std::clamp(norm, 0.0f, 1.0f);
-        releaseMs_ = 2.0f + 1998.0f * v;
+        releaseMs_    = 2.0f + 1998.0f * v;
         updateTimeCoeffs();
     }
 
     void setHoldNorm(float norm) noexcept
     {
         const float v = std::clamp(norm, 0.0f, 1.0f);
-        holdMs_ = 2.0f + 1998.0f * v;
+        holdMs_       = 2.0f + 1998.0f * v;
         updateTimeCoeffs();
     }
 
@@ -131,8 +131,8 @@ public:
 
         for (int s = 0; s < numSamples; ++s)
         {
-            const float l = inL[s];
-            const float r = inR[s];
+            const float l    = inL[s];
+            const float r    = inR[s];
             const float absL = std::abs(l);
             const float absR = std::abs(r);
 
@@ -161,8 +161,8 @@ public:
             {
                 const float duckGainL = 1.0f - gainL_ * (1.0f - rangeLin);
                 const float duckGainR = 1.0f - gainR_ * (1.0f - rangeLin);
-                outL_s = l * duckGainL;
-                outR_s = r * duckGainR;
+                outL_s                = l * duckGainL;
+                outR_s                = r * duckGainR;
             }
 
             outL[s] = outL_s;
@@ -173,8 +173,8 @@ public:
 private:
     void updateTimeCoeffs() noexcept
     {
-        atkCoeff_ = 1.0f - std::exp(-1.0f / static_cast<float>(sampleRate_ * attackMs_ / 1000.0f));
-        relCoeff_ = 1.0f - std::exp(-1.0f / static_cast<float>(sampleRate_ * releaseMs_ / 1000.0f));
+        atkCoeff_    = 1.0f - std::exp(-1.0f / static_cast<float>(sampleRate_ * attackMs_ / 1000.0f));
+        relCoeff_    = 1.0f - std::exp(-1.0f / static_cast<float>(sampleRate_ * releaseMs_ / 1000.0f));
         holdSamples_ = static_cast<float>(sampleRate_ * holdMs_ / 1000.0f);
     }
 
@@ -204,14 +204,14 @@ private:
     }
 
     double sampleRate_ = 44100.0;
-    float threshold_ = 0.5f;
-    float range_ = 0.5f;
-    float attackMs_ = 1.0f;
-    float releaseMs_ = 100.0f;
-    float holdMs_ = 50.0f;
-    float punch_ = 0.5f;
-    int gateMode_ = kGate;
-    bool power_ = true;
+    float threshold_   = 0.5f;
+    float range_       = 0.5f;
+    float attackMs_    = 1.0f;
+    float releaseMs_   = 100.0f;
+    float holdMs_      = 50.0f;
+    float punch_       = 0.5f;
+    int gateMode_      = kGate;
+    bool power_        = true;
 
     float envL_ = 0.0f, envR_ = 0.0f;
     float gainL_ = 1.0f, gainR_ = 1.0f;

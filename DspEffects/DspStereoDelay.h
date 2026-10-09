@@ -44,9 +44,9 @@ class DspStereoDelay
 public:
     enum RoutingMode
     {
-        kStereo = 0,
-        kCross = 1,
-        kMono = 2,
+        kStereo   = 0,
+        kCross    = 1,
+        kMono     = 2,
         kPingPong = 3
     };
 
@@ -58,7 +58,7 @@ public:
     void prepare(double sampleRate)
     {
         sampleRate_ = (sampleRate > 1000.0) ? sampleRate : 44100.0;
-        
+
         // Capacidad máxima de 2.2 segundos para cubrir márgenes y offset
         const int maxSamples = static_cast<int>(sampleRate_ * 2.2) + 1024;
         delayBufL_.assign(static_cast<size_t>(maxSamples), 0.0f);
@@ -81,15 +81,35 @@ public:
         lpfStateR_ = 0.0f;
     }
 
-    void setTimeNorm(float norm) noexcept     { timeParam_ = std::clamp(norm, 0.0f, 1.0f); updateDelaySamples(); }
-    void setMode(int mode) noexcept           { mode_ = std::clamp(mode, 0, 3); }
-    void setModeNorm(float norm) noexcept     { mode_ = std::clamp(static_cast<int>(norm * 3.99f), 0, 3); }
-    void setFactorLNorm(float norm) noexcept  { factorL_ = std::clamp(norm, 0.0f, 1.0f); updateDelaySamples(); }
-    void setFactorRNorm(float norm) noexcept  { factorR_ = std::clamp(norm, 0.0f, 1.0f); updateDelaySamples(); }
-    void setOffsetNorm(float norm) noexcept   { offsetParam_ = std::clamp(norm, 0.0f, 1.0f); updateDelaySamples(); }
-    void setFeedbackLNorm(float norm) noexcept{ feedbackL_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setFeedbackRNorm(float norm) noexcept{ feedbackR_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setHiCutNorm(float norm) noexcept    { lpfCutoff_ = std::clamp(norm, 0.0f, 1.0f); updateLPFCoeff(); }
+    void setTimeNorm(float norm) noexcept
+    {
+        timeParam_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelaySamples();
+    }
+    void setMode(int mode) noexcept { mode_ = std::clamp(mode, 0, 3); }
+    void setModeNorm(float norm) noexcept { mode_ = std::clamp(static_cast<int>(norm * 3.99f), 0, 3); }
+    void setFactorLNorm(float norm) noexcept
+    {
+        factorL_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelaySamples();
+    }
+    void setFactorRNorm(float norm) noexcept
+    {
+        factorR_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelaySamples();
+    }
+    void setOffsetNorm(float norm) noexcept
+    {
+        offsetParam_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelaySamples();
+    }
+    void setFeedbackLNorm(float norm) noexcept { feedbackL_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setFeedbackRNorm(float norm) noexcept { feedbackR_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setHiCutNorm(float norm) noexcept
+    {
+        lpfCutoff_ = std::clamp(norm, 0.0f, 1.0f);
+        updateLPFCoeff();
+    }
 
     void process(const float* inL, const float* inR,
                  float* outL, float* outR,
@@ -134,9 +154,9 @@ public:
                 case kMono: // Mezcla mono
                 {
                     const float mono = (lpfStateL_ + lpfStateR_) * 0.5f;
-                    const float fb = (fbL + fbR) * 0.5f;
-                    writeL = dryL + mono * fb;
-                    writeR = dryR + mono * fb;
+                    const float fb   = (fbL + fbR) * 0.5f;
+                    writeL           = dryL + mono * fb;
+                    writeR           = dryR + mono * fb;
                     break;
                 }
                 case kPingPong: // Ping-Pong
@@ -165,19 +185,19 @@ public:
 private:
     static float factorToScale(float normalized) noexcept
     {
-        static constexpr float scales[] = { 0.25f, 0.375f, 0.5f, 0.6667f, 1.0f, 1.3333f, 1.5f, 2.0f, 3.0f };
-        const int idx = std::clamp(static_cast<int>(normalized * 8.99f), 0, 8);
+        static constexpr float scales[] = {0.25f, 0.375f, 0.5f, 0.6667f, 1.0f, 1.3333f, 1.5f, 2.0f, 3.0f};
+        const int idx                   = std::clamp(static_cast<int>(normalized * 8.99f), 0, 8);
         return scales[idx];
     }
 
     void updateDelaySamples() noexcept
     {
         const float masterMs = 1.0f + 1999.0f * (timeParam_ * timeParam_);
-        float leftMs = masterMs * factorToScale(factorL_);
+        float leftMs         = masterMs * factorToScale(factorL_);
         const float offsetMs = (offsetParam_ - 0.5f) * 200.0f;
-        float rightMs = masterMs * factorToScale(factorR_) + offsetMs;
+        float rightMs        = masterMs * factorToScale(factorR_) + offsetMs;
 
-        leftMs = std::clamp(leftMs, 1.0f, 2000.0f);
+        leftMs  = std::clamp(leftMs, 1.0f, 2000.0f);
         rightMs = std::clamp(rightMs, 1.0f, 2000.0f);
 
         delaySamplesL_ = std::max(1, static_cast<int>(sampleRate_ * leftMs * 0.001));
@@ -187,13 +207,13 @@ private:
     void updateLPFCoeff() noexcept
     {
         float freqHz = 200.0f * std::pow(100.0f, lpfCutoff_);
-        freqHz = std::min(freqHz, static_cast<float>(sampleRate_ * 0.45));
-        lpfCoeff_ = static_cast<float>(std::exp(-6.28318530717958647692 * freqHz / sampleRate_));
+        freqHz       = std::min(freqHz, static_cast<float>(sampleRate_ * 0.45));
+        lpfCoeff_    = static_cast<float>(std::exp(-6.28318530717958647692 * freqHz / sampleRate_));
     }
 
     double sampleRate_ = 44100.0;
     float timeParam_   = 0.5f;
-    int   mode_        = kStereo;
+    int mode_          = kStereo;
     float factorL_     = 0.5f;
     float factorR_     = 0.5f;
     float offsetParam_ = 0.5f;

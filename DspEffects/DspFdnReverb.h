@@ -37,7 +37,7 @@ namespace abd::dsp
 class DspFdnReverb
 {
 public:
-    static constexpr int kNumDelays = 8;
+    static constexpr int kNumDelays    = 8;
     static constexpr int kNumAllpasses = 4;
 
     DspFdnReverb()
@@ -48,16 +48,16 @@ public:
     void prepare(double sampleRate)
     {
         sampleRate_ = (sampleRate > 1000.0) ? sampleRate : 44100.0;
-        
+
         // Asignación máxima previa para garantizar 100% RT-Safety
-        constexpr int baseLens[8] = { 1433, 1789, 2053, 2591, 3169, 3793, 4201, 4877 };
+        constexpr int baseLens[8] = {1433, 1789, 2053, 2591, 3169, 3793, 4201, 4877};
         for (int i = 0; i < kNumDelays; ++i)
         {
             const int maxLen = static_cast<int>(baseLens[i] * 1.2f) + 256;
             delayBuffers_[i].assign(static_cast<size_t>(maxLen), 0.0f);
         }
 
-        constexpr int apLens[4] = { 347, 613, 919, 1201 };
+        constexpr int apLens[4] = {347, 613, 919, 1201};
         for (int i = 0; i < kNumAllpasses; ++i)
         {
             const int maxLen = static_cast<int>(apLens[i] * 1.2f) + 128;
@@ -73,7 +73,7 @@ public:
         for (int i = 0; i < kNumDelays; ++i)
         {
             std::fill(delayBuffers_[i].begin(), delayBuffers_[i].end(), 0.0f);
-            writePos_[i] = 0;
+            writePos_[i]     = 0;
             dampingState_[i] = 0.0f;
         }
         for (int i = 0; i < kNumAllpasses; ++i)
@@ -83,23 +83,42 @@ public:
         }
     }
 
-    void setSizeNorm(float norm) noexcept      { sizeParam_ = std::clamp(norm, 0.0f, 1.0f); updateDelayLengths(); }
-    void setDecayNorm(float norm) noexcept     { decayParam_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setDiffusionNorm(float norm) noexcept { diffusionParam_ = std::clamp(norm, 0.0f, 1.0f); updateDelayLengths(); }
-    void setDampingNorm(float norm) noexcept   { dampingParam_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setMixNorm(float norm) noexcept       { mix_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setSizeNorm(float norm) noexcept
+    {
+        sizeParam_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelayLengths();
+    }
+    void setDecayNorm(float norm) noexcept { decayParam_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setDiffusionNorm(float norm) noexcept
+    {
+        diffusionParam_ = std::clamp(norm, 0.0f, 1.0f);
+        updateDelayLengths();
+    }
+    void setDampingNorm(float norm) noexcept { dampingParam_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setMixNorm(float norm) noexcept { mix_ = std::clamp(norm, 0.0f, 1.0f); }
 
     void setParameter(int index, float value) noexcept
     {
         const float val = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: setSizeNorm(val); break;
-            case 1: setDecayNorm(val); break;
-            case 2: setDiffusionNorm(val); break;
-            case 3: setDampingNorm(val); break;
-            case 4: setMixNorm(val); break;
-            default: break;
+            case 0:
+                setSizeNorm(val);
+                break;
+            case 1:
+                setDecayNorm(val);
+                break;
+            case 2:
+                setDiffusionNorm(val);
+                break;
+            case 3:
+                setDampingNorm(val);
+                break;
+            case 4:
+                setMixNorm(val);
+                break;
+            default:
+                break;
         }
     }
 
@@ -107,20 +126,20 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float fb = decayParam_ * 0.85f;
+        const float fb        = decayParam_ * 0.85f;
         const float dampCoeff = 0.1f + dampingParam_ * 0.8f;
 
         for (int s = 0; s < numSamples; ++s)
         {
-            const float xL = inL[s];
-            const float xR = inR[s];
+            const float xL    = inL[s];
+            const float xR    = inR[s];
             const float input = (xL + xR) * 0.5f;
 
             // Escritura en las líneas de retardo
             for (int d = 0; d < kNumDelays; ++d)
             {
                 const float inSample = (d < 2) ? input * (d == 0 ? xL : xR) : input;
-                const int wPos = writePos_[d];
+                const int wPos       = writePos_[d];
                 if (wPos < static_cast<int>(delayBuffers_[d].size()))
                     delayBuffers_[d][wPos] += inSample * 0.3f;
             }
@@ -136,7 +155,7 @@ public:
                     continue;
                 }
                 const int readPos = (writePos_[d] - curSize / 2 + curSize * 2) % curSize;
-                float samp = delayBuffers_[d][readPos];
+                float samp        = delayBuffers_[d][readPos];
 
                 dampingState_[d] += dampCoeff * (samp - dampingState_[d]);
                 delayOut[d] = dampingState_[d];
@@ -157,7 +176,7 @@ public:
                 const int curSize = delaySizes_[d];
                 if (curSize <= 0) continue;
                 delayBuffers_[d][writePos_[d]] = matrixOut[d] * fb;
-                writePos_[d] = (writePos_[d] + 1) % curSize;
+                writePos_[d]                   = (writePos_[d] + 1) % curSize;
             }
 
             // Difusión Allpass
@@ -166,24 +185,24 @@ public:
             {
                 const int apSize = apSizes_[a];
                 if (apSize <= 0) continue;
-                const int readPos = (apWritePos_[a] - apSize / 2 + apSize * 2) % apSize;
-                const float apOut = apBuffers_[a][readPos];
+                const int readPos             = (apWritePos_[a] - apSize / 2 + apSize * 2) % apSize;
+                const float apOut             = apBuffers_[a][readPos];
                 apBuffers_[a][apWritePos_[a]] = diff + apGains_[a] * apOut;
-                diff = -apGains_[a] * diff + apOut;
-                apWritePos_[a] = (apWritePos_[a] + 1) % apSize;
+                diff                          = -apGains_[a] * diff + apOut;
+                apWritePos_[a]                = (apWritePos_[a] + 1) % apSize;
             }
 
             const float wet = diff * 0.5f;
-            outL[s] = xL * (1.0f - mix_) + wet * mix_;
-            outR[s] = xR * (1.0f - mix_) + wet * mix_;
+            outL[s]         = xL * (1.0f - mix_) + wet * mix_;
+            outR[s]         = xR * (1.0f - mix_) + wet * mix_;
         }
     }
 
 private:
     void updateDelayLengths() noexcept
     {
-        constexpr int baseLens[8] = { 1433, 1789, 2053, 2591, 3169, 3793, 4201, 4877 };
-        const float scale = 0.3f + sizeParam_ * 0.7f;
+        constexpr int baseLens[8] = {1433, 1789, 2053, 2591, 3169, 3793, 4201, 4877};
+        const float scale         = 0.3f + sizeParam_ * 0.7f;
         for (int i = 0; i < kNumDelays; ++i)
         {
             int size = static_cast<int>(baseLens[i] * scale);
@@ -193,7 +212,7 @@ private:
             delaySizes_[i] = size;
         }
 
-        constexpr int apLens[4] = { 347, 613, 919, 1201 };
+        constexpr int apLens[4] = {347, 613, 919, 1201};
         for (int i = 0; i < kNumAllpasses; ++i)
         {
             int size = static_cast<int>(apLens[i] * (0.5f + sizeParam_ * 0.5f));
@@ -205,7 +224,7 @@ private:
         }
     }
 
-    double sampleRate_ = 44100.0;
+    double sampleRate_    = 44100.0;
     float sizeParam_      = 0.5f;
     float decayParam_     = 0.5f;
     float diffusionParam_ = 0.5f;
@@ -213,14 +232,14 @@ private:
     float mix_            = 0.4f;
 
     std::vector<float> delayBuffers_[kNumDelays];
-    int delaySizes_[kNumDelays] = {};
-    int writePos_[kNumDelays]   = {};
+    int delaySizes_[kNumDelays]     = {};
+    int writePos_[kNumDelays]       = {};
     float dampingState_[kNumDelays] = {};
 
     std::vector<float> apBuffers_[kNumAllpasses];
-    int apSizes_[kNumAllpasses]     = {};
-    int apWritePos_[kNumAllpasses]  = {};
-    float apGains_[kNumAllpasses]   = {};
+    int apSizes_[kNumAllpasses]    = {};
+    int apWritePos_[kNumAllpasses] = {};
+    float apGains_[kNumAllpasses]  = {};
 };
 
 } // namespace abd::dsp

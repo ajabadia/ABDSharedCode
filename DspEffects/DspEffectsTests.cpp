@@ -57,11 +57,49 @@
 
 #include "DspCore/DspCore.h"
 #include "DspEffects/CascadeShelfEq.h"
+#include "DspEffects/DspAnalogTapeDelay.h"
+#include "DspEffects/DspAutoPan.h"
+#include "DspEffects/DspBonsai.h"
 #include "DspEffects/DspChorus.h"
+#include "DspEffects/DspChorusD.h"
+#include "DspEffects/DspCombulator.h"
+#include "DspEffects/DspDecimDelay.h"
 #include "DspEffects/DspDelay.h"
+#include "DspEffects/DspDuckingDelay.h"
+#include "DspEffects/DspEdison.h"
+#include "DspEffects/DspEnhancer.h"
+#include "DspEffects/DspFairComp.h"
+#include "DspEffects/DspFdnReverb.h"
+#include "DspEffects/DspFlanger.h"
+#include "DspEffects/DspFrequencyShifter.h"
+#include "DspEffects/DspGranularDelay.h"
+#include "DspEffects/DspMidasEQ.h"
+#include "DspEffects/DspModDelayRev.h"
+#include "DspEffects/DspMoodFilter.h"
+#include "DspEffects/DspMultiBandDist.h"
+#include "DspEffects/DspMultiTapDelay.h"
+#include "DspEffects/DspNimbus.h"
+#include "DspEffects/DspNoiseGate.h"
+#include "DspEffects/DspOversamplingDistortion.h"
+#include "DspEffects/DspPatternFreeze.h"
+#include "DspEffects/DspPhaser.h"
+#include "DspEffects/DspPitchShifter.h"
+#include "DspEffects/DspRackAmp.h"
+#include "DspEffects/DspResonator.h"
 #include "DspEffects/DspReverb.h"
+#include "DspEffects/DspRotarySpeaker.h"
 #include "DspEffects/DspSaturation.h"
 #include "DspEffects/DspSchroederReverb.h"
+#include "DspEffects/DspShimmerDelay.h"
+#include "DspEffects/DspSolinaEnsemble.h"
+#include "DspEffects/DspSpectralDelay.h"
+#include "DspEffects/DspStereoChorus.h"
+#include "DspEffects/DspStereoDelay.h"
+#include "DspEffects/DspTapeDelay.h"
+#include "DspEffects/DspTreemonster.h"
+#include "DspEffects/DspVocoder.h"
+#include "DspEffects/DspWaveShaper.h"
+#include "DspEffects/DspZitaReverb.h"
 #include "DspEffects/EffectPolicy.h"
 #include "DspEffects/FxDefaultCatalogue.h"
 #include "DspEffects/FxEngine.h"
@@ -77,44 +115,6 @@
 #include "DspEffects/profiles/MS2000EqProfile.h"
 #include "DspEffects/profiles/Re201Profile.h"
 #include "DspEffects/profiles/ReverbProfile.h"
-#include "DspEffects/DspPhaser.h"
-#include "DspEffects/DspMoodFilter.h"
-#include "DspEffects/DspSolinaEnsemble.h"
-#include "DspEffects/DspVocoder.h"
-#include "DspEffects/DspFairComp.h"
-#include "DspEffects/DspNoiseGate.h"
-#include "DspEffects/DspWaveShaper.h"
-#include "DspEffects/DspOversamplingDistortion.h"
-#include "DspEffects/DspMultiBandDist.h"
-#include "DspEffects/DspRackAmp.h"
-#include "DspEffects/DspMidasEQ.h"
-#include "DspEffects/DspStereoChorus.h"
-#include "DspEffects/DspChorusD.h"
-#include "DspEffects/DspFlanger.h"
-#include "DspEffects/DspAutoPan.h"
-#include "DspEffects/DspRotarySpeaker.h"
-#include "DspEffects/DspStereoDelay.h"
-#include "DspEffects/DspMultiTapDelay.h"
-#include "DspEffects/DspTapeDelay.h"
-#include "DspEffects/DspAnalogTapeDelay.h"
-#include "DspEffects/DspDuckingDelay.h"
-#include "DspEffects/DspDecimDelay.h"
-#include "DspEffects/DspModDelayRev.h"
-#include "DspEffects/DspShimmerDelay.h"
-#include "DspEffects/DspFdnReverb.h"
-#include "DspEffects/DspZitaReverb.h"
-#include "DspEffects/DspPitchShifter.h"
-#include "DspEffects/DspFrequencyShifter.h"
-#include "DspEffects/DspEdison.h"
-#include "DspEffects/DspEnhancer.h"
-#include "DspEffects/DspResonator.h"
-#include "DspEffects/DspCombulator.h"
-#include "DspEffects/DspGranularDelay.h"
-#include "DspEffects/DspPatternFreeze.h"
-#include "DspEffects/DspSpectralDelay.h"
-#include "DspEffects/DspNimbus.h"
-#include "DspEffects/DspBonsai.h"
-#include "DspEffects/DspTreemonster.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6116,8 +6116,8 @@ int main()
         phaser.setFeedbackNorm(0.4f);
         phaser.setStageCount(6);
 
-        float inL[64] = { 1.0f };
-        float inR[64] = { 1.0f };
+        float inL[64]  = {1.0f};
+        float inR[64]  = {1.0f};
         float outL[64] = {};
         float outR[64] = {};
         phaser.process(inL, inR, outL, outR, 64);
@@ -6156,8 +6156,8 @@ int main()
         vocoder.setBandCount(16);
         vocoder.setFormantShift(1.0f);
 
-        float modL[64] = { 0.5f };
-        float carL[64] = { 0.5f };
+        float modL[64] = {0.5f};
+        float carL[64] = {0.5f};
         std::fill(std::begin(outL), std::end(outL), 0.0f);
         std::fill(std::begin(outR), std::end(outR), 0.0f);
         vocoder.process(modL, modL, carL, carL, outL, outR, 64);
@@ -6366,10 +6366,10 @@ int main()
 
     // Fase 6A: Reverbs FDN/Zita y Pitch/Frequency Shifters
     {
-        const float inL[64] = { 0.5f, -0.3f, 0.2f, -0.1f };
-        const float inR[64] = { -0.4f, 0.25f, -0.15f, 0.35f };
-        float outL[64] = {};
-        float outR[64] = {};
+        const float inL[64] = {0.5f, -0.3f, 0.2f, -0.1f};
+        const float inR[64] = {-0.4f, 0.25f, -0.15f, 0.35f};
+        float outL[64]      = {};
+        float outR[64]      = {};
 
         // 1. DspFdnReverb
         abd::dsp::DspFdnReverb fdn;
@@ -6414,10 +6414,10 @@ int main()
 
     // Fase 6B: Procesadores M/S, Excitador y Resonadores
     {
-        const float inL[64] = { 0.5f, -0.3f, 0.2f, -0.1f };
-        const float inR[64] = { -0.4f, 0.25f, -0.15f, 0.35f };
-        float outL[64] = {};
-        float outR[64] = {};
+        const float inL[64] = {0.5f, -0.3f, 0.2f, -0.1f};
+        const float inR[64] = {-0.4f, 0.25f, -0.15f, 0.35f};
+        float outL[64]      = {};
+        float outR[64]      = {};
 
         // 1. DspEdison
         abd::dsp::DspEdison edison;
@@ -6460,10 +6460,10 @@ int main()
 
     // Fase 6C: Procesadores Granulares, Congelación y Síntesis Experimental
     {
-        const float inL[64] = { 0.5f, -0.3f, 0.2f, -0.1f };
-        const float inR[64] = { -0.4f, 0.25f, -0.15f, 0.35f };
-        float outL[64] = {};
-        float outR[64] = {};
+        const float inL[64] = {0.5f, -0.3f, 0.2f, -0.1f};
+        const float inR[64] = {-0.4f, 0.25f, -0.15f, 0.35f};
+        float outL[64]      = {};
+        float outR[64]      = {};
 
         // 1. DspGranularDelay
         abd::dsp::DspGranularDelay gran;

@@ -38,7 +38,7 @@ class DspFlanger
 {
 public:
     static constexpr int kMaxDelaySamples = 16384; // >80ms a 192 kHz
-    static constexpr int kDelayMask = kMaxDelaySamples - 1;
+    static constexpr int kDelayMask       = kMaxDelaySamples - 1;
 
     DspFlanger() noexcept
     {
@@ -62,13 +62,17 @@ public:
         lfoPhaseR_ = 0.25;
     }
 
-    void setRateNorm(float norm) noexcept        { rate_ = std::clamp(norm, 0.0f, 1.0f); updateLFOIncrement(); }
-    void setDepthLNorm(float norm) noexcept      { depthL_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setDepthRNorm(float norm) noexcept      { depthR_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setBaseDelayLNorm(float norm) noexcept  { baseDelayL_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setBaseDelayRNorm(float norm) noexcept  { baseDelayR_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setPhaseNorm(float norm) noexcept       { phase_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setFeedbackNorm(float norm) noexcept    { feedback_ = std::clamp(norm, 0.0f, 1.0f) * 0.9f; }
+    void setRateNorm(float norm) noexcept
+    {
+        rate_ = std::clamp(norm, 0.0f, 1.0f);
+        updateLFOIncrement();
+    }
+    void setDepthLNorm(float norm) noexcept { depthL_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setDepthRNorm(float norm) noexcept { depthR_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setBaseDelayLNorm(float norm) noexcept { baseDelayL_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setBaseDelayRNorm(float norm) noexcept { baseDelayR_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setPhaseNorm(float norm) noexcept { phase_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setFeedbackNorm(float norm) noexcept { feedback_ = std::clamp(norm, 0.0f, 1.0f) * 0.9f; }
 
     void process(const float* inL, const float* inR,
                  float* outL, float* outR,
@@ -76,8 +80,8 @@ public:
     {
         const float maxDepthSampL = static_cast<float>(sampleRate_ * 0.005 * depthL_);
         const float maxDepthSampR = static_cast<float>(sampleRate_ * 0.005 * depthR_);
-        const float baseSampL = static_cast<float>(sampleRate_ * (0.0005f + 0.0195f * baseDelayL_));
-        const float baseSampR = static_cast<float>(sampleRate_ * (0.0005f + 0.0195f * baseDelayR_));
+        const float baseSampL     = static_cast<float>(sampleRate_ * (0.0005f + 0.0195f * baseDelayL_));
+        const float baseSampR     = static_cast<float>(sampleRate_ * (0.0005f + 0.0195f * baseDelayR_));
 
         float phaseOffset = phase_ * 0.5f;
         if (phaseOffset >= 1.0f) phaseOffset -= 1.0f;
@@ -122,33 +126,33 @@ private:
     void updateLFOIncrement() noexcept
     {
         const float freqHz = 0.05f + 7.95f * rate_;
-        lfoPhaseInc_ = freqHz / sampleRate_;
+        lfoPhaseInc_       = freqHz / sampleRate_;
     }
 
     static inline float readDelay(const std::array<float, kMaxDelaySamples>& buf, int writePos, float delaySamples) noexcept
     {
         const float clampedDel = std::clamp(delaySamples, 0.0f, static_cast<float>(kMaxDelaySamples - 2));
-        float readPos = static_cast<float>(writePos) - clampedDel;
+        float readPos          = static_cast<float>(writePos) - clampedDel;
         if (readPos < 0.0f) readPos += static_cast<float>(kMaxDelaySamples);
 
-        const int idx = static_cast<int>(readPos) & kDelayMask;
-        const int next = (idx + 1) & kDelayMask;
+        const int idx    = static_cast<int>(readPos) & kDelayMask;
+        const int next   = (idx + 1) & kDelayMask;
         const float frac = readPos - static_cast<float>(static_cast<int>(readPos));
 
         return buf[idx] * (1.0f - frac) + buf[next] * frac;
     }
 
     double sampleRate_ = 44100.0;
-    float rate_ = 0.2f;
-    float depthL_ = 0.5f;
-    float depthR_ = 0.5f;
-    float baseDelayL_ = 0.3f;
-    float baseDelayR_ = 0.3f;
-    float phase_ = 0.25f;
-    float feedback_ = 0.45f;
+    float rate_        = 0.2f;
+    float depthL_      = 0.5f;
+    float depthR_      = 0.5f;
+    float baseDelayL_  = 0.3f;
+    float baseDelayR_  = 0.3f;
+    float phase_       = 0.25f;
+    float feedback_    = 0.45f;
 
-    double lfoPhaseL_ = 0.0;
-    double lfoPhaseR_ = 0.25;
+    double lfoPhaseL_   = 0.0;
+    double lfoPhaseR_   = 0.25;
     double lfoPhaseInc_ = 0.0;
 
     std::array<float, kMaxDelaySamples> delayBufL_{};

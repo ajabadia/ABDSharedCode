@@ -53,65 +53,65 @@ public:
         {
             // Direct Form II Transposed
             const float out = b0 * in + s1;
-            s1 = b1 * in - a1 * out + s2;
-            s2 = b2 * in - a2 * out;
+            s1              = b1 * in - a1 * out + s2;
+            s2              = b2 * in - a2 * out;
             return out;
         }
 
         void setLowShelf(float sampleRate, float freqHz, float gainLin, float Q = 0.7071f) noexcept
         {
-            const float nyquist = static_cast<float>(sampleRate) * 0.48f;
-            const float f = std::clamp(freqHz, 20.0f, nyquist);
-            const float A = std::sqrt(gainLin);
-            const float w0 = 6.28318530717958647692f * f / static_cast<float>(sampleRate);
-            const float cosw = std::cos(w0);
-            const float sinw = std::sin(w0);
-            const float alpha = sinw / 2.0f * std::sqrt((A + 1.0f / A) * (1.0f / Q - 1.0f) + 2.0f);
+            const float nyquist       = static_cast<float>(sampleRate) * 0.48f;
+            const float f             = std::clamp(freqHz, 20.0f, nyquist);
+            const float A             = std::sqrt(gainLin);
+            const float w0            = 6.28318530717958647692f * f / static_cast<float>(sampleRate);
+            const float cosw          = std::cos(w0);
+            const float sinw          = std::sin(w0);
+            const float alpha         = sinw / 2.0f * std::sqrt((A + 1.0f / A) * (1.0f / Q - 1.0f) + 2.0f);
             const float twoSqrtAAlpha = 2.0f * std::sqrt(A) * alpha;
 
             const float a0 = (A + 1.0f) + (A - 1.0f) * cosw + twoSqrtAAlpha;
-            b0 = (A * ((A + 1.0f) - (A - 1.0f) * cosw + twoSqrtAAlpha)) / a0;
-            b1 = (2.0f * A * ((A - 1.0f) - (A + 1.0f) * cosw)) / a0;
-            b2 = (A * ((A + 1.0f) - (A - 1.0f) * cosw - twoSqrtAAlpha)) / a0;
-            a1 = (-2.0f * ((A - 1.0f) + (A + 1.0f) * cosw)) / a0;
-            a2 = ((A + 1.0f) + (A - 1.0f) * cosw - twoSqrtAAlpha) / a0;
+            b0             = (A * ((A + 1.0f) - (A - 1.0f) * cosw + twoSqrtAAlpha)) / a0;
+            b1             = (2.0f * A * ((A - 1.0f) - (A + 1.0f) * cosw)) / a0;
+            b2             = (A * ((A + 1.0f) - (A - 1.0f) * cosw - twoSqrtAAlpha)) / a0;
+            a1             = (-2.0f * ((A - 1.0f) + (A + 1.0f) * cosw)) / a0;
+            a2             = ((A + 1.0f) + (A - 1.0f) * cosw - twoSqrtAAlpha) / a0;
         }
 
         void setHighShelf(float sampleRate, float freqHz, float gainLin, float Q = 0.7071f) noexcept
         {
-            const float nyquist = static_cast<float>(sampleRate) * 0.48f;
-            const float f = std::clamp(freqHz, 20.0f, nyquist);
-            const float A = std::sqrt(gainLin);
-            const float w0 = 6.28318530717958647692f * f / static_cast<float>(sampleRate);
-            const float cosw = std::cos(w0);
-            const float sinw = std::sin(w0);
-            const float alpha = sinw / 2.0f * std::sqrt((A + 1.0f / A) * (1.0f / Q - 1.0f) + 2.0f);
+            const float nyquist       = static_cast<float>(sampleRate) * 0.48f;
+            const float f             = std::clamp(freqHz, 20.0f, nyquist);
+            const float A             = std::sqrt(gainLin);
+            const float w0            = 6.28318530717958647692f * f / static_cast<float>(sampleRate);
+            const float cosw          = std::cos(w0);
+            const float sinw          = std::sin(w0);
+            const float alpha         = sinw / 2.0f * std::sqrt((A + 1.0f / A) * (1.0f / Q - 1.0f) + 2.0f);
             const float twoSqrtAAlpha = 2.0f * std::sqrt(A) * alpha;
 
             const float a0 = (A + 1.0f) - (A - 1.0f) * cosw + twoSqrtAAlpha;
-            b0 = (A * ((A + 1.0f) + (A - 1.0f) * cosw + twoSqrtAAlpha)) / a0;
-            b1 = (-2.0f * A * ((A - 1.0f) + (A + 1.0f) * cosw)) / a0;
-            b2 = (A * ((A + 1.0f) + (A - 1.0f) * cosw - twoSqrtAAlpha)) / a0;
-            a1 = (2.0f * ((A - 1.0f) - (A + 1.0f) * cosw)) / a0;
-            a2 = ((A + 1.0f) - (A - 1.0f) * cosw - twoSqrtAAlpha) / a0;
+            b0             = (A * ((A + 1.0f) + (A - 1.0f) * cosw + twoSqrtAAlpha)) / a0;
+            b1             = (-2.0f * A * ((A - 1.0f) + (A + 1.0f) * cosw)) / a0;
+            b2             = (A * ((A + 1.0f) + (A - 1.0f) * cosw - twoSqrtAAlpha)) / a0;
+            a1             = (2.0f * ((A - 1.0f) - (A + 1.0f) * cosw)) / a0;
+            a2             = ((A + 1.0f) - (A - 1.0f) * cosw - twoSqrtAAlpha) / a0;
         }
 
         void setPeak(float sampleRate, float freqHz, float gainLin, float Q) noexcept
         {
             const float nyquist = static_cast<float>(sampleRate) * 0.48f;
-            const float f = std::clamp(freqHz, 20.0f, nyquist);
-            const float A = std::sqrt(gainLin);
-            const float w0 = 6.28318530717958647692f * f / static_cast<float>(sampleRate);
-            const float cosw = std::cos(w0);
-            const float sinw = std::sin(w0);
-            const float alpha = sinw / (2.0f * std::max(0.1f, Q));
+            const float f       = std::clamp(freqHz, 20.0f, nyquist);
+            const float A       = std::sqrt(gainLin);
+            const float w0      = 6.28318530717958647692f * f / static_cast<float>(sampleRate);
+            const float cosw    = std::cos(w0);
+            const float sinw    = std::sin(w0);
+            const float alpha   = sinw / (2.0f * std::max(0.1f, Q));
 
             const float a0 = 1.0f + alpha / A;
-            b0 = (1.0f + alpha * A) / a0;
-            b1 = (-2.0f * cosw) / a0;
-            b2 = (1.0f - alpha * A) / a0;
-            a1 = (-2.0f * cosw) / a0;
-            a2 = (1.0f - alpha / A) / a0;
+            b0             = (1.0f + alpha * A) / a0;
+            b1             = (-2.0f * cosw) / a0;
+            b2             = (1.0f - alpha * A) / a0;
+            a1             = (-2.0f * cosw) / a0;
+            a2             = (1.0f - alpha / A) / a0;
         }
     };
 
@@ -129,23 +129,67 @@ public:
 
     void reset() noexcept
     {
-        lowShelfL_.reset();  lowShelfR_.reset();
-        lowMidL_.reset();    lowMidR_.reset();
-        highMidL_.reset();   highMidR_.reset();
-        highShelfL_.reset(); highShelfR_.reset();
+        lowShelfL_.reset();
+        lowShelfR_.reset();
+        lowMidL_.reset();
+        lowMidR_.reset();
+        highMidL_.reset();
+        highMidR_.reset();
+        highShelfL_.reset();
+        highShelfR_.reset();
     }
 
-    void setLoShelfGainNorm(float norm) noexcept { loShelfGain_ = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setLoShelfFreqNorm(float norm) noexcept { loShelfFreq_ = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setLoMidGainNorm(float norm) noexcept   { loMidGain_   = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setLoMidFreqNorm(float norm) noexcept   { loMidFreq_   = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setLoMidQNorm(float norm) noexcept      { loMidQ_      = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setHiMidGainNorm(float norm) noexcept   { hiMidGain_   = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setHiMidFreqNorm(float norm) noexcept   { hiMidFreq_   = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setHiMidQNorm(float norm) noexcept      { hiMidQ_      = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setHiShelfGainNorm(float norm) noexcept { hiShelfGain_ = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setHiShelfFreqNorm(float norm) noexcept { hiShelfFreq_ = std::clamp(norm, 0.0f, 1.0f); updateCoefficients(); }
-    void setEqIn(bool enabled) noexcept          { eqIn_        = enabled; }
+    void setLoShelfGainNorm(float norm) noexcept
+    {
+        loShelfGain_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setLoShelfFreqNorm(float norm) noexcept
+    {
+        loShelfFreq_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setLoMidGainNorm(float norm) noexcept
+    {
+        loMidGain_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setLoMidFreqNorm(float norm) noexcept
+    {
+        loMidFreq_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setLoMidQNorm(float norm) noexcept
+    {
+        loMidQ_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setHiMidGainNorm(float norm) noexcept
+    {
+        hiMidGain_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setHiMidFreqNorm(float norm) noexcept
+    {
+        hiMidFreq_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setHiMidQNorm(float norm) noexcept
+    {
+        hiMidQ_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setHiShelfGainNorm(float norm) noexcept
+    {
+        hiShelfGain_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setHiShelfFreqNorm(float norm) noexcept
+    {
+        hiShelfFreq_ = std::clamp(norm, 0.0f, 1.0f);
+        updateCoefficients();
+    }
+    void setEqIn(bool enabled) noexcept { eqIn_ = enabled; }
 
     void process(const float* inL, const float* inR,
                  float* outL, float* outR,
@@ -208,14 +252,14 @@ private:
         // 2. Low Mid Peak
         const float lmFreq = mapFreq(loMidFreq_);
         const float lmGain = dbToGain(loMidGain_);
-        const float lmQ = mapQ(loMidQ_);
+        const float lmQ    = mapQ(loMidQ_);
         lowMidL_.setPeak(sr, lmFreq, lmGain, lmQ);
         lowMidR_.setPeak(sr, lmFreq, lmGain, lmQ);
 
         // 3. High Mid Peak
         const float hmFreq = mapFreq(hiMidFreq_);
         const float hmGain = dbToGain(hiMidGain_);
-        const float hmQ = mapQ(hiMidQ_);
+        const float hmQ    = mapQ(hiMidQ_);
         highMidL_.setPeak(sr, hmFreq, hmGain, hmQ);
         highMidR_.setPeak(sr, hmFreq, hmGain, hmQ);
 
@@ -237,7 +281,7 @@ private:
     float hiMidQ_      = 0.3f;
     float hiShelfGain_ = 0.5f;
     float hiShelfFreq_ = 0.8f;
-    bool eqIn_ = true;
+    bool eqIn_         = true;
 
     Biquad lowShelfL_, lowShelfR_;
     Biquad lowMidL_, lowMidR_;

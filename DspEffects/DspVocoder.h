@@ -39,9 +39,9 @@ namespace abd::dsp
  */
 struct VocoderBiquad
 {
-    float b0 { 0.0f }, b1 { 0.0f }, b2 { 0.0f };
-    float a1 { 0.0f }, a2 { 0.0f };
-    float s1 { 0.0f }, s2 { 0.0f };
+    float b0{0.0f}, b1{0.0f}, b2{0.0f};
+    float a1{0.0f}, a2{0.0f};
+    float s1{0.0f}, s2{0.0f};
 
     void reset() noexcept
     {
@@ -50,12 +50,12 @@ struct VocoderBiquad
 
     void setBandpass(float freqHz, float q, double sampleRate) noexcept
     {
-        const float nyq = static_cast<float>(sampleRate) * 0.49f;
-        const float f = std::clamp(freqHz, 20.0f, nyq);
-        const float w0 = 6.283185307179586f * f / static_cast<float>(sampleRate);
+        const float nyq   = static_cast<float>(sampleRate) * 0.49f;
+        const float f     = std::clamp(freqHz, 20.0f, nyq);
+        const float w0    = 6.283185307179586f * f / static_cast<float>(sampleRate);
         const float alpha = std::sin(w0) / (2.0f * std::max(0.1f, q));
         const float cosw0 = std::cos(w0);
-        const float a0 = 1.0f + alpha;
+        const float a0    = 1.0f + alpha;
 
         b0 = alpha / a0;
         b1 = 0.0f;
@@ -67,8 +67,8 @@ struct VocoderBiquad
     float process(float in) noexcept
     {
         const float out = b0 * in + s1;
-        s1 = b1 * in - a1 * out + s2;
-        s2 = b2 * in - a2 * out;
+        s1              = b1 * in - a1 * out + s2;
+        s2              = b2 * in - a2 * out;
         return out;
     }
 };
@@ -153,8 +153,8 @@ public:
     void setLogFrequencies(float minHz = 100.0f, float maxHz = 15000.0f) noexcept
     {
         customFreqs_ = false;
-        minFreqHz_ = minHz;
-        maxFreqHz_ = maxHz;
+        minFreqHz_   = minHz;
+        maxFreqHz_   = maxHz;
         updateFrequencies();
     }
 
@@ -250,7 +250,7 @@ private:
         for (int b = 0; b < activeBands_; ++b)
         {
             float shiftedFreq = bandFreqs_[b] * formantMultiplier_;
-            shiftedFreq = std::clamp(shiftedFreq, 20.0f, nyq);
+            shiftedFreq       = std::clamp(shiftedFreq, 20.0f, nyq);
 
             analysisL_[b].setBandpass(shiftedFreq, q, sampleRate_);
             analysisR_[b].setBandpass(shiftedFreq, q, sampleRate_);
@@ -267,23 +267,23 @@ private:
 
     float generatePinkNoise(float& state) noexcept
     {
-        noiseSeed_ = noiseSeed_ * 1103515245u + 12345u;
+        noiseSeed_        = noiseSeed_ * 1103515245u + 12345u;
         const float white = (static_cast<float>(noiseSeed_ & 0x7FFFFFFF) / 1073741823.5f) - 1.0f;
-        state = state * 0.99765f + white * 0.0412156f;
+        state             = state * 0.99765f + white * 0.0412156f;
         return state * 2.0f;
     }
 
-    double sampleRate_ { 44100.0 };
-    int activeBands_   { 16 };
-    float formantMultiplier_ { 1.0f };
-    float attackSec_   { 0.010f };
-    float releaseSec_  { 0.050f };
-    bool customFreqs_  { false };
-    float minFreqHz_   { 100.0f };
-    float maxFreqHz_   { 15000.0f };
-    bool useInternalMod_ { false };
+    double sampleRate_{44100.0};
+    int activeBands_{16};
+    float formantMultiplier_{1.0f};
+    float attackSec_{0.010f};
+    float releaseSec_{0.050f};
+    bool customFreqs_{false};
+    float minFreqHz_{100.0f};
+    float maxFreqHz_{15000.0f};
+    bool useInternalMod_{false};
 
-    float bandFreqs_[kMaxBands] {};
+    float bandFreqs_[kMaxBands]{};
     VocoderBiquad analysisL_[kMaxBands];
     VocoderBiquad analysisR_[kMaxBands];
     VocoderBiquad resynthL_[kMaxBands];
@@ -293,9 +293,9 @@ private:
     EnvelopeFollower followersL_[kMaxBands];
     EnvelopeFollower followersR_[kMaxBands];
 
-    float noiseStateL_ { 0.0f };
-    float noiseStateR_ { 0.0f };
-    uint32_t noiseSeed_ { 12345u };
+    float noiseStateL_{0.0f};
+    float noiseStateR_{0.0f};
+    uint32_t noiseSeed_{12345u};
 };
 
 } // namespace abd::dsp

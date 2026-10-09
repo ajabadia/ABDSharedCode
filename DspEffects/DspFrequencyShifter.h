@@ -54,19 +54,19 @@ public:
 
     void reset() noexcept
     {
-        oscPhase_ = 0.0f;
-        lfoPhase_ = 0.0f;
-        fbL_ = 0.0f;
-        fbR_ = 0.0f;
+        oscPhase_    = 0.0f;
+        lfoPhase_    = 0.0f;
+        fbL_         = 0.0f;
+        fbR_         = 0.0f;
         hilbertPosL_ = 0;
         hilbertPosR_ = 0;
         hilbertBufL_.fill(0.0f);
         hilbertBufR_.fill(0.0f);
     }
 
-    void setMixNorm(float norm) noexcept      { paramMix_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setShiftNorm(float norm) noexcept    { paramShift_ = std::clamp(norm, 0.0f, 1.0f); }
-    void setLfoRateNorm(float norm) noexcept  { paramLfoRate_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setMixNorm(float norm) noexcept { paramMix_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setShiftNorm(float norm) noexcept { paramShift_ = std::clamp(norm, 0.0f, 1.0f); }
+    void setLfoRateNorm(float norm) noexcept { paramLfoRate_ = std::clamp(norm, 0.0f, 1.0f); }
     void setLfoDepthNorm(float norm) noexcept { paramLfoDepth_ = std::clamp(norm, 0.0f, 1.0f); }
     void setFeedbackNorm(float norm) noexcept { paramFeedback_ = std::clamp(norm, 0.0f, 1.0f); }
 
@@ -75,12 +75,23 @@ public:
         const float val = std::clamp(value, 0.0f, 1.0f);
         switch (index)
         {
-            case 0: setMixNorm(val); break;
-            case 1: setShiftNorm(val); break;
-            case 2: setLfoRateNorm(val); break;
-            case 3: setLfoDepthNorm(val); break;
-            case 4: setFeedbackNorm(val); break;
-            default: break;
+            case 0:
+                setMixNorm(val);
+                break;
+            case 1:
+                setShiftNorm(val);
+                break;
+            case 2:
+                setLfoRateNorm(val);
+                break;
+            case 3:
+                setLfoDepthNorm(val);
+                break;
+            case 4:
+                setFeedbackNorm(val);
+                break;
+            default:
+                break;
         }
     }
 
@@ -88,12 +99,12 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float mix = paramMix_;
-        const float lfoRate = paramLfoRate_ * 9.9f + 0.1f;
-        const float lfoDepth = paramLfoDepth_;
-        const float feedback = paramFeedback_;
-        const float baseShift = (paramShift_ - 0.5f) * 4000.0f;
-        const float lfoInc = lfoRate / static_cast<float>(sampleRate_);
+        const float mix        = paramMix_;
+        const float lfoRate    = paramLfoRate_ * 9.9f + 0.1f;
+        const float lfoDepth   = paramLfoDepth_;
+        const float feedback   = paramFeedback_;
+        const float baseShift  = (paramShift_ - 0.5f) * 4000.0f;
+        const float lfoInc     = lfoRate / static_cast<float>(sampleRate_);
         constexpr float kTwoPi = 6.28318530717958647692f;
 
         for (int i = 0; i < numSamples; ++i)
@@ -102,7 +113,7 @@ public:
             const float dryR = inR[i];
 
             // 1. Modulación por LFO
-            const float lfoVal = std::sin(lfoPhase_ * kTwoPi) * lfoDepth;
+            const float lfoVal  = std::sin(lfoPhase_ * kTwoPi) * lfoDepth;
             const float shiftHz = baseShift * (1.0f + lfoVal);
             lfoPhase_ += lfoInc;
             if (lfoPhase_ >= 1.0f) lfoPhase_ -= 1.0f;
@@ -129,8 +140,10 @@ public:
             fbR_ = wetR;
 
             oscPhase_ += oscInc;
-            if (oscPhase_ >= 1.0f) oscPhase_ -= 1.0f;
-            else if (oscPhase_ < 0.0f) oscPhase_ += 1.0f;
+            if (oscPhase_ >= 1.0f)
+                oscPhase_ -= 1.0f;
+            else if (oscPhase_ < 0.0f)
+                oscPhase_ += 1.0f;
 
             outL[i] = dryL + (wetL - dryL) * mix;
             outR[i] = dryR + (wetR - dryR) * mix;
@@ -144,10 +157,9 @@ private:
             -0.0124f, 0.0f, 0.0456f, 0.0f, -0.1327f,
             0.0f, 0.6184f, 0.0f, -0.6184f,
             0.0f, 0.1327f, 0.0f, -0.0456f,
-            0.0f, 0.0124f
-        };
+            0.0f, 0.0124f};
 
-        buf[pos] = input;
+        buf[pos]     = input;
         float output = 0.0f;
         for (int j = 0; j < kHilbertLen; ++j)
         {

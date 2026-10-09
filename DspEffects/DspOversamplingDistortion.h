@@ -41,8 +41,8 @@ namespace abd::dsp
 class DspOversamplingDistortion
 {
 public:
-    static constexpr int kOversample = 4;
-    static constexpr int kChunkSize = 32;
+    static constexpr int kOversample  = 4;
+    static constexpr int kChunkSize   = 32;
     static constexpr int kUpChunkSize = kChunkSize * kOversample;
 
     DspOversamplingDistortion() noexcept
@@ -89,7 +89,7 @@ public:
     float waveshape(float x) const noexcept
     {
         const float g = 1.0f + drive_ * 8.0f;
-        float shaped = std::tanh(x * g);
+        float shaped  = std::tanh(x * g);
         shaped += 0.1f * drive_ * shaped * shaped * shaped;
         return shaped / (1.0f + 0.1f * drive_);
     }
@@ -98,8 +98,8 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float widthL = 1.0f + stereo_ * 0.3f;
-        const float widthR = 1.0f - stereo_ * 0.3f;
+        const float widthL    = 1.0f + stereo_ * 0.3f;
+        const float widthR    = 1.0f - stereo_ * 0.3f;
         const float toneCoeff = 0.1f + tone_ * 0.8f;
 
         int processed = 0;
@@ -132,8 +132,8 @@ public:
             for (int i = 0; i < chunkSize; ++i)
             {
                 const int base = i * kOversample;
-                float accL = 0.0f;
-                float accR = 0.0f;
+                float accL     = 0.0f;
+                float accR     = 0.0f;
                 for (int j = 0; j < kOversample; ++j)
                 {
                     const float w = 0.5f + 0.5f * std::cos(3.14159265358979323846f * static_cast<float>(j) / static_cast<float>(kOversample));
@@ -160,11 +160,11 @@ public:
 
 private:
     double sampleRate_ = 44100.0;
-    float drive_ = 0.3f;
-    float tone_ = 0.5f;
-    float mix_ = 0.4f;
-    float level_ = 0.7f;
-    float stereo_ = 0.5f;
+    float drive_       = 0.3f;
+    float tone_        = 0.5f;
+    float mix_         = 0.4f;
+    float level_       = 0.7f;
+    float stereo_      = 0.5f;
 
     std::array<float, kUpChunkSize> upBufL_{};
     std::array<float, kUpChunkSize> upBufR_{};
