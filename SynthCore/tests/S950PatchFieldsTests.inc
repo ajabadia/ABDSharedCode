@@ -15,7 +15,8 @@
 // que su cabecera dice que mide. Treinta y cinco filas, y si alguien añade un
 // campo sin contarlo, el test lo dice.
 
-static void testS950PatchFields() {
+static void testS950PatchFields()
+{
     printf("=== S950PatchFields ===\n");
 
     using namespace abd::synth;
@@ -33,7 +34,8 @@ static void testS950PatchFields() {
     // que lee la cabecera del keygroup siguiente. Y como un keygroup puede
     // empezar en cualquier punto de un programa encadenado, la lectura seguiría
     // siendo válida y devolvería basura con toda naturalidad.
-    for (int i = 0; i < patchFieldCount; ++i) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
         const auto& f = fieldAt(i);
         char msg[128];
         snprintf(msg, sizeof(msg), "el byte de '%s' cae dentro del registro de 70 bytes", f.code);
@@ -45,8 +47,10 @@ static void testS950PatchFields() {
     // verdades, y el que escriba último gana sin avisar. Los Bit sí pueden
     // compartir byte, y DEBEN: es lo que hace posible cambiar uno sin perder los
     // otros tres.
-    for (int i = 0; i < patchFieldCount; ++i) {
-        for (int j = i + 1; j < patchFieldCount; ++j) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
+        for (int j = i + 1; j < patchFieldCount; ++j)
+        {
             const auto& a = fieldAt(i);
             const auto& b = fieldAt(j);
             if (a.byteOffset != b.byteOffset) continue;
@@ -61,7 +65,8 @@ static void testS950PatchFields() {
     // Dos flags con la misma máscara son un flag escrito dos veces. Y un flag
     // cuyo rango no sea 0..1 es un booleano con tres estados, que no existe.
     std::uint8_t seenMasks = 0;
-    for (int i = 0; i < patchFieldCount; ++i) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
         const auto& f = fieldAt(i);
         if (f.encoding != PatchField::Encoding::Bit) continue;
         char msg[128];
@@ -88,8 +93,10 @@ static void testS950PatchFields() {
     check(findField("noExisteEsteCampo") == nullptr, "un código inexistente devuelve nullptr");
     check(findField(nullptr) == nullptr, "un código nulo devuelve nullptr");
     check(findField("") == nullptr, "un código vacío devuelve nullptr");
-    for (int i = 0; i < patchFieldCount; ++i) {
-        for (int j = i + 1; j < patchFieldCount; ++j) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
+        for (int j = i + 1; j < patchFieldCount; ++j)
+        {
             char msg[128];
             snprintf(msg, sizeof(msg), "'%s' y '%s' no comparten código", fieldAt(i).code, fieldAt(j).code);
             check(strcmp(fieldAt(i).code, fieldAt(j).code) != 0, msg);
@@ -101,7 +108,8 @@ static void testS950PatchFields() {
     }
 
     // ── Los rangos: alto >= bajo, y el máximo representable en su byte ──
-    for (int i = 0; i < patchFieldCount; ++i) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
         const auto& f = fieldAt(i);
         char msg[128];
         snprintf(msg, sizeof(msg), "el rango de '%s' no está al revés", f.code);
@@ -118,7 +126,8 @@ static void testS950PatchFields() {
     // ── El nombre existe y no está vacío ──
     // Un `name` vacío no rompe nada al compilar: rompe el panel, en un sitio
     // donde nadie mira hasta que sale un control sin etiqueta.
-    for (int i = 0; i < patchFieldCount; ++i) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
         const auto& f = fieldAt(i);
         char msg[128];
         snprintf(msg, sizeof(msg), "'%s' tiene nombre de panel", f.code);
@@ -132,7 +141,8 @@ static void testS950PatchFields() {
     // ── Los Signed van de -50 a +50, que es lo que imprime el panel ──
     // Se fija la regla para que un Signed nuevo no se cuele con un rango de
     // 0..99 y luego produzca un byte que significa otra cosa.
-    for (int i = 0; i < patchFieldCount; ++i) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
         const auto& f = fieldAt(i);
         if (f.encoding != PatchField::Encoding::Signed) continue;
         char msg[128];
@@ -144,14 +154,16 @@ static void testS950PatchFields() {
     {
         const auto* port = findField("outputPort");
         check(port != nullptr, "el campo outputPort existe");
-        if (port) {
+        if (port)
+        {
             check(port->encoding == PatchField::Encoding::Port, "outputPort usa la codificación Port");
             check(port->lo == 0 && port->hi == 10, "outputPort va de 0 a 10, que son 11 salidas");
         }
         check(strcmp(outputPorts[0].name, "ALL") == 0, "la salida 0 es ALL");
         check(strcmp(outputPorts[9].name, "LEFT") == 0, "la salida 9 es LEFT");
         check(strcmp(outputPorts[10].name, "RIGHT") == 0, "la salida 10 es RIGHT");
-        for (int i = 0; i < outputPortCount; ++i) {
+        for (int i = 0; i < outputPortCount; ++i)
+        {
             char msg[128];
             snprintf(msg, sizeof(msg), "la salida %d lleva su número de panel", i);
             check(outputPorts[i].panelValue == i, msg);
@@ -165,18 +177,20 @@ static void testS950PatchFields() {
     // y el alto de un offset de 16 bits en dieciseiseavos de semitono. Si el
     // fine fuera 0..99 se perdería un cuarto de tono por arriba, y todo seguiría
     // compilando y sonando casi bien, que es lo peor.
-    for (int zone = 0; zone < keygroupMaxZones; ++zone) {
+    for (int zone = 0; zone < keygroupMaxZones; ++zone)
+    {
         const char* code = zone == 0 ? "softFine" : "loudFine";
-        const auto* f = findField(code);
+        const auto* f    = findField(code);
         char msg[128];
         snprintf(msg, sizeof(msg), "'%s' va de 0 a 255, no de 0 a 99", code);
         check(f != nullptr && f->lo == 0 && f->hi == 255, msg);
     }
     {
         const auto* fine = findField("softFine");
-        const auto* tr = findField("softTranspose");
+        const auto* tr   = findField("softTranspose");
         check(fine != nullptr && tr != nullptr, "la zona suave tiene fine y transpose");
-        if (fine && tr) {
+        if (fine && tr)
+        {
             // Y la prueba de que la función sirve para algo: medio tono arriba
             // son 8 dieciseiseavos, no 8 "unidades de fine".
             check(zonePitchOffset(*fine, 0, *tr, 1) == 256, "un semitono son 256 dieciseiseavos");
@@ -196,7 +210,8 @@ static void testS950PatchFields() {
         const auto* soft = findField("softFilter");
         const auto* loud = findField("loudFilter");
         check(soft != nullptr && loud != nullptr, "las dos zonas tienen su filtro");
-        if (soft && loud) {
+        if (soft && loud)
+        {
             check(loud->byteOffset - soft->byteOffset == keygroupZoneStride,
                   "la zona 2 está 22 bytes después de la zona 1");
         }
@@ -209,7 +224,8 @@ static void testS950PatchFields() {
     {
         const auto* sw = findField("velocitySwitch");
         check(sw != nullptr, "el switch de velocidad existe");
-        if (sw) {
+        if (sw)
+        {
             check(sw->lo == 1 && sw->hi == 128, "el switch va de 1 a 128");
             check(sw->hi == keygroupVelocityCount, "el 128 es una velocidad que no existe");
             check(sw->lo == 1, "el 0 no es un valor de switch, es el hueco");
@@ -221,8 +237,9 @@ static void testS950PatchFields() {
     // recorre la memoria. Es un test tonto que se rompe solo si alguien inserta
     // una fila entre medias, que es justo cuando conviene que se note.
     {
-        static const char* const env[] = { "vcfAttack", "vcfDecay", "vcfSustain", "vcfRelease" };
-        for (int i = 0; i < 4; ++i) {
+        static const char* const env[] = {"vcfAttack", "vcfDecay", "vcfSustain", "vcfRelease"};
+        for (int i = 0; i < 4; ++i)
+        {
             const auto* f = findField(env[i]);
             char msg[128];
             snprintf(msg, sizeof(msg), "'%s' está en el byte %d de la envolvente del filtro", env[i], 34 + i);
@@ -233,7 +250,8 @@ static void testS950PatchFields() {
     // ── Los trims apuntan a campos que existen, y su offset cabe en el campo ──
     // Un trim que mueve un campo que ya no está en la tabla es un mando que no
     // hace nada, y no da ningún error: simplemente se queda ahí.
-    for (int i = 0; i < performTrimCount; ++i) {
+    for (int i = 0; i < performTrimCount; ++i)
+    {
         const auto& t = performTrims[i];
         char msg[128];
         snprintf(msg, sizeof(msg), "el trim '%s' tiene nombre", t.code);
@@ -241,7 +259,8 @@ static void testS950PatchFields() {
         snprintf(msg, sizeof(msg), "el trim '%s' tiene un recorrido que no está al revés", t.code);
         check(t.lo <= t.hi, msg);
 
-        if (t.fieldCode[0] == '\0') {
+        if (t.fieldCode[0] == '\0')
+        {
             // Un trim sin campo es un control que la máquina NO tenía. Es
             // legítimo — la resonancia y el LFO al filtro son exactamente eso —
             // pero tiene que ser una decisión, no un olvido: aquí se cuentan y
@@ -280,15 +299,14 @@ static void testS950PatchFields() {
     {
         static const char* const full[] = {
             "vcaAttack", "vcaDecay", "vcaSustain", "vcaRelease",
-            "vcfAttack", "vcfDecay", "vcfSustain", "vcfRelease"
-        };
-        for (int i = 0; i < 8; ++i) {
+            "vcfAttack", "vcfDecay", "vcfSustain", "vcfRelease"};
+        for (int i = 0; i < 8; ++i)
+        {
             const auto* t = findTrim(full[i]);
             const auto* f = findField(full[i]);
             char msg[128];
             snprintf(msg, sizeof(msg), "el trim de '%s' recorre sus 99 enteros", full[i]);
-            check(t != nullptr && f != nullptr && t->lo == -99 && t->hi == 99
-                  && (f->hi - f->lo) == 99, msg);
+            check(t != nullptr && f != nullptr && t->lo == -99 && t->hi == 99 && (f->hi - f->lo) == 99, msg);
         }
     }
 
@@ -300,7 +318,8 @@ static void testS950PatchFields() {
         const auto* t = findTrim("vcfAmount");
         const auto* f = findField("vcfAmount");
         check(t != nullptr && f != nullptr, "el VCF amount tiene trim y campo");
-        if (t && f) {
+        if (t && f)
+        {
             check(t->lo == -50 && t->hi == 50, "el offset del VCF amount es de 50, no de 99");
             check((f->hi - f->lo) == 100, "el campo del VCF amount recorre 100, el doble que su offset");
         }
@@ -311,14 +330,11 @@ static void testS950PatchFields() {
     // dejan la profundidad del LFO en 0, así que un mando simétrico gastaría
     // media vuelta pidiendo menos que nada. Lo que se mide es que la regla se
     // aplique a cada fila, no que hoy salgan bien.
-    for (int i = 0; i < performTrimCount; ++i) {
-        const auto& t = performTrims[i];
-        const char* c = t.code;
-        const bool isDepth = strcmp(c, "lfoDepth") == 0
-                          || strcmp(c, "velToFilter") == 0
-                          || strcmp(c, "velToLoudness") == 0
-                          || strcmp(c, "lfoToFilter") == 0
-                          || strcmp(c, "resonance") == 0;
+    for (int i = 0; i < performTrimCount; ++i)
+    {
+        const auto& t         = performTrims[i];
+        const char* c         = t.code;
+        const bool isDepth    = strcmp(c, "lfoDepth") == 0 || strcmp(c, "velToFilter") == 0 || strcmp(c, "velToLoudness") == 0 || strcmp(c, "lfoToFilter") == 0 || strcmp(c, "resonance") == 0;
         const bool isAbsolute = strcmp(c, "lfoShape") == 0;
         char msg[128];
         // Tres clases y solo tres: un offset que suma y resta, una profundidad
@@ -327,7 +343,8 @@ static void testS950PatchFields() {
         snprintf(msg, sizeof(msg), "'%s' es bipolar, profundidad o absoluto, y no dos cosas", c);
         check((t.bipolar + isDepth + (isAbsolute ? 1 : 0)) == 1, msg);
         // Y un bipolar de verdad tiene que cruzar el cero, o no es bipolar.
-        if (t.bipolar) {
+        if (t.bipolar)
+        {
             snprintf(msg, sizeof(msg), "'%s' bipolar cruza el cero", c);
             check(t.lo < 0 && t.hi > 0, msg);
         }
@@ -340,7 +357,8 @@ static void testS950PatchFields() {
     {
         const auto* shape = findTrim("lfoShape");
         check(shape != nullptr, "lfoShape existe");
-        if (shape) {
+        if (shape)
+        {
             check(shape->lo == 0 && shape->hi == 3, "lfoShape son cuatro formas, 0 a 3");
             check(shape->fieldCode[0] == '\0', "lfoShape no mueve ningún campo del keygroup");
         }
@@ -354,7 +372,8 @@ static void testS950PatchFields() {
     // motor se quejaba —un panel que lo buscase no encontraria nada, y solo
     // se sabria al mover el mando—. Lo cazó el contrato JSON, que mira al
     // reves. Esta es la que lo haria ver en el sitio donde vive el dato.
-    for (int i = 0; i < patchFieldCount; ++i) {
+    for (int i = 0; i < patchFieldCount; ++i)
+    {
         const auto& f = fieldAt(i);
         if (f.trimId[0] == '\0')
             continue;
@@ -366,7 +385,8 @@ static void testS950PatchFields() {
 
     // Y el otro sentido, que es el que ya estaba: un trim sin campo tiene que
     // ser una de las decisiones explicitas, no un olvido.
-    for (int i = 0; i < performTrimCount; ++i) {
+    for (int i = 0; i < performTrimCount; ++i)
+    {
         const auto& t = performTrims[i];
         char msg[128];
         snprintf(msg, sizeof(msg), "el trim '%s' o mueve un campo, o no mueve ninguno", t.code);
@@ -374,8 +394,10 @@ static void testS950PatchFields() {
     }
 
     // ── Los nombres de trim no se repiten ──
-    for (int i = 0; i < performTrimCount; ++i) {
-        for (int j = i + 1; j < performTrimCount; ++j) {
+    for (int i = 0; i < performTrimCount; ++i)
+    {
+        for (int j = i + 1; j < performTrimCount; ++j)
+        {
             char msg[128];
             snprintf(msg, sizeof(msg), "'%s' y '%s' no comparten nombre de panel",
                      performTrims[i].name, performTrims[j].name);
@@ -384,7 +406,8 @@ static void testS950PatchFields() {
     }
 
     // ── findTrim devuelve su propia fila, y nullptr si no existe ──
-    for (int i = 0; i < performTrimCount; ++i) {
+    for (int i = 0; i < performTrimCount; ++i)
+    {
         char msg[128];
         snprintf(msg, sizeof(msg), "buscar el trim '%s' devuelve su propia fila", performTrims[i].code);
         check(findTrim(performTrims[i].code) == &performTrims[i], msg);
@@ -396,7 +419,8 @@ static void testS950PatchFields() {
     {
         const auto* decay = findField("vcaDecay");
         check(decay != nullptr, "vcaDecay existe");
-        if (decay) {
+        if (decay)
+        {
             check(clampToField(*decay, 50) == 50, "un valor dentro del rango no se toca");
             check(clampToField(*decay, -1) == 0, "por debajo se recorta al mínimo");
             check(clampToField(*decay, 100) == 99, "por encima se recorta al máximo");

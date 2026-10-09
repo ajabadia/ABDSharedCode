@@ -34,24 +34,33 @@
 // sesenta y cuatro en el 9. Sale partido de verdad, sin hacer nada raro, y sin
 // contigüidad entre los dos bloques.
 
-static const int kTestKeygroups = 16;   // 1158 bytes: pasa al segundo bloque
-static const int kTestFileLength = 38 + 16 * 70;   // 1158
-static const int kTestStraddleKeygroup = 14;       // empieza en 38 + 980 = 1018
-static const int kTestChain[3] = { 4, 9, 20 };   // 3 bloques, NINGUNO contiguo
-static const int kTestStartBlock = 4;
+static const int kTestKeygroups        = 16;           // 1158 bytes: pasa al segundo bloque
+static const int kTestFileLength       = 38 + 16 * 70; // 1158
+static const int kTestStraddleKeygroup = 14;           // empieza en 38 + 980 = 1018
+static const int kTestChain[3]         = {4, 9, 20};   // 3 bloques, NINGUNO contiguo
+static const int kTestStartBlock       = 4;
 
 // Los valores de cada keygroup, distintos en cada uno, para que un byte leido del
 // keygroup equivocado se note. Cada grupo es un numero distinto yyyy.
-static void putU16 (std::vector<std::uint8_t>& b, std::size_t at, unsigned v) {
-    if (at + 1 < b.size()) { b[at] = (std::uint8_t)(v & 0xFF); b[at + 1] = (std::uint8_t)((v >> 8) & 0xFF); }
+static void putU16(std::vector<std::uint8_t>& b, std::size_t at, unsigned v)
+{
+    if (at + 1 < b.size())
+    {
+        b[at]     = (std::uint8_t)(v & 0xFF);
+        b[at + 1] = (std::uint8_t)((v >> 8) & 0xFF);
+    }
 }
-static void putU24 (std::vector<std::uint8_t>& b, std::size_t at, unsigned v) {
-    if (at + 2 < b.size()) {
-        b[at] = (std::uint8_t)(v & 0xFF); b[at + 1] = (std::uint8_t)((v >> 8) & 0xFF);
+static void putU24(std::vector<std::uint8_t>& b, std::size_t at, unsigned v)
+{
+    if (at + 2 < b.size())
+    {
+        b[at]     = (std::uint8_t)(v & 0xFF);
+        b[at + 1] = (std::uint8_t)((v >> 8) & 0xFF);
         b[at + 2] = (std::uint8_t)((v >> 16) & 0xFF);
     }
 }
-static void putName10 (std::vector<std::uint8_t>& b, std::size_t at, const char* n) {
+static void putName10(std::vector<std::uint8_t>& b, std::size_t at, const char* n)
+{
     for (int i = 0; i < 10; ++i) b[at + (std::size_t)i] = (std::uint8_t)(i < (int)strlen(n) ? n[i] : ' ');
 }
 
@@ -62,62 +71,67 @@ static void putName10 (std::vector<std::uint8_t>& b, std::size_t at, const char*
     un `byteOffset` equivocado en el catalogo y el mismo en el test se
     taparian. Los offsets estan escritos como numeros literales, y al lado esta
     el codigo del campo que se supone que es. */
-static std::vector<std::uint8_t> buildTestProgram() {
+static std::vector<std::uint8_t> buildTestProgram()
+{
     std::vector<std::uint8_t> f((std::size_t)kTestFileLength, 0u);
 
     // --- Cabecera del programa (38 bytes), y son los primeros bytes del fichero ---
-    putName10(f, 0, "TESTPROG");    // la copia que la maquina enseña, 0..9
-    f[23] = (std::uint8_t)kTestKeygroups;   // numero de keygroups
-    f[26] = 0;                      // numero de programa
+    putName10(f, 0, "TESTPROG");          // la copia que la maquina enseña, 0..9
+    f[23] = (std::uint8_t)kTestKeygroups; // numero de keygroups
+    f[26] = 0;                            // numero de programa
 
     // --- Los 16 keygroups ---
-    for (int k = 0; k < kTestKeygroups; ++k) {
+    for (int k = 0; k < kTestKeygroups; ++k)
+    {
         const std::size_t kg = 38 + (std::size_t)k * 70;
-        const int base = 10 * k;     // cada keygroup tiene un numero distinto
+        const int base       = 10 * k; // cada keygroup tiene un numero distinto
 
-        f[kg + 0]  = (std::uint8_t)(base + 1);   // byte 0: low key
-        f[kg + 1]  = (std::uint8_t)(base + 2);   // byte 1: high key
-        f[kg + 2]  = 128;                         // byte 2: sin segunda zona
-        f[kg + 3]  = (std::uint8_t)(base + 3);   // byte 3: VCA attack
-        f[kg + 4]  = (std::uint8_t)(base + 4);   // byte 4: VCA decay
-        f[kg + 5]  = (std::uint8_t)(base + 5);   // byte 5: VCA sustain
-        f[kg + 6]  = (std::uint8_t)(base + 6);   // byte 6: VCA release
-        f[kg + 7]  = (std::uint8_t)(base + 7);   // byte 7: vel to filter
-        f[kg + 8]  = (std::uint8_t)(base + 8);   // byte 8: key to filter
-        f[kg + 9]  = (std::uint8_t)(base + 9);   // byte 9: vel to attack
-        f[kg + 10] = (std::uint8_t)(int8_t)(-(base + 1) % 51);  // byte 10: vel to release, con signo
-        f[kg + 11] = (std::uint8_t)(base + 11);  // byte 11: vel to loudness
-        f[kg + 12] = (std::uint8_t)(base + 12);  // byte 12: warp velocity
-        f[kg + 13] = (std::uint8_t)(int8_t)(-(base + 2) % 51);  // byte 13: warp depth
-        f[kg + 14] = (std::uint8_t)(base + 14);  // byte 14: warp time
-        f[kg + 15] = (std::uint8_t)(base + 15);  // byte 15: LFO delay
-        f[kg + 16] = (std::uint8_t)(base + 16);  // byte 16: LFO rate
-        f[kg + 17] = (std::uint8_t)(base + 17);  // byte 17: LFO depth
-        f[kg + 18] = 0x1D;                        // byte 18: los cuatro flags ENCENDIDOS
-        f[kg + 19] = (std::uint8_t)(k % 11);      // byte 19: puerto; el 10 -> 0xFF = "todos"
+        f[kg + 0]  = (std::uint8_t)(base + 1);                 // byte 0: low key
+        f[kg + 1]  = (std::uint8_t)(base + 2);                 // byte 1: high key
+        f[kg + 2]  = 128;                                      // byte 2: sin segunda zona
+        f[kg + 3]  = (std::uint8_t)(base + 3);                 // byte 3: VCA attack
+        f[kg + 4]  = (std::uint8_t)(base + 4);                 // byte 4: VCA decay
+        f[kg + 5]  = (std::uint8_t)(base + 5);                 // byte 5: VCA sustain
+        f[kg + 6]  = (std::uint8_t)(base + 6);                 // byte 6: VCA release
+        f[kg + 7]  = (std::uint8_t)(base + 7);                 // byte 7: vel to filter
+        f[kg + 8]  = (std::uint8_t)(base + 8);                 // byte 8: key to filter
+        f[kg + 9]  = (std::uint8_t)(base + 9);                 // byte 9: vel to attack
+        f[kg + 10] = (std::uint8_t)(int8_t)(-(base + 1) % 51); // byte 10: vel to release, con signo
+        f[kg + 11] = (std::uint8_t)(base + 11);                // byte 11: vel to loudness
+        f[kg + 12] = (std::uint8_t)(base + 12);                // byte 12: warp velocity
+        f[kg + 13] = (std::uint8_t)(int8_t)(-(base + 2) % 51); // byte 13: warp depth
+        f[kg + 14] = (std::uint8_t)(base + 14);                // byte 14: warp time
+        f[kg + 15] = (std::uint8_t)(base + 15);                // byte 15: LFO delay
+        f[kg + 16] = (std::uint8_t)(base + 16);                // byte 16: LFO rate
+        f[kg + 17] = (std::uint8_t)(base + 17);                // byte 17: LFO depth
+        f[kg + 18] = 0x1D;                                     // byte 18: los cuatro flags ENCENDIDOS
+        f[kg + 19] = (std::uint8_t)(k % 11);                   // byte 19: puerto; el 10 -> 0xFF = "todos"
         f[kg + 20] = 0;
-        f[kg + 21] = (std::uint8_t)(base + 21);  // byte 21: LFO de aftertouch (0..50)
-        f[kg + 22] = (std::uint8_t)(base + 22);  // byte 22: LFO de modwheel (0..50)
-        f[kg + 23] = (std::uint8_t)(int8_t)(-(base + 3) % 51);  // byte 23: VCF amount
+        f[kg + 21] = (std::uint8_t)(base + 21);                // byte 21: LFO de aftertouch (0..50)
+        f[kg + 22] = (std::uint8_t)(base + 22);                // byte 22: LFO de modwheel (0..50)
+        f[kg + 23] = (std::uint8_t)(int8_t)(-(base + 3) % 51); // byte 23: VCF amount
 
         // Bytes 24..33: el nombre de la zona 1. No es un campo, y por eso el
         // catalogo no lo tiene: se prueba que se puede leer crudo.
         putName10(f, kg + 24, "ZONEONE");
-        f[kg + 34] = (std::uint8_t)(base + 34);  // byte 34: VCF attack
-        f[kg + 35] = (std::uint8_t)(base + 35);  // byte 35: VCF decay
-        f[kg + 36] = (std::uint8_t)(base + 36);  // byte 36: VCF sustain
-        f[kg + 37] = (std::uint8_t)(base + 37);  // byte 37: VCF release
-        f[kg + 38] = 0; f[kg + 39] = 0; f[kg + 40] = 0; f[kg + 41] = 0;
-        f[kg + 42] = (std::uint8_t)((base + 42) % 256);  // byte 42: soft fine, 0..255
-        f[kg + 43] = (std::uint8_t)(int8_t)(-(base + 4) % 51);  // byte 43: soft transpose
-        f[kg + 44] = (std::uint8_t)(base + 44);  // byte 44: soft filter
-        f[kg + 45] = (std::uint8_t)(int8_t)(-(base + 5) % 51);  // byte 45: soft loudness
+        f[kg + 34] = (std::uint8_t)(base + 34); // byte 34: VCF attack
+        f[kg + 35] = (std::uint8_t)(base + 35); // byte 35: VCF decay
+        f[kg + 36] = (std::uint8_t)(base + 36); // byte 36: VCF sustain
+        f[kg + 37] = (std::uint8_t)(base + 37); // byte 37: VCF release
+        f[kg + 38] = 0;
+        f[kg + 39] = 0;
+        f[kg + 40] = 0;
+        f[kg + 41] = 0;
+        f[kg + 42] = (std::uint8_t)((base + 42) % 256);        // byte 42: soft fine, 0..255
+        f[kg + 43] = (std::uint8_t)(int8_t)(-(base + 4) % 51); // byte 43: soft transpose
+        f[kg + 44] = (std::uint8_t)(base + 44);                // byte 44: soft filter
+        f[kg + 45] = (std::uint8_t)(int8_t)(-(base + 5) % 51); // byte 45: soft loudness
         // 46..63: el nombre de la zona 2 (46 = 24 + 22), y el resto a cero.
         putName10(f, kg + 46, "ZONETWO");
-        f[kg + 64] = (std::uint8_t)((base + 64) % 256);  // byte 64: loud fine
-        f[kg + 65] = (std::uint8_t)(int8_t)(-(base + 6) % 51);  // byte 65: loud transpose
-        f[kg + 66] = (std::uint8_t)(base + 66);  // byte 66: loud filter
-        f[kg + 67] = (std::uint8_t)(int8_t)(-(base + 7) % 51);  // byte 67: loud loudness
+        f[kg + 64] = (std::uint8_t)((base + 64) % 256);        // byte 64: loud fine
+        f[kg + 65] = (std::uint8_t)(int8_t)(-(base + 6) % 51); // byte 65: loud transpose
+        f[kg + 66] = (std::uint8_t)(base + 66);                // byte 66: loud filter
+        f[kg + 67] = (std::uint8_t)(int8_t)(-(base + 7) % 51); // byte 67: loud loudness
         // 68..69: la cadena de punteros. A cero: este programa no apunta a
         // ningun sample, y no es lo que se esta probando.
     }
@@ -129,8 +143,9 @@ static std::vector<std::uint8_t> buildTestProgram() {
     La cadena es 4 -> 9 -> 20: bloques que no se tocan. Un keygroup partido entre
     el 4 y el 9 tiene que salir bien, y sale, porque `fileByteAt` recorre la
     cadena byte a byte. */
-static abd::synth::S950Disk buildTestDisk() {
-    auto d = abd::synth::S950Disk::blank(false);   // 800 bloques, doble densidad
+static abd::synth::S950Disk buildTestDisk()
+{
+    auto d = abd::synth::S950Disk::blank(false); // 800 bloques, doble densidad
 
     // La cadena, a mano, en la tabla de asignacion.
     d.setFat(kTestChain[0], kTestChain[1]);
@@ -140,9 +155,10 @@ static abd::synth::S950Disk buildTestDisk() {
     // El contenido, repartido por la MISMA cadena, byte a byte. Nada de
     // `setBlock` con un bloque entero: el fichero son 1218 bytes y el bloque
     // son 1024, asi que si se copiase entero se perderia lo que pasa del corte.
-    const auto f = buildTestProgram();
+    const auto f     = buildTestProgram();
     std::size_t done = 0;
-    for (int i = 0; i < 3 && done < f.size(); ++i) {
+    for (int i = 0; i < 3 && done < f.size(); ++i)
+    {
         const std::size_t base = (std::size_t)kTestChain[i] * 1024u;
         const std::size_t take = std::min((std::size_t)1024u, f.size() - done);
         for (std::size_t b = 0; b < take; ++b) d.bytes()[base + b] = f[done + b];
@@ -150,7 +166,7 @@ static abd::synth::S950Disk buildTestDisk() {
     }
 
     // La entrada del directorio, a mano, 24 bytes.
-    auto& img = d.bytes();
+    auto& img             = d.bytes();
     const std::size_t dir = 0;
     putName10(img, dir, "TESTPROG");
     img[dir + 16] = 'P';
@@ -162,7 +178,8 @@ static abd::synth::S950Disk buildTestDisk() {
     return d;
 }
 
-static void testS950Disk() {
+static void testS950Disk()
+{
     printf("=== S950Disk ===\n");
 
     using namespace abd::synth;
@@ -184,7 +201,8 @@ static void testS950Disk() {
         // Un disco de 900 bloques no existe en la maquina, pero si alguien pasa
         // una imagen asi, la densidad sale del tamano y no de lo que se creyera.
         std::vector<std::uint8_t> odd(900u * 1024u, 0u);
-        S950Disk o; o.adopt(std::move(odd));
+        S950Disk o;
+        o.adopt(std::move(odd));
         check(o.isHighDensity(), "900 bloques se leen como alta densidad, que es lo que hay");
     }
 
@@ -197,7 +215,11 @@ static void testS950Disk() {
 
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "el programa aparece por nombre y tipo");
-        if (e == nullptr) { printf("  (aborta: sin programa no se puede seguir)\n"); return; }
+        if (e == nullptr)
+        {
+            printf("  (aborta: sin programa no se puede seguir)\n");
+            return;
+        }
 
         check(strcmp(e->name, "TESTPROG") == 0, "el nombre se lee sin espacios de mas");
         check(e->type == 'P', "el tipo es P");
@@ -228,9 +250,10 @@ static void testS950Disk() {
         // esto daria basura, y aqui sale bien.
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para probar la cadena");
-        if (e) {
+        if (e)
+        {
             std::size_t at = 0;
-            const int kg = kTestStraddleKeygroup;   // empieza en 38 + 14*70 = 1018
+            const int kg   = kTestStraddleKeygroup; // empieza en 38 + 14*70 = 1018
             check(d.keygroupByteAt(*e, kg, 0, at), "el byte 0 del keygroup partido se resuelve");
             const std::size_t expected = (std::size_t)kTestChain[0] * 1024u + 1018u;
             check(at == expected, "el byte 0 cae en el final del bloque 4");
@@ -247,10 +270,11 @@ static void testS950Disk() {
     // ═══════ 4. EL CONTEO DE KEYGROUPS ═══════
 
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para contar keygroups");
-        if (e) {
+        if (e)
+        {
             check(d.keygroupCount(*e) == kTestKeygroups, "el programa tiene 16 keygroups");
 
             // Y los bordes: fuera de rango no es "el ultimo", es un fallo.
@@ -262,8 +286,8 @@ static void testS950Disk() {
             // danado, y se dice que no tiene keygroups. Un resto truncado seria
             // leer basura como si fuera un keygroup mas.
             S950Disk bad = buildTestDisk();
-            auto& img = bad.bytes();
-            putU24(img, 17, (unsigned)(kTestFileLength + 5));   // 5 bytes de mas
+            auto& img    = bad.bytes();
+            putU24(img, 17, (unsigned)(kTestFileLength + 5)); // 5 bytes de mas
             bad.rescan();
             const auto* p2 = bad.find("TESTPROG", 'P');
             check(p2 != nullptr, "el programa danado sigue en el directorio");
@@ -283,32 +307,47 @@ static void testS950Disk() {
     // ═══════ 5. LEER LOS 38 CAMPOS, UNO A UNO ═══════
 
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para leer");
         if (e == nullptr) return;
 
         int v = 0;
-        for (int k = 0; k < 3; ++k) {
+        for (int k = 0; k < 3; ++k)
+        {
             const int b = 10 * k;
             char msg[128];
 
             // Los con valor positive distinto por keygroup: si el modulo leyera
             // del keygroup equivocado, el numero no casaria.
-            snprintf(msg, sizeof(msg), "k%d: low key", k);       check(d.readField(*e, k, "lowKey", v) && v == b + 1, msg);
-            snprintf(msg, sizeof(msg), "k%d: high key", k);      check(d.readField(*e, k, "highKey", v) && v == b + 2, msg);
-            snprintf(msg, sizeof(msg), "k%d: VCA attack", k);    check(d.readField(*e, k, "vcaAttack", v) && v == b + 3, msg);
-            snprintf(msg, sizeof(msg), "k%d: VCA decay", k);     check(d.readField(*e, k, "vcaDecay", v) && v == b + 4, msg);
-            snprintf(msg, sizeof(msg), "k%d: VCA sustain", k);   check(d.readField(*e, k, "vcaSustain", v) && v == b + 5, msg);
-            snprintf(msg, sizeof(msg), "k%d: VCA release", k);   check(d.readField(*e, k, "vcaRelease", v) && v == b + 6, msg);
-            snprintf(msg, sizeof(msg), "k%d: vel to filter", k); check(d.readField(*e, k, "velToFilter", v) && v == b + 7, msg);
-            snprintf(msg, sizeof(msg), "k%d: key to filter", k); check(d.readField(*e, k, "keyToFilter", v) && v == b + 8, msg);
-            snprintf(msg, sizeof(msg), "k%d: vel to attack", k); check(d.readField(*e, k, "velToAttack", v) && v == b + 9, msg);
-            snprintf(msg, sizeof(msg), "k%d: LFO delay", k);     check(d.readField(*e, k, "lfoDelay", v) && v == b + 15, msg);
-            snprintf(msg, sizeof(msg), "k%d: LFO rate", k);      check(d.readField(*e, k, "lfoRate", v) && v == b + 16, msg);
-            snprintf(msg, sizeof(msg), "k%d: LFO depth", k);     check(d.readField(*e, k, "lfoDepth", v) && v == b + 17, msg);
-            snprintf(msg, sizeof(msg), "k%d: soft filter", k);   check(d.readField(*e, k, "softFilter", v) && v == b + 44, msg);
-            snprintf(msg, sizeof(msg), "k%d: loud filter", k);   check(d.readField(*e, k, "loudFilter", v) && v == b + 66, msg);
+            snprintf(msg, sizeof(msg), "k%d: low key", k);
+            check(d.readField(*e, k, "lowKey", v) && v == b + 1, msg);
+            snprintf(msg, sizeof(msg), "k%d: high key", k);
+            check(d.readField(*e, k, "highKey", v) && v == b + 2, msg);
+            snprintf(msg, sizeof(msg), "k%d: VCA attack", k);
+            check(d.readField(*e, k, "vcaAttack", v) && v == b + 3, msg);
+            snprintf(msg, sizeof(msg), "k%d: VCA decay", k);
+            check(d.readField(*e, k, "vcaDecay", v) && v == b + 4, msg);
+            snprintf(msg, sizeof(msg), "k%d: VCA sustain", k);
+            check(d.readField(*e, k, "vcaSustain", v) && v == b + 5, msg);
+            snprintf(msg, sizeof(msg), "k%d: VCA release", k);
+            check(d.readField(*e, k, "vcaRelease", v) && v == b + 6, msg);
+            snprintf(msg, sizeof(msg), "k%d: vel to filter", k);
+            check(d.readField(*e, k, "velToFilter", v) && v == b + 7, msg);
+            snprintf(msg, sizeof(msg), "k%d: key to filter", k);
+            check(d.readField(*e, k, "keyToFilter", v) && v == b + 8, msg);
+            snprintf(msg, sizeof(msg), "k%d: vel to attack", k);
+            check(d.readField(*e, k, "velToAttack", v) && v == b + 9, msg);
+            snprintf(msg, sizeof(msg), "k%d: LFO delay", k);
+            check(d.readField(*e, k, "lfoDelay", v) && v == b + 15, msg);
+            snprintf(msg, sizeof(msg), "k%d: LFO rate", k);
+            check(d.readField(*e, k, "lfoRate", v) && v == b + 16, msg);
+            snprintf(msg, sizeof(msg), "k%d: LFO depth", k);
+            check(d.readField(*e, k, "lfoDepth", v) && v == b + 17, msg);
+            snprintf(msg, sizeof(msg), "k%d: soft filter", k);
+            check(d.readField(*e, k, "softFilter", v) && v == b + 44, msg);
+            snprintf(msg, sizeof(msg), "k%d: loud filter", k);
+            check(d.readField(*e, k, "loudFilter", v) && v == b + 66, msg);
 
             // El switch es 128 en todos: es el "no hay segunda zona".
             snprintf(msg, sizeof(msg), "k%d: sin segunda zona", k);
@@ -340,15 +379,18 @@ static void testS950Disk() {
         }
 
         // Y el resto de los signed, con la misma regla, en todos los keygroups.
-        for (int k = 0; k < 4; ++k) {
+        for (int k = 0; k < 4; ++k)
+        {
             const int b = 10 * k;
             char msg[128];
-            struct { const char* code; int add; } signs[] = {
-                { "velToRelease", 1 }, { "warpDepth", 2 }, { "vcfAmount", 3 },
-                { "softTranspose", 4 }, { "softLoudness", 5 },
-                { "loudTranspose", 6 }, { "loudLoudness", 7 }
-            };
-            for (auto& s : signs) {
+            struct
+            {
+                const char* code;
+                int add;
+            } signs[] = {
+                {"velToRelease", 1}, {"warpDepth", 2}, {"vcfAmount", 3}, {"softTranspose", 4}, {"softLoudness", 5}, {"loudTranspose", 6}, {"loudLoudness", 7}};
+            for (auto& s : signs)
+            {
                 const int expected = -(b + s.add) % 51;
                 snprintf(msg, sizeof(msg), "k%d: '%s' con signo vale %d", k, s.code, expected);
                 check(d.readField(*e, k, s.code, v) && v == expected, msg);
@@ -375,10 +417,11 @@ static void testS950Disk() {
 
         // El 0xFF: el caso que hace que esto sea una tabla y no un array.
         {
-            auto d2 = buildTestDisk();
+            auto d2        = buildTestDisk();
             const auto* e2 = d2.find("TESTPROG", 'P');
             check(e2 != nullptr, "hay programa para el 0xFF");
-            if (e2) {
+            if (e2)
+            {
                 d2.writeRawKeygroupByte(*e2, 0, 19, 0xFF);
                 check(d2.readField(*e2, 0, "outputPort", v) && v == 0,
                       "el 0xFF del disco es el 0 del panel, no 255");
@@ -405,10 +448,11 @@ static void testS950Disk() {
     // ═══════ 6. LEER UN BYTE QUE NO ES UN CAMPO ═══════
 
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para los bytes crudos");
-        if (e) {
+        if (e)
+        {
             // El nombre de la zona 1 esta en el byte 24, y no en el catalogo
             // porque no es un campo del panel: es texto. Y aun asi hay que poder
             // leerlo, cruzando la cadena.
@@ -429,33 +473,37 @@ static void testS950Disk() {
     // y se exige que SOLO haya cambiado el byte del campo. Un byte de mas es un
     // dato perdido: otro campo, el bit reservado, el nombre de una zona.
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para escribir");
         if (e == nullptr) return;
 
         const auto before = d.bytes();
-        int v = 0;
+        int v             = 0;
 
         check(d.writeField(*e, 5, "vcaDecay", 77), "escribir un campo devuelve true");
         check(d.readField(*e, 5, "vcaDecay", v) && v == 77, "y se lee lo que se ha escrito");
 
         // Cuantos bytes han cambiado: exactamente uno.
         int changed = 0, changedAt = -1;
-        for (std::size_t i = 0; i < before.size(); ++i) {
-            if (before[i] != d.bytes()[i]) { ++changed; changedAt = (int)i; }
+        for (std::size_t i = 0; i < before.size(); ++i)
+        {
+            if (before[i] != d.bytes()[i])
+            {
+                ++changed;
+                changedAt = (int)i;
+            }
         }
         check(changed == 1, "escribir un campo cambia UN byte de la imagen");
         // Y es exactamente el byte 4 del keygroup 5, resuelto por la cadena.
-        const std::size_t expected = (std::size_t)kTestChain[0] * 1024u
-                                   + 38u + 5u * 70u + 4u;
+        const std::size_t expected = (std::size_t)kTestChain[0] * 1024u + 38u + 5u * 70u + 4u;
         check(changedAt == (int)expected, "y es el byte del campo, en el sitio que dice la cadena");
     }
 
     // ═══════ 8. ESCRIBIR UN FLAG NO TIRA LOS OTROS ═══════
 
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para los flags");
         if (e == nullptr) return;
@@ -473,7 +521,7 @@ static void testS950Disk() {
         // Y el bit reservado 0x02, que nadie descifro. El test lo pone a mano y
         // comprueba que sobrevive a la escritura de un flag: es la razon de que
         // un flag se escriba con lectura-modificacion-escritura y no a pelo.
-        d.writeRawKeygroupByte(*e, 0, 18, 0x1F);   // 0x1D + el bit reservado
+        d.writeRawKeygroupByte(*e, 0, 18, 0x1F); // 0x1D + el bit reservado
         check(d.writeField(*e, 0, "constantPitch", 0), "escribir un flag con el reservado puesto");
         std::uint8_t byte = 0;
         check(d.readRawKeygroupByte(*e, 0, 18, byte), "se puede leer el byte de flags crudo");
@@ -487,7 +535,7 @@ static void testS950Disk() {
     // ═══════ 9. EL RECORTE AL RANGO DEL CAMPO ═══════
 
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para recortar");
         if (e == nullptr) return;
@@ -516,7 +564,7 @@ static void testS950Disk() {
     // ═══════ 10. ESCRIBIR FUERA DE RANGO ES UN FALLO, NO UN CRASH ═══════
 
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para los fallos");
         if (e == nullptr) return;
@@ -571,7 +619,7 @@ static void testS950Disk() {
     // un S900— y se lee. Lo que tiene que salir NO es 32 en cada etapa: es la
     // envolvente plana, porque 32 no es un ajuste que nadie eligio.
     {
-        auto d = buildTestDisk();
+        auto d        = buildTestDisk();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "hay programa para la envolvente en blanco");
         if (e == nullptr) return;
@@ -607,12 +655,13 @@ static void testS950Disk() {
         // atras, si esta danada. Un recorrido sin limite no volveria nunca, y un
         // importador de un fichero raro no puede colgarse.
         auto d = buildTestDisk();
-        d.setFat(kTestChain[0], kTestChain[0]);   // el 4 se apunta a si mismo
+        d.setFat(kTestChain[0], kTestChain[0]); // el 4 se apunta a si mismo
         check(d.chainLength(kTestStartBlock, 800) == 1, "una cadena que se apunta a si misma se corta");
         d.rescan();
         const auto* e = d.find("TESTPROG", 'P');
         check(e != nullptr, "el programa sigue estando, aunque la cadena este rota");
-        if (e) {
+        if (e)
+        {
             check(e->chainBlocks == 1, "la cadena rota se ve corta: un bloque donde hacia falta dos");
             check(!e->chainOk, "y se marca como que no cubre los 1158 bytes que declara");
         }
@@ -636,17 +685,17 @@ static void testS950Disk() {
 
         // Una entrada que apunta a un bloque imposible se descarta al leer el
         // directorio: no se cuela como un programa.
-        auto d2 = S950Disk::blank(false);
+        auto d2   = S950Disk::blank(false);
         auto& img = d2.bytes();
         putName10(img, 0, "FANTASMA");
         img[16] = 'P';
         putU24(img, 17, 500);
-        putU16(img, 20, 99999);   // bloque que no existe
+        putU16(img, 20, 99999); // bloque que no existe
         d2.rescan();
         check(d2.find("FANTASMA", 'P') == nullptr, "una entrada a un bloque imposible no se lee como fichero");
 
         // Y un tipo de fichero que no existe no es una entrada.
-        auto d3 = S950Disk::blank(false);
+        auto d3    = S950Disk::blank(false);
         auto& img3 = d3.bytes();
         putName10(img3, 0, "RARO");
         img3[16] = 'Z';
@@ -658,7 +707,8 @@ static void testS950Disk() {
         // Y una imagen truncada: adopts se recorta al bloque entero, y no deja
         // medio bloque suelto que no se puede direccionar.
         std::vector<std::uint8_t> cut(500u * 1024u + 7u, 0u);
-        S950Disk t; t.adopt(cut);
+        S950Disk t;
+        t.adopt(cut);
         check(t.bytes().size() == 500u * 1024u, "una imagen a medio bloque se recorta al bloque entero");
     }
 
@@ -690,7 +740,7 @@ static void testS950Disk() {
     // ═══════ 15. LA VUELTA COMPLETA: ESCRIBIR Y VOLVER A LEER ═══════
 
     {
-        auto d = S950Disk::blank(false);
+        auto d        = S950Disk::blank(false);
         const auto* p = d.addProgram("RT", 2);
         check(p != nullptr, "se crea el programa de la vuelta completa");
         if (p == nullptr) return;
@@ -698,8 +748,9 @@ static void testS950Disk() {
         // Todos los 38 campos, con un valor distinto cada uno, y todos leidos
         // de vuelta. El valor tiene que caber en el rango del campo, asi que se
         // elige de dentro.
-        for (int i = 0; i < patchFieldCount; ++i) {
-            const auto& f = fieldAt(i);
+        for (int i = 0; i < patchFieldCount; ++i)
+        {
+            const auto& f   = fieldAt(i);
             const int value = f.lo + ((i * 7) % (f.hi - f.lo + 1));
             char msg[128];
             snprintf(msg, sizeof(msg), "vuelta completa: '%s' se escribe", f.code);
@@ -709,10 +760,11 @@ static void testS950Disk() {
         // Y ahora se leen TODOS de vuelta, y cada uno tiene que ser el que se
         // escribio. Esto cruza el catalogo entero, la codificacion de cada tipo,
         // la cadena de bloques y el recorte.
-        for (int i = 0; i < patchFieldCount; ++i) {
-            const auto& f = fieldAt(i);
+        for (int i = 0; i < patchFieldCount; ++i)
+        {
+            const auto& f   = fieldAt(i);
             const int value = f.lo + ((i * 7) % (f.hi - f.lo + 1));
-            int v = -12345;
+            int v           = -12345;
             char msg[128];
             snprintf(msg, sizeof(msg), "vuelta completa: '%s' se relee igual", f.code);
             check(d.readField(*p, 1, f.code, v) && v == value, msg);

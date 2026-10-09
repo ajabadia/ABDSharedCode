@@ -30,8 +30,14 @@ void* operator new(std::size_t size)
     throw std::bad_alloc();
 }
 
-void operator delete(void* ptr) noexcept { std::free(ptr); }
-void operator delete(void* ptr, std::size_t) noexcept { std::free(ptr); }
+void operator delete(void* ptr) noexcept
+{
+    std::free(ptr);
+}
+void operator delete(void* ptr, std::size_t) noexcept
+{
+    std::free(ptr);
+}
 
 #include "ADSREnvelope.h"
 #include "Arpeggiator.h"
@@ -92,9 +98,9 @@ static void check(bool condition, const char* testName)
 // autocontenido y solo depende de la cabecera de SynthCore que prueba.
 #include "tests/ArpeggiatorTests.inc"
 #include "tests/ControlSequencerTests.inc"
-#include "tests/LFOAnalogTests.inc"
-#include "tests/EnvelopeAnalogTests.inc"
 #include "tests/DriftEngineTests.inc"
+#include "tests/EnvelopeAnalogTests.inc"
+#include "tests/LFOAnalogTests.inc"
 
 // El catalogo del S950 tambien va en su propio .inc: es un bloque de datos con
 // sus propias reglas, y mezclarlo con el resto haria mas dificil ver que se
@@ -221,7 +227,10 @@ static void testEnvelope()
     // ── Las 4 etapas como contrato observable ──
     ADSREnvelope st;
     st.prepare(44100.0);
-    st.setAttack(0.0f); st.setDecay(0.0f); st.setSustain(0.5f); st.setRelease(0.0f);
+    st.setAttack(0.0f);
+    st.setDecay(0.0f);
+    st.setSustain(0.5f);
+    st.setRelease(0.0f);
     check(st.getStage() == EnvelopeStage::Idle, "arranca en Idle");
     st.noteOn();
     check(st.getStage() == EnvelopeStage::Attack, "noteOn entra en Attack");
@@ -238,7 +247,10 @@ static void testEnvelope()
     auto nivelSustain = [](float sus, float vel) {
         ADSREnvelope e;
         e.prepare(44100.0);
-        e.setAttack(0.0f); e.setDecay(0.0f); e.setSustain(sus); e.setRelease(0.0f);
+        e.setAttack(0.0f);
+        e.setDecay(0.0f);
+        e.setSustain(sus);
+        e.setRelease(0.0f);
         e.noteOn(vel);
         float v = 0.0f;
         for (int i = 0; i < 480; ++i) v = e.getNextSample();
@@ -256,11 +268,14 @@ static void testEnvelope()
     // ── Retrigger: noteOn en pleno release SUBE desde donde estaba ──
     ADSREnvelope rt;
     rt.prepare(44100.0);
-    rt.setAttack(0.0f); rt.setDecay(0.0f); rt.setSustain(0.5f); rt.setRelease(1.0f); // release de 10 s
+    rt.setAttack(0.0f);
+    rt.setDecay(0.0f);
+    rt.setSustain(0.5f);
+    rt.setRelease(1.0f); // release de 10 s
     rt.noteOn(1.0f);
     for (int i = 0; i < 480; ++i) rt.getNextSample();
     rt.noteOff();
-    for (int i = 0; i < 4410; ++i) rt.getNextSample();   // 0,1 s: apenas ha bajado
+    for (int i = 0; i < 4410; ++i) rt.getNextSample(); // 0,1 s: apenas ha bajado
     const float antesDelRetrigger = rt.getCurrentLevel();
     check(antesDelRetrigger > 0.4f, "tras 0,1 s de release lento la nota aún suena (medido, no supuesto)");
     rt.noteOn(1.0f);
@@ -271,8 +286,10 @@ static void testEnvelope()
     // ── noteOff en pleno ataque: solo baja, y acaba en Idle ──
     ADSREnvelope na;
     na.prepare(44100.0);
-    na.setAttack(1.0f);   // 5 s: a los 0,1 s va por ~0,18
-    na.setDecay(0.0f); na.setSustain(1.0f); na.setRelease(0.0f);
+    na.setAttack(1.0f); // 5 s: a los 0,1 s va por ~0,18
+    na.setDecay(0.0f);
+    na.setSustain(1.0f);
+    na.setRelease(0.0f);
     na.noteOn(1.0f);
     for (int i = 0; i < 4410; ++i) na.getNextSample();
     const float picoDelCorte = na.getCurrentLevel();
@@ -298,21 +315,39 @@ static void testEnvelope()
     // ── Fuera de rango: setters y velocidad se clampean, nada de NaN ──
     ADSREnvelope xr;
     xr.prepare(44100.0);
-    xr.setAttack(5.0f); xr.setDecay(-3.0f); xr.setSustain(9.0f); xr.setRelease(-1.0f);
+    xr.setAttack(5.0f);
+    xr.setDecay(-3.0f);
+    xr.setSustain(9.0f);
+    xr.setRelease(-1.0f);
     xr.noteOn(1.5f);
     bool finito = true;
-    for (int i = 0; i < 5000; ++i) { const float v = xr.getNextSample(); if (!std::isfinite(v)) finito = false; }
+    for (int i = 0; i < 5000; ++i)
+    {
+        const float v = xr.getNextSample();
+        if (!std::isfinite(v)) finito = false;
+    }
     xr.noteOff();
-    for (int i = 0; i < 5000; ++i) { const float v = xr.getNextSample(); if (!std::isfinite(v)) finito = false; }
+    for (int i = 0; i < 5000; ++i)
+    {
+        const float v = xr.getNextSample();
+        if (!std::isfinite(v)) finito = false;
+    }
     check(finito, "parámetros y velocidad fuera de rango: todo el ciclo sale finito (sin NaN)");
 
     // ── prepare con sample rate inválido cae al fallback de 44100 ──
     ADSREnvelope p1, p2;
     p1.prepare(44100.0);
     p2.prepare(500.0);
-    p1.setAttack(0.3f); p1.setDecay(0.3f); p1.setSustain(0.5f); p1.setRelease(0.3f);
-    p2.setAttack(0.3f); p2.setDecay(0.3f); p2.setSustain(0.5f); p2.setRelease(0.3f);
-    p1.noteOn(0.7f); p2.noteOn(0.7f);
+    p1.setAttack(0.3f);
+    p1.setDecay(0.3f);
+    p1.setSustain(0.5f);
+    p1.setRelease(0.3f);
+    p2.setAttack(0.3f);
+    p2.setDecay(0.3f);
+    p2.setSustain(0.5f);
+    p2.setRelease(0.3f);
+    p1.noteOn(0.7f);
+    p2.noteOn(0.7f);
     bool mismoRecorridoEnv = true;
     for (int i = 0; i < 500; ++i)
         if (p1.getNextSample() != p2.getNextSample()) mismoRecorridoEnv = false;
@@ -360,11 +395,11 @@ static void testPortamento()
 static int contarVueltasSierra(LFO& lfo, int muestras, float modOctavas = 0.0f)
 {
     int vueltas = 0;
-    float prev = lfo.getNextSample(modOctavas);
+    float prev  = lfo.getNextSample(modOctavas);
     for (int i = 1; i < muestras; ++i)
     {
         const float v = lfo.getNextSample(modOctavas);
-        if (v - prev > 1.5f) ++vueltas;   // el diente sube de golpe al envolver
+        if (v - prev > 1.5f) ++vueltas; // el diente sube de golpe al envolver
         prev = v;
     }
     return vueltas;
@@ -434,7 +469,7 @@ static void testLFO()
         LFO l;
         l.prepare(44100.0);
         l.setWaveformLFO1(LFOWaveform::Sawtooth);
-        l.setFrequencyHz(5000.0f);      // clampeado al techo
+        l.setFrequencyHz(5000.0f); // clampeado al techo
         l.reset(0.0f);
         const int vueltas20 = contarVueltasSierra(l, 44100);
         check(vueltas20 >= 18 && vueltas20 <= 21, "setFrequencyHz se clampea al techo de 20 Hz (≈20 vueltas/s)");
@@ -442,10 +477,10 @@ static void testLFO()
         LFO s;
         s.prepare(44100.0);
         s.setWaveformLFO1(LFOWaveform::Sawtooth);
-        s.setFrequencyHz(0.000001f);    // clampeado al suelo
+        s.setFrequencyHz(0.000001f); // clampeado al suelo
         s.reset(0.0f);
         float v10s = 0.0f;
-        for (int i = 0; i < 441000; ++i) v10s = s.getNextSample();   // 10 s de tiempo real
+        for (int i = 0; i < 441000; ++i) v10s = s.getNextSample(); // 10 s de tiempo real
         // 10 s × 0,01 Hz = 0,1 de ciclo → diente = 1 − 2·0,1 = 0,8
         check(std::abs(v10s - 0.8f) < 0.01f, "setFrequencyHz se clampea al suelo de 0,01 Hz (0,8 tras 10 s)");
     }
@@ -455,8 +490,8 @@ static void testLFO()
         LFO s1;
         s1.prepare(44100.0);
         s1.setWaveformLFO1(LFOWaveform::Sawtooth);
-        s1.setTempoSync(true, 6);       // 1/8 → ×2
-        s1.setBpm(120.0);               // 120/60 × 2 = 4 Hz
+        s1.setTempoSync(true, 6); // 1/8 → ×2
+        s1.setBpm(120.0);         // 120/60 × 2 = 4 Hz
         s1.reset(0.0f);
         const int v4 = contarVueltasSierra(s1, 44100 * 3);
         check(v4 >= 11 && v4 <= 13, "sync: BPM 120 × 1/8 = 4 Hz medidos (≈12 vueltas en 3 s)");
@@ -464,7 +499,7 @@ static void testLFO()
         LFO s2;
         s2.prepare(44100.0);
         s2.setWaveformLFO1(LFOWaveform::Sawtooth);
-        s2.setTempoSync(true, 0);       // 1/1 → ×0,25
+        s2.setTempoSync(true, 0); // 1/1 → ×0,25
         s2.reset(0.0f);
         const int vMedia = contarVueltasSierra(s2, 44100 * 6);
         check(vMedia >= 2 && vMedia <= 4, "sync: BPM 120 × 1/1 = 0,5 Hz medidos (≈3 vueltas en 6 s)");
@@ -472,8 +507,8 @@ static void testLFO()
         LFO s3;
         s3.prepare(44100.0);
         s3.setWaveformLFO1(LFOWaveform::Sawtooth);
-        s3.setTempoSync(true, 4);       // 1/4 → ×1
-        s3.setBpm(999.0);               // fuera de rango → 120 por defecto
+        s3.setTempoSync(true, 4); // 1/4 → ×1
+        s3.setBpm(999.0);         // fuera de rango → 120 por defecto
         s3.reset(0.0f);
         const int vBpm = contarVueltasSierra(s3, 44100 * 2);
         check(vBpm >= 3 && vBpm <= 5, "setBpm inválido vuelve a 120 (idx4 → 2 Hz, 4 vueltas en 2 s)");
@@ -486,7 +521,7 @@ static void testLFO()
         s4.setWaveformLFO1(LFOWaveform::Sawtooth);
         s4.setFrequencyHz(2.0f);
         s4.setTempoSync(false);
-        s4.setBpm(300.0);               // sync apagado: la manual de 2 Hz no se mueve
+        s4.setBpm(300.0); // sync apagado: la manual de 2 Hz no se mueve
         s4.reset(0.0f);
         const int vManual = contarVueltasSierra(s4, 44100 * 2);
         check(vManual >= 3 && vManual <= 5, "con sync OFF, setBpm(300) NO retunea: siguen las 2 Hz manuales");
@@ -494,7 +529,7 @@ static void testLFO()
         LFO s5;
         s5.prepare(44100.0);
         s5.setWaveformLFO1(LFOWaveform::Sawtooth);
-        s5.setTempoSync(true, 6);       // se activa y se apaga
+        s5.setTempoSync(true, 6); // se activa y se apaga
         s5.setTempoSync(false);
         s5.setFrequencyHz(1.0f);
         s5.reset(0.0f);
@@ -505,11 +540,14 @@ static void testLFO()
     // ── Frecuencia modulada: el parámetro aplica 2^(2·oct) — +1 = ×4 ──
     {
         LFO b, m;
-        b.prepare(44100.0); m.prepare(44100.0);
+        b.prepare(44100.0);
+        m.prepare(44100.0);
         b.setWaveformLFO1(LFOWaveform::Sawtooth);
         m.setWaveformLFO1(LFOWaveform::Sawtooth);
-        b.setFrequencyHz(1.0f); m.setFrequencyHz(1.0f);
-        b.reset(0.0f); m.reset(0.0f);
+        b.setFrequencyHz(1.0f);
+        m.setFrequencyHz(1.0f);
+        b.reset(0.0f);
+        m.reset(0.0f);
         const int vBase = contarVueltasSierra(b, 44100);
         const int vMod  = contarVueltasSierra(m, 44100, 1.0f);
         check(vBase >= 0 && vBase <= 2, "sin modulación, 1 Hz da una vuelta por segundo");
@@ -521,21 +559,21 @@ static void testLFO()
         LFO libre;
         libre.prepare(44100.0);
         libre.setWaveformLFO1(LFOWaveform::Square);
-        libre.setKeySyncMode(0);        // Off: libre
+        libre.setKeySyncMode(0); // Off: libre
         libre.setFrequencyHz(1.0f);
-        for (int i = 0; i < 30000; ++i) libre.getNextSample();   // fase ≈ 0,68 → cuadrada en bajo
+        for (int i = 0; i < 30000; ++i) libre.getNextSample(); // fase ≈ 0,68 → cuadrada en bajo
         libre.triggerKeySync(false);
         check(libre.getNextSample() < -0.5f, "key sync Off: triggerKeySync NO resetea (sigue en bajo)");
 
         LFO tim;
         tim.prepare(44100.0);
         tim.setWaveformLFO1(LFOWaveform::Square);
-        tim.setKeySyncMode(1);          // Timbre
+        tim.setKeySyncMode(1); // Timbre
         tim.setFrequencyHz(1.0f);
         for (int i = 0; i < 30000; ++i) tim.getNextSample();
-        tim.triggerKeySync(false);      // no es la primera nota del timbre
+        tim.triggerKeySync(false); // no es la primera nota del timbre
         check(tim.getNextSample() < -0.5f, "key sync Timbre: fuera de la primera nota NO resetea");
-        tim.triggerKeySync(true);       // primera nota del timbre
+        tim.triggerKeySync(true); // primera nota del timbre
         check(tim.getNextSample() > 0.5f, "key sync Timbre: con la primera nota SÍ resetea");
     }
 
@@ -560,8 +598,8 @@ static void testLFO()
         h.setWaveformLFO1(LFOWaveform::SampleAndHold);
         h.setFrequencyHz(1.0f);
         const float v0 = h.getNextSample();
-        float vNuevo = v0;
-        for (int i = 0; i < 44102; ++i) vNuevo = h.getNextSample();  // cruza el wrap del segundo 1
+        float vNuevo   = v0;
+        for (int i = 0; i < 44102; ++i) vNuevo = h.getNextSample(); // cruza el wrap del segundo 1
         check(vNuevo != v0, "S&H cambia de valor al cruzar el ciclo");
     }
 
@@ -573,8 +611,10 @@ static void testLFO()
         cuad.setFrequencyHz(1.0f);
         cuad.reset(0.0f);
         int alto1 = 0, alto2 = 0;
-        for (int i = 0; i < 44100; ++i) if (cuad.getNextSample() > 0.0f) ++alto1;
-        for (int i = 0; i < 44100; ++i) if (cuad.getNextSample() > 0.0f) ++alto2;
+        for (int i = 0; i < 44100; ++i)
+            if (cuad.getNextSample() > 0.0f) ++alto1;
+        for (int i = 0; i < 44100; ++i)
+            if (cuad.getNextSample() > 0.0f) ++alto2;
         check(std::abs(alto1 - 22050) <= 3 && std::abs(alto2 - 22050) <= 3,
               "LFO1 Square: duty fijo al 50 % en dos ciclos seguidos");
 
@@ -582,12 +622,13 @@ static void testLFO()
         sqp.prepare(44100.0);
         sqp.setWaveformLFO2(LFOWaveformLFO2::SquarePlus);
         sqp.setFrequencyHz(1.0f);
-        sqp.reset(0.0f);                 // el reset pone PW inicial 0,5
+        sqp.reset(0.0f); // el reset pone PW inicial 0,5
         int duties[4] = {};
         for (int c = 0; c < 4; ++c)
         {
             int altos = 0;
-            for (int i = 0; i < 44100; ++i) if (sqp.getNextSample() > 0.0f) ++altos;
+            for (int i = 0; i < 44100; ++i)
+                if (sqp.getNextSample() > 0.0f) ++altos;
             duties[c] = altos;
         }
         check(std::abs(duties[0] - 22050) <= 3, "Square+ arranca con el PW inicial 0,5 del reset");
@@ -596,7 +637,8 @@ static void testLFO()
             if (duties[c] < 2200 || duties[c] > 41900) dentroDelRango = false;
         check(dentroDelRango, "Square+: cada ciclo su duty queda entre el 5 % y el 95 %");
         bool cambia = false;
-        for (int c = 1; c < 4; ++c) if (duties[c] != duties[1]) cambia = true;
+        for (int c = 1; c < 4; ++c)
+            if (duties[c] != duties[1]) cambia = true;
         check(cambia, "Square+: el duty CAMBIA de ciclo a ciclo (PW aleatoria, no fija)");
     }
 
@@ -609,7 +651,8 @@ static void testLFO()
         p2.setWaveformLFO1(LFOWaveform::Triangle);
         p1.setFrequencyHz(3.0f);
         p2.setFrequencyHz(3.0f);
-        p1.reset(0.0f); p2.reset(0.0f);
+        p1.reset(0.0f);
+        p2.reset(0.0f);
         bool mismoRecorridoLfo = true;
         for (int i = 0; i < 5000; ++i)
             if (p1.getNextSample() != p2.getNextSample()) mismoRecorridoLfo = false;

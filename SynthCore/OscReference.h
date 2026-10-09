@@ -251,12 +251,12 @@ private:
     }
 
     //==========================================================================
-    double sampleRateHz = 44100.0;
-    double requestedHz  = defaultFrequencyHz; // lo que se ha pedido (antes de los topes)
-    double frequency    = defaultFrequencyHz; // lo que SE ESTA usando
-    double increment    = defaultFrequencyHz / sampleRateHz;
-    double phase        = 0.0; // 0..1, la fase de la proxima muestra
-    double pulseWidth   = 0.5; // 0..1, solo lo usa un rectangulo, que este prototipo aun no tiene
+    double sampleRateHz         = 44100.0;
+    double requestedHz          = defaultFrequencyHz; // lo que se ha pedido (antes de los topes)
+    double frequency            = defaultFrequencyHz; // lo que SE ESTA usando
+    double increment            = defaultFrequencyHz / sampleRateHz;
+    double phase                = 0.0; // 0..1, la fase de la proxima muestra
+    double pulseWidth           = 0.5; // 0..1, solo lo usa un rectangulo, que este prototipo aun no tiene
     OscWaveform currentWaveform = OscWaveform::Sawtooth;
 };
 

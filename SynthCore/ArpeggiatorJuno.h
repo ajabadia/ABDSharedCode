@@ -32,30 +32,30 @@ namespace abd::synth
 //==============================================================================
 enum class ArpDivision : int
 {
-    kDiv1 = 0,   // whole note
-    kDiv2,       // 1/2 note
-    kDiv4,       // 1/4 note
-    kDiv4T,      // 1/4 triplet
-    kDiv8,       // 1/8 note
-    kDiv8T,      // 1/8 triplet
-    kDiv16,      // 1/16 note
-    kDiv16T,     // 1/16 triplet
-    kDiv32,      // 1/32 note
+    kDiv1 = 0, // whole note
+    kDiv2,     // 1/2 note
+    kDiv4,     // 1/4 note
+    kDiv4T,    // 1/4 triplet
+    kDiv8,     // 1/8 note
+    kDiv8T,    // 1/8 triplet
+    kDiv16,    // 1/16 note
+    kDiv16T,   // 1/16 triplet
+    kDiv32,    // 1/32 note
     kNumArpDivisions
 };
 
 static constexpr int kNumArpDivisionsCount = static_cast<int>(ArpDivision::kNumArpDivisions);
 
 static constexpr double kArpDivBeats[kNumArpDivisionsCount] = {
-    4.0,         // 1/1
-    2.0,         // 1/2
-    1.0,         // 1/4
-    2.0 / 3.0,   // 1/4T
-    0.5,         // 1/8
-    1.0 / 3.0,   // 1/8T
-    0.25,        // 1/16
-    1.0 / 6.0,   // 1/16T
-    0.125        // 1/32
+    4.0,       // 1/1
+    2.0,       // 1/2
+    1.0,       // 1/4
+    2.0 / 3.0, // 1/4T
+    0.5,       // 1/8
+    1.0 / 3.0, // 1/8T
+    0.25,      // 1/16
+    1.0 / 6.0, // 1/16T
+    0.125      // 1/32
 };
 
 //==============================================================================
@@ -66,27 +66,27 @@ public:
     static constexpr int kMaxHeldNotes = 128;
     static constexpr int kMaxArpNote   = 96; // Límite de teclado físico Roland Juno (C7)
 
-    bool    mEnabled       = false;
-    int     mMode          = 0;       // 0=Up, 1=Up/Down, 2=Down
-    int     mRange         = 0;       // 0=1oct, 1=2oct, 2=3oct
-    float   mRate          = 120.f;   // BPM (steps per minute)
-    float   mSampleRate    = 44100.f;
+    bool mEnabled     = false;
+    int mMode         = 0;     // 0=Up, 1=Up/Down, 2=Down
+    int mRange        = 0;     // 0=1oct, 1=2oct, 2=3oct
+    float mRate       = 120.f; // BPM (steps per minute)
+    float mSampleRate = 44100.f;
 
     // Estado de sincronización DAW
-    bool    mSyncToHost    = false;
-    bool    mHostPlaying   = false;
-    double  mHostBPM       = 120.0;
-    double  mHostBeatPos   = 0.0;
-    int     mDivision      = static_cast<int>(ArpDivision::kDiv16);
-    int64_t mLastSyncStep  = -1;
+    bool mSyncToHost      = false;
+    bool mHostPlaying     = false;
+    double mHostBPM       = 120.0;
+    double mHostBeatPos   = 0.0;
+    int mDivision         = static_cast<int>(ArpDivision::kDiv16);
+    int64_t mLastSyncStep = -1;
 
-    int     mStepIndex     = 0;
-    int     mDirection     = 1;       // 1=ascending, -1=descending
-    float   mPhase         = 0.f;
-    int     mLastNote      = -1;      // actualmente sonando
+    int mStepIndex = 0;
+    int mDirection = 1; // 1=ascending, -1=descending
+    float mPhase   = 0.f;
+    int mLastNote  = -1; // actualmente sonando
     std::atomic<uint32_t> mTickCount{0};
 
-    bool    mLimitToKeyboard = true;
+    bool mLimitToKeyboard = true;
 
     ArpeggiatorJuno() noexcept = default;
 
@@ -94,7 +94,7 @@ public:
     static float arpRate(float t) noexcept
     {
         float pos = 1.f - t;
-        float hz = 1.0f / (2.0f * (33000.0f + pos * 1000000.0f) * 0.47e-6f * 0.6633f);
+        float hz  = 1.0f / (2.0f * (33000.0f + pos * 1000000.0f) * 0.47e-6f * 0.6633f);
         return hz * 60.f;
     }
 
@@ -159,7 +159,7 @@ public:
         if (mLimitToKeyboard)
             return mHeldCount * (mRange + 1);
 
-        int count = 0;
+        int count   = 0;
         int octaves = mRange + 1;
         for (int oct = 0; oct < octaves; ++oct)
         {
@@ -174,7 +174,7 @@ public:
 
     [[nodiscard]] int SeqNote(int idx) const noexcept
     {
-        int i = 0;
+        int i       = 0;
         int octaves = mRange + 1;
         for (int oct = 0; oct < octaves; ++oct)
         {
@@ -204,13 +204,13 @@ public:
         if (len == 0) return -1;
 
         if (mStepIndex >= len) mStepIndex = 0;
-        if (mStepIndex < 0)    mStepIndex = len - 1;
+        if (mStepIndex < 0) mStepIndex = len - 1;
 
         int note = -1;
         switch (mMode)
         {
             case 0: // Up
-                note = SeqNote(mStepIndex);
+                note       = SeqNote(mStepIndex);
                 mStepIndex = (mStepIndex + 1) % len;
                 break;
 
@@ -233,7 +233,7 @@ public:
                 break;
 
             case 2: // Down
-                note = SeqNote(len - 1 - mStepIndex);
+                note       = SeqNote(len - 1 - mStepIndex);
                 mStepIndex = (mStepIndex + 1) % len;
                 break;
 
@@ -260,7 +260,7 @@ public:
 
         if (mSyncToHost)
         {
-            int div = std::clamp(mDivision, 0, kNumArpDivisionsCount - 1);
+            int div         = std::clamp(mDivision, 0, kNumArpDivisionsCount - 1);
             double divBeats = kArpDivBeats[div];
 
             if (mHostPlaying)
@@ -269,7 +269,7 @@ public:
 
                 for (int s = 0; s < nFrames; ++s)
                 {
-                    double beatPos = mHostBeatPos + s * beatsPerSample;
+                    double beatPos  = mHostBeatPos + s * beatsPerSample;
                     int64_t stepNow = static_cast<int64_t>(std::floor(beatPos / divBeats));
 
                     if (stepNow != mLastSyncStep)
@@ -292,7 +292,7 @@ public:
             }
 
             float syncRate = static_cast<float>(mHostBPM / divBeats);
-            float inc = syncRate / (60.f * mSampleRate);
+            float inc      = syncRate / (60.f * mSampleRate);
 
             for (int s = 0; s < nFrames; ++s)
             {
@@ -339,9 +339,9 @@ public:
         }
     }
 
-    [[nodiscard]] int  getHeldCount() const noexcept { return mHeldCount; }
+    [[nodiscard]] int getHeldCount() const noexcept { return mHeldCount; }
     [[nodiscard]] bool hasHeldNotes() const noexcept { return mHeldCount > 0; }
-    [[nodiscard]] int  getHeldNote(int idx) const noexcept
+    [[nodiscard]] int getHeldNote(int idx) const noexcept
     {
         if (idx >= 0 && idx < mHeldCount)
             return mHeldNotes[static_cast<size_t>(idx)];

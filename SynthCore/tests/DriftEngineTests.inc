@@ -26,8 +26,10 @@ static void testDriftEngineDeterminism()
 
     // ── Dos motores idénticos: la misma trayectoria, bit a bit ──
     abd::synth::DriftEngine a, b;
-    a.setSampleRate (44100.0); a.setDriftParams (1.0f, 1.0f, 0.5f);
-    b.setSampleRate (44100.0); b.setDriftParams (1.0f, 1.0f, 0.5f);
+    a.setSampleRate(44100.0);
+    a.setDriftParams(1.0f, 1.0f, 0.5f);
+    b.setSampleRate(44100.0);
+    b.setDriftParams(1.0f, 1.0f, 0.5f);
 
     bool igualdad = true;
     // 40000 muestras ≈ 0,9 s: pasan DOS cambios de target (el intervalo a
@@ -36,27 +38,27 @@ static void testDriftEngineDeterminism()
     {
         a.nextSample();
         b.nextSample();
-        if (a.getOsc1PitchDrift()  != b.getOsc1PitchDrift())  igualdad = false;
-        if (a.getVcfCutoffDrift()   != b.getVcfCutoffDrift())  igualdad = false;
-        if (a.getEnvTimeDrift()     != b.getEnvTimeDrift())    igualdad = false;
+        if (a.getOsc1PitchDrift() != b.getOsc1PitchDrift()) igualdad = false;
+        if (a.getVcfCutoffDrift() != b.getVcfCutoffDrift()) igualdad = false;
+        if (a.getEnvTimeDrift() != b.getEnvTimeDrift()) igualdad = false;
     }
-    check (igualdad, "dos motores con los mismos parámetros recorren la misma trayectoria (bit a bit)");
+    check(igualdad, "dos motores con los mismos parámetros recorren la misma trayectoria (bit a bit)");
 
     // ── Drift a 0: las cinco salidas quedan en cero exacto ──
     abd::synth::DriftEngine z;
-    z.setSampleRate (44100.0);
-    z.setDriftParams (0.0f, 0.0f, 0.5f);
+    z.setSampleRate(44100.0);
+    z.setDriftParams(0.0f, 0.0f, 0.5f);
     bool ceros = true;
     for (int i = 0; i < 10000; ++i)
     {
         z.nextSample();
-        if (z.getOsc1PitchDrift()     != 0.0f) ceros = false;
-        if (z.getOsc2PitchDrift()     != 0.0f) ceros = false;
-        if (z.getVcfCutoffDrift()     != 0.0f) ceros = false;
-        if (z.getVcfResonanceDrift()  != 0.0f) ceros = false;
-        if (z.getEnvTimeDrift()       != 0.0f) ceros = false;
+        if (z.getOsc1PitchDrift() != 0.0f) ceros = false;
+        if (z.getOsc2PitchDrift() != 0.0f) ceros = false;
+        if (z.getVcfCutoffDrift() != 0.0f) ceros = false;
+        if (z.getVcfResonanceDrift() != 0.0f) ceros = false;
+        if (z.getEnvTimeDrift() != 0.0f) ceros = false;
     }
-    check (ceros, "con drift a 0 las cinco salidas quedan en cero exacto");
+    check(ceros, "con drift a 0 las cinco salidas quedan en cero exacto");
 }
 
 static void testDriftEngineAmplitudeScaling()
@@ -65,8 +67,10 @@ static void testDriftEngineAmplitudeScaling()
 
     // ── Misma semilla, amplitudes 1,0 vs 0,25 ──
     abd::synth::DriftEngine fuerte, debil;
-    fuerte.setSampleRate (44100.0); fuerte.setDriftParams (1.0f, 0.0f, 0.5f);
-    debil .setSampleRate (44100.0); debil .setDriftParams (0.25f, 0.0f, 0.5f);
+    fuerte.setSampleRate(44100.0);
+    fuerte.setDriftParams(1.0f, 0.0f, 0.5f);
+    debil.setSampleRate(44100.0);
+    debil.setDriftParams(0.25f, 0.0f, 0.5f);
 
     bool monoton = true, paramCero = true;
     float maxFuerte = 0.0f, maxDebil = 0.0f;
@@ -77,38 +81,40 @@ static void testDriftEngineAmplitudeScaling()
 
         const float vf = fuerte.getOsc1PitchDrift();
         const float vd = debil.getOsc1PitchDrift();
-        if (std::abs (vf) + 1.0e-6f < std::abs (vd)) monoton = false;
-        if (std::abs (vf) > maxFuerte) maxFuerte = std::abs (vf);
-        if (std::abs (vd) > maxDebil)  maxDebil  = std::abs (vd);
+        if (std::abs(vf) + 1.0e-6f < std::abs(vd)) monoton = false;
+        if (std::abs(vf) > maxFuerte) maxFuerte = std::abs(vf);
+        if (std::abs(vd) > maxDebil) maxDebil = std::abs(vd);
 
         // paramDrift = 0: el filtro NO deriva ni una muestra.
-        if (fuerte.getVcfCutoffDrift()    != 0.0f) paramCero = false;
+        if (fuerte.getVcfCutoffDrift() != 0.0f) paramCero = false;
         if (fuerte.getVcfResonanceDrift() != 0.0f) paramCero = false;
     }
-    check (paramCero, "paramDrift 0 mantiene el drift del filtro en cero");
-    check (monoton, "amplitud 1,0 nunca da menos recorrido que 0,25 (misma semilla)");
-    check (maxFuerte > maxDebil && maxFuerte > 0.01f,
-           "la amplitud mayor alcanza un pico claramente mayor");
+    check(paramCero, "paramDrift 0 mantiene el drift del filtro en cero");
+    check(monoton, "amplitud 1,0 nunca da menos recorrido que 0,25 (misma semilla)");
+    check(maxFuerte > maxDebil && maxFuerte > 0.01f,
+          "la amplitud mayor alcanza un pico claramente mayor");
 
     // ── Invariancia al sample rate: misma pared de tiempo, mismos valores ──
     abd::synth::DriftEngine a44, a88;
-    a44.setSampleRate (44100.0); a44.setDriftParams (1.0f, 1.0f, 0.5f);
-    a88.setSampleRate (88200.0); a88.setDriftParams (1.0f, 1.0f, 0.5f);
+    a44.setSampleRate(44100.0);
+    a44.setDriftParams(1.0f, 1.0f, 0.5f);
+    a88.setSampleRate(88200.0);
+    a88.setDriftParams(1.0f, 1.0f, 0.5f);
 
     float maxDiff = 0.0f;
-    for (int i = 0; i < 22050; ++i)          // 0,5 s de tiempo real
+    for (int i = 0; i < 22050; ++i) // 0,5 s de tiempo real
     {
         a44.nextSample();
         a88.nextSample();
-        a88.nextSample();                    // 88,2 kHz: dos muestras por una
+        a88.nextSample(); // 88,2 kHz: dos muestras por una
 
-        const float d1 = std::abs (a44.getOsc1PitchDrift() - a88.getOsc1PitchDrift());
-        const float d2 = std::abs (a44.getVcfCutoffDrift()  - a88.getVcfCutoffDrift());
+        const float d1 = std::abs(a44.getOsc1PitchDrift() - a88.getOsc1PitchDrift());
+        const float d2 = std::abs(a44.getVcfCutoffDrift() - a88.getVcfCutoffDrift());
         if (d1 > maxDiff) maxDiff = d1;
         if (d2 > maxDiff) maxDiff = d2;
     }
-    check (maxDiff < 0.01f,
-           "el mismo proceso a 44,1 y 88,2 kHz coincide en el tiempo real (invariante al SR)");
-    check (std::abs (a44.getOsc1PitchDrift()) > 0.01f,
-           "el drift de afinación se ha movido de verdad (la comparación no es 0 vs 0)");
+    check(maxDiff < 0.01f,
+          "el mismo proceso a 44,1 y 88,2 kHz coincide en el tiempo real (invariante al SR)");
+    check(std::abs(a44.getOsc1PitchDrift()) > 0.01f,
+          "el drift de afinación se ha movido de verdad (la comparación no es 0 vs 0)");
 }

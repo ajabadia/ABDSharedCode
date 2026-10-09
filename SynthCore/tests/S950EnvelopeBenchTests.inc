@@ -28,26 +28,27 @@
 // ataque) es la MISMA que usa el test de al lado, pero se declara otra vez aqui
 // para que este bloque no dependa del orden de los includes.
 
-static double benchTruthEnvTime (int stored)
+static double benchTruthEnvTime(int stored)
 {
-    return 0.010 * std::exp (0.06 * (double) stored);
+    return 0.010 * std::exp(0.06 * (double)stored);
 }
 
 // El sesgo RELATIVO que el banco ha medido para un mando, en fraccion. Lo que
 // de verdad se pasa al arnes es el absoluto, pero para comparar esto asi queda
 // mas legible.
-static double benchRelBias (const abd::synth::bench::BiasEntry& e)
+static double benchRelBias(const abd::synth::bench::BiasEntry& e)
 {
     return e.truth > 0.0 ? e.bias / e.truth : 0.0;
 }
 
-static void testS950EnvelopeBench() {
+static void testS950EnvelopeBench()
+{
     printf("=== S950EnvelopeBench ===\n");
 
     using namespace abd::synth;
     namespace bench = abd::synth::bench;
 
-    const double sr = 48000.0;
+    const double sr        = 48000.0;
     const double oneSample = 1.0 / sr;
 
     // ═══════ 1. LA VERDAD ANALITICA CONTRA EL RENDER, A MANO ═══════
@@ -68,46 +69,48 @@ static void testS950EnvelopeBench() {
 
     {
         int comprobadas = 0;
-        double peor = 0.0;
+        double peor     = 0.0;
 
-        for (auto shape : { bench::ReferenceShape::Linear, bench::ReferenceShape::Exponential })
+        for (auto shape : {bench::ReferenceShape::Linear, bench::ReferenceShape::Exponential})
         {
-            for (double th : { 0.25, 0.5, 0.75 })
+            for (double th : {0.25, 0.5, 0.75})
             {
-                for (double rise : { 0.001, 0.0027, 0.02, 0.2 })
+                for (double rise : {0.001, 0.0027, 0.02, 0.2})
                 {
                     bench::BenchConfig cfg;
-                    cfg.sampleRate = sr;
-                    cfg.windowSeconds = oneSample;   // promedia cero
-                    cfg.threshold = th;
-                    cfg.holdSeconds = 0.0;
-                    cfg.tailSeconds = 0.01;
+                    cfg.sampleRate    = sr;
+                    cfg.windowSeconds = oneSample; // promedia cero
+                    cfg.threshold     = th;
+                    cfg.holdSeconds   = 0.0;
+                    cfg.tailSeconds   = 0.01;
 
-                    const auto rendered = bench::renderReference (shape, rise, cfg);
+                    const auto rendered = bench::renderReference(shape, rise, cfg);
 
                     // El conteo a mano: cuantas muestras estan por encima del
                     // umbral. Sin analisis, sin formula, solo el render.
                     int count = 0;
                     for (std::size_t i = 0; i < rendered.size(); ++i)
-                        if (static_cast<double> (rendered[i]) > th)
+                        if (static_cast<double>(rendered[i]) > th)
                             ++count;
 
-                    const double aMano   = static_cast<double> (count) / sr;
-                    const double formula = bench::trueOnSeconds (shape, rise, cfg);
+                    const double aMano   = static_cast<double>(count) / sr;
+                    const double formula = bench::trueOnSeconds(shape, rise, cfg);
 
                     // Y que el analisis, con la ventana de una muestra, diga
                     // exactamente lo mismo que el conteo: si el analisis no
                     // coincide con contar, el analisis no cuenta.
-                    const auto lectura = bench::analyseDuration (rendered, cfg);
-                    if (! lectura.seconds.has_value()) continue;
-                    if (std::abs (*lectura.seconds - aMano) > 1e-12) {
+                    const auto lectura = bench::analyseDuration(rendered, cfg);
+                    if (!lectura.seconds.has_value()) continue;
+                    if (std::abs(*lectura.seconds - aMano) > 1e-12)
+                    {
                         check(false, "el analisis coincide con el conteo a mano");
                         continue;
                     }
 
-                    const double diff = std::abs (aMano - formula);
+                    const double diff = std::abs(aMano - formula);
                     if (diff > peor) peor = diff;
-                    if (diff > oneSample * 1.000001) {
+                    if (diff > oneSample * 1.000001)
+                    {
                         char msg[160];
                         snprintf(msg, sizeof(msg),
                                  "la verdad analitica cuadra con el render (umbral %.2f)", th);
@@ -132,23 +135,23 @@ static void testS950EnvelopeBench() {
 
     {
         bench::BenchConfig cfg;
-        cfg.sampleRate = sr;
+        cfg.sampleRate    = sr;
         cfg.windowSeconds = 0.002;
-        cfg.threshold = 0.5;
+        cfg.threshold     = 0.5;
 
-        const auto tabla = bench::biasTable (bench::ReferenceShape::Linear, cfg,
-                                             0.006, 0.300, 14);
+        const auto tabla = bench::biasTable(bench::ReferenceShape::Linear, cfg,
+                                            0.006, 0.300, 14);
         check(tabla.size() == 14 && tabla.front().measured && tabla.back().measured,
               "el barrido de rise da una tabla completa y toda medida");
 
-        bool hayPositivo = false;
-        bool hayNegativo = false;
+        bool hayPositivo  = false;
+        bool hayNegativo  = false;
         double enElRapido = 0.0;
         double enElLento  = 0.0;
 
         for (std::size_t i = 0; i < tabla.size(); ++i)
         {
-            const double rel = benchRelBias (tabla[i]);
+            const double rel = benchRelBias(tabla[i]);
             // El corte va en el 0.02% —dos muestras y media de 48 k—, que es
             // donde el sesgo deja de ser redondeo y pasa a ser el efecto de la
             // ventana. Por debajo de ahi lo que cambia de signo es el ruido del
@@ -161,9 +164,9 @@ static void testS950EnvelopeBench() {
 
         check(hayPositivo && hayNegativo,
               "el sesgo cambia de signo segun la velocidad de la barrida");
-        check(std::abs (enElRapido) > 0.003,
+        check(std::abs(enElRapido) > 0.003,
               "y en el rise mas corto que se ve el error es de un 0.35%");
-        check(std::abs (enElRapido) > std::abs (enElLento) * 10.0,
+        check(std::abs(enElRapido) > std::abs(enElLento) * 10.0,
               "y se apaga al alejarse de la ventana: el error de la ventana es del orden de la ventana");
     }
 
@@ -176,21 +179,21 @@ static void testS950EnvelopeBench() {
 
     {
         bench::BenchConfig a;
-        a.sampleRate = 44100.0;
+        a.sampleRate    = 44100.0;
         a.windowSeconds = 0.002;
-        a.threshold = 0.5;
+        a.threshold     = 0.5;
 
         bench::BenchConfig b = a;
-        b.sampleRate = 96000.0;
+        b.sampleRate         = 96000.0;
 
-        const double rise = 0.02;   // diez veces la ventana, de sobra
-        const auto ra = bench::measureReference (bench::ReferenceShape::Linear, rise, a);
-        const auto rb = bench::measureReference (bench::ReferenceShape::Linear, rise, b);
-        const double truth = bench::trueOnSeconds (bench::ReferenceShape::Linear, rise, a);
+        const double rise  = 0.02; // diez veces la ventana, de sobra
+        const auto ra      = bench::measureReference(bench::ReferenceShape::Linear, rise, a);
+        const auto rb      = bench::measureReference(bench::ReferenceShape::Linear, rise, b);
+        const double truth = bench::trueOnSeconds(bench::ReferenceShape::Linear, rise, a);
 
         check(ra.seconds.has_value() && rb.seconds.has_value(),
               "a 44.1 y a 96 el rise se ve en los dos casos");
-        check(std::abs (*ra.seconds - *rb.seconds) / truth < 0.005,
+        check(std::abs(*ra.seconds - *rb.seconds) / truth < 0.005,
               "el sesgo no depende de la tasa de muestreo con la ventana en segundos");
     }
 
@@ -206,20 +209,18 @@ static void testS950EnvelopeBench() {
 
     {
         bench::BenchConfig a;
-        a.sampleRate = 44100.0;
+        a.sampleRate    = 44100.0;
         a.windowSeconds = 0.002;
-        a.threshold = 0.5;
+        a.threshold     = 0.5;
 
         bench::BenchConfig b = a;
-        b.sampleRate = 96000.0;
+        b.sampleRate         = 96000.0;
 
-        const double rise = 0.001;   // por debajo del suelo con esta ventana
-        const auto ra = bench::measureReference (bench::ReferenceShape::Exponential, rise, a);
-        const auto rb = bench::measureReference (bench::ReferenceShape::Exponential, rise, b);
+        const double rise = 0.001; // por debajo del suelo con esta ventana
+        const auto ra     = bench::measureReference(bench::ReferenceShape::Exponential, rise, a);
+        const auto rb     = bench::measureReference(bench::ReferenceShape::Exponential, rise, b);
 
-        check(ra.outcome != bench::MeasureOutcome::Measured
-              || rb.outcome != bench::MeasureOutcome::Measured
-              || bench::isTrustworthy (ra, a) == false,
+        check(ra.outcome != bench::MeasureOutcome::Measured || rb.outcome != bench::MeasureOutcome::Measured || bench::isTrustworthy(ra, a) == false,
               "cerca del suelo la tasa cambia lo que se ve, y el banco lo dice en vez de taparlo");
     }
 
@@ -230,24 +231,28 @@ static void testS950EnvelopeBench() {
     // pulso ocupe media ventana. El numero accionable del banco.
 
     {
-        double anterior = 0.0;
-        bool creciente = true;
+        double anterior           = 0.0;
+        bool creciente            = true;
         bool cercaDeLaCuartaParte = true;
 
-        for (double win : { 0.0002, 0.002, 0.02, 0.04 })
+        for (double win : {0.0002, 0.002, 0.02, 0.04})
         {
             bench::BenchConfig cfg;
-            cfg.sampleRate = sr;
+            cfg.sampleRate    = sr;
             cfg.windowSeconds = win;
-            cfg.threshold = 0.5;
+            cfg.threshold     = 0.5;
 
-            const auto suelo = bench::visibilityFloor (bench::ReferenceShape::Linear, cfg);
-            if (! suelo.has_value()) { creciente = false; break; }
+            const auto suelo = bench::visibilityFloor(bench::ReferenceShape::Linear, cfg);
+            if (!suelo.has_value())
+            {
+                creciente = false;
+                break;
+            }
 
             if (*suelo <= anterior) creciente = false;
             anterior = *suelo;
 
-            if (std::abs (*suelo - win / 4.0) > win * 0.25) cercaDeLaCuartaParte = false;
+            if (std::abs(*suelo - win / 4.0) > win * 0.25) cercaDeLaCuartaParte = false;
         }
 
         check(creciente, "el suelo de visibilidad crece con la ventana de analisis");
@@ -257,14 +262,14 @@ static void testS950EnvelopeBench() {
         // veredicto. Un cero seria un tiempo, y un tiempo de cero no es lo que
         // pasa: lo que pasa es que la sonda no lo ha visto.
         bench::BenchConfig cfg;
-        cfg.sampleRate = sr;
+        cfg.sampleRate    = sr;
         cfg.windowSeconds = 0.02;
-        cfg.threshold = 0.5;
+        cfg.threshold     = 0.5;
 
-        const auto corto = bench::measureReference (bench::ReferenceShape::Linear, 0.00002, cfg);
+        const auto corto = bench::measureReference(bench::ReferenceShape::Linear, 0.00002, cfg);
         check(corto.outcome == bench::MeasureOutcome::NeverRose,
               "por debajo del suelo el veredicto es que no se ha visto");
-        check(! corto.seconds.has_value(),
+        check(!corto.seconds.has_value(),
               "y no sale un tiempo, ni siquiera un cero");
     }
 
@@ -278,21 +283,21 @@ static void testS950EnvelopeBench() {
 
     {
         bench::BenchConfig cfg;
-        cfg.sampleRate = sr;
+        cfg.sampleRate    = sr;
         cfg.windowSeconds = 0.02;
-        cfg.threshold = 0.5;
-        cfg.tailSeconds = 0.0;   // la grabacion se acaba antes de tiempo
+        cfg.threshold     = 0.5;
+        cfg.tailSeconds   = 0.0; // la grabacion se acaba antes de tiempo
 
-        const auto cortada = bench::measureReference (bench::ReferenceShape::Linear, 0.005, cfg);
+        const auto cortada = bench::measureReference(bench::ReferenceShape::Linear, 0.005, cfg);
         check(cortada.outcome == bench::MeasureOutcome::NeverFell,
               "sin cola, un rise corto da un corte de grabacion, no una duracion");
-        check(! cortada.seconds.has_value(), "y tampoco aqui hay un tiempo de salida");
+        check(!cortada.seconds.has_value(), "y tampoco aqui hay un tiempo de salida");
 
         const std::vector<float> nada;
-        const auto vacia = bench::analyseDuration (nada, cfg);
+        const auto vacia = bench::analyseDuration(nada, cfg);
         check(vacia.outcome == bench::MeasureOutcome::Empty,
               "un render vacio es un estado distinto de no haberlo visto");
-        check(bench::aboveSamples (vacia) == 0, "y no tiene ni una muestra por encima");
+        check(bench::aboveSamples(vacia) == 0, "y no tiene ni una muestra por encima");
     }
 
     // ═══════ 7. LO QUE EL BANCO NO PUEDE MEDIR, NO SE CONVIERTE EN UN CERO ═══════
@@ -304,20 +309,20 @@ static void testS950EnvelopeBench() {
 
     {
         bench::BenchConfig cfg;
-        cfg.sampleRate = sr;
+        cfg.sampleRate    = sr;
         cfg.windowSeconds = 0.02;
-        cfg.threshold = 0.5;
+        cfg.threshold     = 0.5;
 
         std::vector<bench::Command> mandos;
         for (int i = 0; i < 8; ++i)
         {
             bench::Command c;
-            c.stored = 10 + i * 10;
-            c.riseSeconds = 0.005 * std::exp (0.30 * (double) i);   // de 5 ms a 41 ms
-            mandos.push_back (c);
+            c.stored      = 10 + i * 10;
+            c.riseSeconds = 0.005 * std::exp(0.30 * (double)i); // de 5 ms a 41 ms
+            mandos.push_back(c);
         }
 
-        const auto rep = bench::runReference (mandos, bench::ReferenceShape::Linear, cfg);
+        const auto rep = bench::runReference(mandos, bench::ReferenceShape::Linear, cfg);
 
         check(rep.usable() + rep.skippedCount() == mandos.size(),
               "cada mando o se mide o se salta, y no se pierde ninguno");
@@ -356,18 +361,18 @@ static void testS950EnvelopeBench() {
 
     {
         bench::BenchConfig cfg;
-        cfg.sampleRate = sr;
+        cfg.sampleRate    = sr;
         cfg.windowSeconds = 0.02;
-        cfg.threshold = 0.5;
+        cfg.threshold     = 0.5;
 
-        const auto rd = bench::measureReference (bench::ReferenceShape::Linear, 0.005, cfg);
+        const auto rd = bench::measureReference(bench::ReferenceShape::Linear, 0.005, cfg);
         check(rd.outcome == bench::MeasureOutcome::Measured,
               "el analisis cruza el umbral y cree que ha medido");
         check(rd.seconds.has_value() && *rd.seconds < 0.001,
               "y lo que devuelve es una espiga de una muestra, no una duracion");
-        check(! bench::isTrustworthy (rd, cfg),
+        check(!bench::isTrustworthy(rd, cfg),
               "pero el banco la rechaza: un tramo mas corto que la ventana no cabe en la ventana");
-        check(bench::aboveSamples (rd) < cfg.windowSamples(),
+        check(bench::aboveSamples(rd) < cfg.windowSamples(),
               "el tramo por encima dura menos que la ventana, que es el motivo");
     }
 
@@ -389,11 +394,11 @@ static void testS950EnvelopeBench() {
         namespace harness = abd::synth::harness;
 
         bench::BenchConfig cfg;
-        cfg.sampleRate = sr;
+        cfg.sampleRate    = sr;
         cfg.windowSeconds = 0.02;
-        cfg.threshold = 0.5;
+        cfg.threshold     = 0.5;
 
-        const int ajustes[] = { 20, 50, 80 };
+        const int ajustes[] = {20, 50, 80};
 
         // El barrido va a la velocidad real de cada punto: la sonda pasa por el
         // ataque de verdad a la velocidad a la que esa ataque de verdad dura.
@@ -402,42 +407,42 @@ static void testS950EnvelopeBench() {
         for (int v : ajustes)
         {
             bench::Command c;
-            c.stored = v;
-            c.riseSeconds = benchTruthEnvTime (v);
-            mandos.push_back (c);
+            c.stored      = v;
+            c.riseSeconds = benchTruthEnvTime(v);
+            mandos.push_back(c);
         }
 
-        const auto rep = bench::runReference (mandos, bench::ReferenceShape::Linear, cfg);
+        const auto rep = bench::runReference(mandos, bench::ReferenceShape::Linear, cfg);
         check(rep.skippedCount() == 0, "a estos velocidades los tres ataques se ven");
 
         double sesgoRealMayor = 0.0;
         for (const auto& e : rep.entries)
         {
-            const double rel = std::abs (benchRelBias (e));
+            const double rel = std::abs(benchRelBias(e));
             if (rel > sesgoRealMayor) sesgoRealMayor = rel;
         }
         check(sesgoRealMayor > 0.0,
               "y el sesgo del analisis NO es cero: hay algo que corregir");
 
         // ── La maquina: la verdad mas el sesgo que el banco ha medido. ──
-        harness::Session sesion (CalCurveId::EnvelopeTime);
-        sesion.addReference (rep.reference);
+        harness::Session sesion(CalCurveId::EnvelopeTime);
+        sesion.addReference(rep.reference);
 
         double peorErrorReal = 0.0;
         for (int v : ajustes)
         {
-            const double verdad = benchTruthEnvTime (v);
-            sesion.addObservation (v, verdad + sesion.referenceBias (v), 1.0);
+            const double verdad = benchTruthEnvTime(v);
+            sesion.addObservation(v, verdad + sesion.referenceBias(v), 1.0);
         }
 
         S950Calibration cal;
-        check(sesion.build (cal), "el arnes construye la tabla con el sesgo medido");
+        check(sesion.build(cal), "el arnes construye la tabla con el sesgo medido");
 
         for (int v : ajustes)
         {
-            const auto leido = cal.read (CalCurveId::EnvelopeTime, v);
-            const double verdad = benchTruthEnvTime (v);
-            const double err = leido.has_value() ? std::abs (*leido - verdad) / verdad : 1.0;
+            const auto leido    = cal.read(CalCurveId::EnvelopeTime, v);
+            const double verdad = benchTruthEnvTime(v);
+            const double err    = leido.has_value() ? std::abs(*leido - verdad) / verdad : 1.0;
             if (err > peorErrorReal) peorErrorReal = err;
         }
 
@@ -455,23 +460,23 @@ static void testS950EnvelopeBench() {
         // verdad es un 0.35% deja al punto un 7.65% por debajo de su sitio, que
         // es PEOR que no corregir. Un factor fijo no es una correccion
         // aproximada: es un error nuevo, y aqui se ve del tamanho que es.
-        harness::Session inventada (CalCurveId::EnvelopeTime);
+        harness::Session inventada(CalCurveId::EnvelopeTime);
         for (int v : ajustes)
         {
-            const double verdad = benchTruthEnvTime (v);
-            inventada.addReference ({ { v, verdad * 0.08, 0.0 } });
-            inventada.addObservation (v, verdad + sesion.referenceBias (v), 1.0);
+            const double verdad = benchTruthEnvTime(v);
+            inventada.addReference({{v, verdad * 0.08, 0.0}});
+            inventada.addObservation(v, verdad + sesion.referenceBias(v), 1.0);
         }
 
         S950Calibration calInventada;
-        inventada.build (calInventada);
+        inventada.build(calInventada);
 
         double peorErrorInventado = 0.0;
         for (int v : ajustes)
         {
-            const auto leido = calInventada.read (CalCurveId::EnvelopeTime, v);
-            const double verdad = benchTruthEnvTime (v);
-            const double err = leido.has_value() ? std::abs (*leido - verdad) / verdad : 1.0;
+            const auto leido    = calInventada.read(CalCurveId::EnvelopeTime, v);
+            const double verdad = benchTruthEnvTime(v);
+            const double err    = leido.has_value() ? std::abs(*leido - verdad) / verdad : 1.0;
             if (err > peorErrorInventado) peorErrorInventado = err;
         }
 
@@ -493,16 +498,15 @@ static void testS950EnvelopeBench() {
 
     {
         S950Calibration cal = S950Calibration::unmeasured();
-        int conPuntos = 0;
+        int conPuntos       = 0;
 
         for (int i = 0; i < calibrationCurveCount; ++i)
-            conPuntos += (int) cal.pointCount ((CalCurveId) i);
+            conPuntos += (int)cal.pointCount((CalCurveId)i);
 
         check(conPuntos == 0, "despues de medir el metodo, la tabla del S950 sigue sin un solo punto");
-        check(cal.isMeasured (CalCurveId::EnvelopeTime) == false
-              && cal.isMeasured (CalCurveId::LfoRate) == false,
+        check(cal.isMeasured(CalCurveId::EnvelopeTime) == false && cal.isMeasured(CalCurveId::LfoRate) == false,
               "y las curvas siguen declaradas y sin medir, que es lo que un panel necesita");
-        check(! cal.read (CalCurveId::EnvelopeTime, 50).has_value(),
+        check(!cal.read(CalCurveId::EnvelopeTime, 50).has_value(),
               "y leer sigue dando desconocido, no un numero inventado");
     }
 }
