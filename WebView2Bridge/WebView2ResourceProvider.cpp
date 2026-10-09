@@ -70,19 +70,18 @@ std::optional<juce::WebBrowserComponent::Resource> resolveEmbeddedAsset(const ju
     if (decodedPath == "juce.js" || decodedPath.endsWith("/juce.js"))
         return std::nullopt;
 
-    // Extract the bare filename (e.g. "src/renderers/OscilloscopeRenderer.js" -> "OscilloscopeRenderer.js")
-    juce::String filename = decodedPath.fromLastOccurrenceOf("/", false, false);
-    if (filename.isEmpty())
-        filename = decodedPath;
+    juce::String normalizedPath = decodedPath.replace("\\", "/");
+    while (normalizedPath.startsWith("/"))
+        normalizedPath = normalizedPath.substring(1);
 
     int binSize         = 0;
     const char* binData = nullptr;
 
-    // Pass 1: Direct match by filename against originalFilenames
+    // Pass 1: Suffix / relative path matching against originalFilenames
     for (int i = 0; i < catalog.namedResourceListSize; ++i)
     {
-        const juce::String orig = juce::String::fromUTF8(catalog.originalFilenames[i]);
-        if (orig.equalsIgnoreCase(filename))
+        juce::String orig = juce::String::fromUTF8(catalog.originalFilenames[i]).replace("\\", "/");
+        if (orig.endsWithIgnoreCase("/" + normalizedPath) || orig.equalsIgnoreCase(normalizedPath))
         {
             binData = catalog.getNamedResource(catalog.namedResourceList[i], binSize);
             if (binData != nullptr)
@@ -90,10 +89,31 @@ std::optional<juce::WebBrowserComponent::Resource> resolveEmbeddedAsset(const ju
         }
     }
 
-    // Pass 2: Fallback to flattened resource identifier (e.g. "OscilloscopeRenderer_js")
+    // Pass 2: Flattened full-path resource identifier fallback (e.g. "abdbank_root_html")
     if (binData == nullptr)
     {
-        juce::String flattenedName = filename.replace(".", "_").replace("-", "_").replace(" ", "_");
+        juce::String resourceName = normalizedPath.replace("/", "_").replace("\\", "_")
+                                                 .replace(".", "_").replace("-", "_").replace(" ", "_");
+        if (juce::CharacterFunctions::isDigit(resourceName[0]))
+            resourceName = "_" + resourceName;
+        binData = catalog.getNamedResource(resourceName.toRawUTF8(), binSize);
+    }
+
+    // Pass 3: Basename matching for Vite-bundled assets (e.g. assets/index.css)
+    if (binData == nullptr && normalizedPath.startsWith("assets/"))
+    {
+        juce::String basename = normalizedPath.fromLastOccurrenceOf("/", false, false);
+        if (basename.isNotEmpty())
+        {
+            juce::String flattenedBasename = basename.replace(".", "_").replace("-", "_").replace(" ", "_");
+            binData = catalog.getNamedResource(flattenedBasename.toRawUTF8(), binSize);
+        }
+    }
+
+    // Pass 4: Root-level basename fallback (guarded against nested collisions)
+    if (binData == nullptr && normalizedPath.length() > 0 && !normalizedPath.containsChar('/'))
+    {
+        juce::String flattenedName = normalizedPath.replace(".", "_").replace("-", "_").replace(" ", "_");
         if (juce::CharacterFunctions::isDigit(flattenedName[0]))
             flattenedName = "_" + flattenedName;
         binData = catalog.getNamedResource(flattenedName.toRawUTF8(), binSize);
@@ -103,7 +123,7 @@ std::optional<juce::WebBrowserComponent::Resource> resolveEmbeddedAsset(const ju
     {
         std::vector<std::byte> bytes(static_cast<size_t>(binSize));
         std::memcpy(bytes.data(), binData, static_cast<size_t>(binSize));
-        return juce::WebBrowserComponent::Resource{std::move(bytes), getMimeTypeForFilename(filename).toStdString()};
+        return juce::WebBrowserComponent::Resource{std::move(bytes), getMimeTypeForFilename(normalizedPath).toStdString()};
     }
 
     return std::nullopt;
