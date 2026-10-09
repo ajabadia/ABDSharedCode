@@ -7,7 +7,14 @@ name: Shared code CI
 # codigo esta sano por si mismo: que sus pruebas corran, que sus herramientas
 # salgan en verde y que el package que publica resuelva sus dependencias.
 #
-# LO QUE ES PUERTA. Los seis trabajos bloquean, y los seis salen en verde.
+# LO QUE ES PUERTA. Los siete trabajos bloquean, y los siete salen en verde.
+#
+# El septimo (`synthcore`) es el primero que EJECUTA C++ aqui: compila
+# ABDShared_SynthCore_Tests —la bateria de SynthCore, sin JUCE y sin GUI— y lo
+# corre en ubuntu (gcc/clang: el terreno donde esta bateria nunca se habia
+# ejecutado) y en windows (MSVC: el terreno del que viene). Su exit code es el
+# veredicto: mas de dos mil comprobaciones, y una sola en rojo dejan el
+# pipeline en rojo.
 #
 # El audit merece una explicacion, porque sin ella su veredicto se lee mal. Compara
 # este repo contra una foto de la suite fijada por SHA, y en esa foto hay 55 fuentes
@@ -40,6 +47,10 @@ on:
       - '.clang-format'
       - '.githooks/**'
       - '**/*.{h,cpp}'
+      # Los .inc de SynthCore/tests son la mitad de la bateria que este
+      # workflow acaba de empezar a ejecutar: sin esta linea, un push que solo
+      # toque un test no encendiera la puerta que lo prueba.
+      - '**/*.inc'
   pull_request:
   workflow_dispatch:
 
@@ -642,3 +653,54 @@ jobs:
               exit 1
               ;;
           esac
+
+  synthcore:
+    # El primer trabajo de este repo que ejecuta C++ en vez de solo mirarlo.
+    # `ABDShared_SynthCore_Tests` es la bateria compartida: los motores de
+    # SynthCore (arpegiador, secuenciador de control, LFO y envolvente
+    # analogicos, drift, la familia de osciladores y el catalogo del S950) con
+    # mas de dos mil comprobaciones, en un binario sin JUCE y sin GUI.
+    #
+    # El exit code del binario ES el veredicto. El paso de ejecucion no filtra
+    # ni captura nada: una sola comprobacion en rojo devuelve 1 y Actions corta
+    # el job, igual que cualquier fallo de compilacion de los pasos de arriba.
+    #
+    # Dos piernas a proposito y con `fail-fast: false`, para que las dos
+    # informen aunque una se caiga: en ubuntu se compila con gcc/clang, que es
+    # donde este codigo nunca se habia ejecutado, y en windows con MSVC, que es
+    # donde se escribe. Solo se pide UN target a cmake: los demas modulos del
+    # proyecto —AutoUpdater en especial, que enlaza juce_core/juce_events— no
+    # se tocan, porque sin JUCE en scope construirlos aqui seria un error, no
+    # una comprobacion.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    name: SynthCore (ABDShared_SynthCore_Tests, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout ABDSharedCode
+        uses: actions/checkout@v7
+
+      - name: Configurar CMake (solo SynthCore, sin JUCE)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DABDSHAREDCODE_BUILD_AUTOUPDATER=OFF
+
+      - name: Compilar ABDShared_SynthCore_Tests
+        run: cmake --build build --target ABDShared_SynthCore_Tests --config Release --parallel
+
+      - name: Ejecutar la suite (el exit code es el veredicto)
+        shell: bash
+        run: |
+          # El binario cae en la raiz de build/ con los generators de una sola
+          # configuracion (ubuntu) y en build/Release con los de varios
+          # (Visual Studio, en windows). Se busca con -quit para no tuberia,
+          # se comprueba que existe y se ejecuta tal cual: sin `| tee` ni
+          # capturas que pudieran devolver el codigo de salida de otro.
+          bin=$(find build -maxdepth 2 -type f \( -name ABDShared_SynthCore_Tests -o -name ABDShared_SynthCore_Tests.exe \) -print -quit)
+          echo "binario: ${bin:-NO ENCONTRADO}"
+          if [ -z "$bin" ]; then
+            echo "::error::no se encontro ABDShared_SynthCore_Tests: la compilacion salio bien pero no dejo binario ejecutable"
+            exit 1
+          fi
+          "$bin"
