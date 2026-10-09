@@ -87,6 +87,12 @@
 #include "DspEffects/DspOversamplingDistortion.h"
 #include "DspEffects/DspMultiBandDist.h"
 #include "DspEffects/DspRackAmp.h"
+#include "DspEffects/DspMidasEQ.h"
+#include "DspEffects/DspStereoChorus.h"
+#include "DspEffects/DspChorusD.h"
+#include "DspEffects/DspFlanger.h"
+#include "DspEffects/DspAutoPan.h"
+#include "DspEffects/DspRotarySpeaker.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6194,6 +6200,67 @@ int main()
         check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspRackAmp produce muestras finitas");
 
         std::printf("  [fase 3] motores DspFairComp, DspNoiseGate, DspWaveShaper, DspOversamplingDistortion, DspMultiBandDist y DspRackAmp comprobados\n");
+    }
+
+    // Motores de la Fase 4 (Ecualización y Modulación Estándar)
+    {
+        float inL[64];
+        float inR[64];
+        float outL[64];
+        float outR[64];
+        for (int i = 0; i < 64; ++i)
+        {
+            inL[i] = std::sin(static_cast<float>(i) * 0.1f);
+            inR[i] = std::cos(static_cast<float>(i) * 0.1f);
+        }
+
+        // 1. DspMidasEQ
+        abd::dsp::DspMidasEQ midas;
+        midas.prepare(44100.0);
+        midas.setLoShelfGainNorm(0.7f);
+        midas.setHiShelfGainNorm(0.3f);
+        midas.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspMidasEQ produce muestras finitas");
+
+        // 2. DspStereoChorus
+        abd::dsp::DspStereoChorus chorus;
+        chorus.prepare(44100.0);
+        chorus.setSpeedNorm(0.4f);
+        chorus.setWidthLNorm(0.5f);
+        chorus.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspStereoChorus produce muestras finitas");
+
+        // 3. DspChorusD
+        abd::dsp::DspChorusD chorusD;
+        chorusD.prepare(44100.0);
+        chorusD.setPreset(0, true);
+        chorusD.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspChorusD produce muestras finitas");
+
+        // 4. DspFlanger
+        abd::dsp::DspFlanger flanger;
+        flanger.prepare(44100.0);
+        flanger.setRateNorm(0.3f);
+        flanger.setFeedbackNorm(0.7f);
+        flanger.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspFlanger produce muestras finitas");
+
+        // 5. DspAutoPan
+        abd::dsp::DspAutoPan autoPan;
+        autoPan.prepare(44100.0);
+        autoPan.setSpeedNorm(0.4f);
+        autoPan.setDepthNorm(0.8f);
+        autoPan.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspAutoPan produce muestras finitas");
+
+        // 6. DspRotarySpeaker
+        abd::dsp::DspRotarySpeaker rotary;
+        rotary.prepare(44100.0);
+        rotary.setSpeedFast(true);
+        rotary.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspRotarySpeaker produce muestras finitas");
+
+        std::printf("  [fase 4] motores DspMidasEQ, DspStereoChorus, DspChorusD, DspFlanger, DspAutoPan y DspRotarySpeaker comprobados\n");
     }
 
     if (gFailures == 0)

@@ -146,11 +146,15 @@
   11. `FXMultiBandDist` (Tipo 32) ➔ Delegado a `abd::dsp::DspMultiBandDist` (crossover de 3 bandas, 6 modos de distorsión y emulación de altavoz/cabinet).
   12. `FXRackAmp` (Tipo 7) ➔ Delegado a `abd::dsp::DspRackAmp` (previo, buzz, punch, crunch asimétrico, EQ 2 bandas y cabinet de 2 polos estilo SansAmp).
 
-### 🔵 Fase 4: Ecualización y Modulación Estándar
-* **Objetivo:** Promover ecualizadores de consola y coros/flangers clásicos.
-* **Componentes:**
-  9. `FXMidasEQ` (Tipo 30) ➔ `DspEffects/CascadeShelfEq.h` y filtros paramétricos compartidos.
-  10. `FXChorus` (10), `FXChorusD` (17), `FXFlanger` (11), `FXAutoPan` (20), `FXRotarySpeaker` (16) ➔ `DspEffects/DspChorus.h` / `DspFlanger.h`.
+### 🔵 Fase 4: Ecualización y Modulación Estándar (Completada)
+* **Objetivo:** Promover ecualizadores de consola analógica y modulaciones clásicas (Chorus, Flanger, AutoPan, Rotary).
+* **Componentes completados:**
+  13. `FXMidasEQ` (Tipo 30) ➔ Delegado a `abd::dsp::DspMidasEQ` (Midas Heritage / PRO Series 4 bandas paramétricas DF2T RBJ, cero JUCE).
+  14. `FXChorus` (Tipo 10) ➔ Delegado a `abd::dsp::DspStereoChorus` (Boss CE-1 / TC SCF estéreo, LFO tri/sin, spread y feedback interno, 100% RT-Safe).
+  15. `FXChorusD` (Tipo 17) ➔ Delegado a `abd::dsp::DspChorusD` (Roland Dimension D SDD-320, osciladores duales en 90°/270°, 4 presets y mezcla cruzada estéreo).
+  16. `FXFlanger` (Tipo 11) ➔ Delegado a `abd::dsp::DspFlanger` (ADA / TC Electronic Flanger corto con peines armónicos y retroalimentación negativa ±90%).
+  17. `FXAutoPan` (Tipo 20) ➔ Delegado a `abd::dsp::DspAutoPan` (Fender / Rhodes AutoPan con envolvente interactiva attack/release y equal-power pan).
+  18. `FXRotarySpeaker` (Tipo 16) ➔ Delegado a `abd::dsp::DspRotarySpeaker` (Leslie 122 Horn + Drum/Rotor con crossover a 800 Hz, inercia de aceleración y Doppler estéreo).
 
 ### 🟣 Fase 5: Delays Especializados y de Cinta
 * **Objetivo:** Unificar líneas de retardo y degradación de cinta.
