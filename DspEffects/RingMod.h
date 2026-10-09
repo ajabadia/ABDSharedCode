@@ -182,11 +182,13 @@ private:
                                              jlimit(0.0f, 1.0f, normalised));
     }
 
-    /** La frecuencia de ESTA muestra: la del mando, ya modulada por el LFO. */
+    /** La frecuencia de ESTA muestra: la del mando, ya modulada por el LFO.
+        Modulación bipolar estándar: barre simétricamente alrededor de la frecuencia
+        base (1.0 + mod) y se recorta en cero para evitar incrementos negativos. */
     float modulatedFrequency(float frequencyNorm, float lfoDepthNorm) const noexcept
     {
-        const float depth = jmax(0.0f, sin(lfoPhase_) * jlimit(0.0f, 1.0f, lfoDepthNorm));
-        return baseFrequency(frequencyNorm) * (1.0f + depth);
+        const float mod = sin(lfoPhase_) * jlimit(0.0f, 1.0f, lfoDepthNorm);
+        return baseFrequency(frequencyNorm) * jmax(0.0f, 1.0f + mod);
     }
 
     /** Las tres formas del perfil, sobre una fase en radianes. */

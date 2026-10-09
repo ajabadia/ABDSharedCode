@@ -85,6 +85,16 @@ struct StudioEchoProfile
     // Donde esta cada cabezal, como multiplicador del retardo base.
     static constexpr float headRatio[3] = {0.20f, 0.45f, 0.70f};
 
+    static float getHeadRatio(int /*mode*/, int head) noexcept
+    {
+        return headRatio[head];
+    }
+
+    static float getHeadGain(int /*mode*/, int /*head*/, float defaultGain) noexcept
+    {
+        return defaultGain;
+    }
+
     // Escala de ganancia del canal derecho por cabezal: un cabezal real no
     // envia lo mismo a L que a R.
     static constexpr float headRightScale[3] = {0.95f, 0.90f, 0.92f};
@@ -131,10 +141,11 @@ public:
         // LARGOS, y por eso el buffer tiene que aguantar 3 veces el retardo
         // base"), asi que dimensionar a `maxDelaySeconds` se quedaba corto por
         // un factor 3 y el cabezal 3 leia fuera del buffer.
-        float maxRatio = Profile::headRatio[0];
+        float maxRatio = Profile::getHeadRatio(0, 0);
 
-        for (int h = 1; h < 3; ++h)
-            maxRatio = jmax(maxRatio, Profile::headRatio[h]);
+        for (int m = 0; m < Profile::numModes; ++m)
+            for (int h = 0; h < 3; ++h)
+                maxRatio = jmax(maxRatio, Profile::getHeadRatio(m, h));
 
         delaySamples_ = static_cast<int>(sampleRate * Profile::maxDelaySeconds * maxRatio) + 2;
         tankSamples_  = static_cast<int>(sampleRate * Profile::maxDelaySeconds) + 1;
@@ -256,11 +267,12 @@ public:
                 // segunda es que `readTape` ya envuelve con un cociente como red
                 // de ultimo recurso, y un envolverse es un salto de fase: mejor
                 // saturar en el tope que dar un salto.
-                const float wanted   = Profile::headRatio[h] * static_cast<float>(delaySamples) * wowMod;
+                const float wanted   = Profile::getHeadRatio(mode_, h) * static_cast<float>(delaySamples) * wowMod;
                 const float distance = jmin(static_cast<float>(delaySamples_ - 1), wanted);
+                const float hGain    = Profile::getHeadGain(mode_, h, gainPerHead);
 
-                headL += readTape(chan, distance) * gainPerHead;
-                headR += readTape(chan, distance) * gainPerHead * Profile::headRightScale[h];
+                headL += readTape(chan, distance) * hGain;
+                headR += readTape(chan, distance) * hGain * Profile::headRightScale[h];
             }
         }
 

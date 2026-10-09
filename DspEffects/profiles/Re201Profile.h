@@ -100,6 +100,16 @@ struct Re201Profile
     */
     static constexpr float headRatio[3] = {1.0f, 2.0f, 3.0f};
 
+    static float getHeadRatio(int /*mode*/, int head) noexcept
+    {
+        return headRatio[head];
+    }
+
+    static float getHeadGain(int /*mode*/, int /*head*/, float defaultGain) noexcept
+    {
+        return defaultGain;
+    }
+
     // Un cabezal de cinta real no envia lo mismo a L que a R.
     static constexpr float headRightScale[3] = {0.95f, 0.90f, 0.92f};
 
