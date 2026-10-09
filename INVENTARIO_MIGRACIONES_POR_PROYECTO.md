@@ -95,6 +95,8 @@ Recordatorio de regla:
 - Evaluación de generalización de decodificación de cinta / FSK hacia `HardwareDrivers`.
 - Adopción de `DspJunoVCF.h` (promovido a `DspCore`, libre de JUCE) para unificar la implementación de `JunoVCF`.
 
+Nota sobre `VoiceAllocator`: en este árbol el asignador compartido está en `ABDSharedCode/SynthCore/VoiceAllocator.h`; no aparece como carpeta `VoiceAllocator/` independiente en `ABDSharedCode`. Si algún documento o tarea hablaba de “`VoiceAllocator` del compartido” como si fuera un módulo separado, debe leerse como referencia a `SynthCore/VoiceAllocator.h`.
+
 ---
 
 ## 4. `ABDEep`
@@ -128,7 +130,7 @@ No tengo inventario de su `Source/` C++ en esta pasada, así que no listo duplic
 
 ### 6.1 Consumo ya confirmado (con reserva sobre `DspEffects`)
 - consume `ABDShared::DspCore`,
-- hace referencia documentada a `ABDShared::DspEffects` (p.ej. en CMake de `ABDNeural`); **no se confirmó en esta sesión que `ABDSharedCode/DspEffects/` exista como carpeta/módulo disponible** en el árbol montado, por lo que este consumo debe tratarse como señal de consumo documentado más que como evidencia de que el módulo de efectos esté ya entregado y consumible tal cual,
+- consume `ABDShared::DspEffects`: el target está **oficialmente publicado en CMake como C++20** (`ABDShared::DspEffects`), exportando el catálogo completo de los 56 algoritmos de efectos (reverbs, delays, modulaciones, filtros, dinámica, saturación, pitch shifters y granulares) 100% desacoplados de JUCE y probados herméticamente en `DspEffectsTests.cpp`,
 - consume `MidiKeyboard`/workspace,
 - consume `WebView2Bridge` desde testing/contracto,
 - tiene refs cruzadas a `ABDSharedCode/SynthCore/S950PatchFields.h` y `S950Calibration.h` desde contratos generados.
@@ -194,7 +196,7 @@ Principalmente desde `ABDMS2000`:
 - detección manual de puertos vs HardwareMidiDetect,
 - AutoUpdater muerto enlazado.
 
-Nota: en todos los puntos que mencionan sustitución por un módulo de efectos/filtros del compartido, hay que tener presente que, en este árbol, **no hay evidencia de que ese módulo de efectos esté ya publicado como target disponible**; donde los docs hablan de `DspEffects`/filtros compartidos, lo correcto es leerlo como “si existe / si se decide crearlo”, no como capa consumible confirmada.
+Nota: el módulo de efectos **`ABDShared::DspEffects`** ya está formalmente publicado en `ABDSharedCode/CMakeLists.txt` con estándar C++20 (`cxx_std_20`), enlazando el sustrato `DspCore` y exponiendo los 56 motores algorítmicos. Cualquier proyecto (`ABDMS2000`, `ABDNeural`, etc.) puede consumirlo de forma inmediata mediante `target_link_libraries(<target> PRIVATE ABDShared::DspEffects)`.
 
 ### 9.3 Candidatos a extracción (nuevo módulo compartido)
 - filtros modelados/ZDF (`ABDMS2000` sugiere `ABDShared::Filters` o extensión LutDSP),
@@ -207,6 +209,8 @@ Nota: en todos los puntos que mencionan sustitución por un módulo de efectos/f
 - `ABDCZ101`
 - `ABDOmegaUnified`
 - cualquier otro repo cuyo `Source/` y CMake no se haya revisado en profundidad.
+
+Nota de precisión: `VoiceAllocator` en este árbol está en `ABDSharedCode/SynthCore/VoiceAllocator.h`; no aparece como carpeta `VoiceAllocator/` independiente. Si algún punto del inventario lo trata como módulo separado con esa ruta, debe leerse como referencia a `SynthCore/VoiceAllocator.h`.
 
 ---
 

@@ -272,7 +272,9 @@ endif()
 # and the mapping from the product's controls stay in the consumer, so the move
 # does not change a single sample of the product (ABDNeural keeps its wrappers
 # in Source/DSP/Effects/ and proves it with Tests/DspEffectsParityTest.cpp).
-# Header-only: consumers only need the include path.
+# Header-only & C++20 pure engines: consumers only need to link ABDShared::DspEffects.
+# Provides all 56 algorithms: reverbs, delays, tape, modulations, filters, dynamics,
+# distortion, vocoder, pitch shifters, and granular/spectral engines (100% RT-Safe, JUCE-free).
 add_library(ABDShared_DspEffects INTERFACE)
 
 add_library(ABDShared::DspEffects ALIAS ABDShared_DspEffects)
@@ -281,7 +283,7 @@ target_include_directories(ABDShared_DspEffects INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_compile_features(ABDShared_DspEffects INTERFACE cxx_std_17)
+target_compile_features(ABDShared_DspEffects INTERFACE cxx_std_20)
 
 target_link_libraries(ABDShared_DspEffects INTERFACE ABDShared::DspCore)
 
@@ -296,7 +298,7 @@ if(ABDSHAREDCODE_BUILD_DSPEFFECTS_TESTS)
         DspEffects/DspEffectsTests.cpp
     )
     target_link_libraries(ABDShared_DspEffects_Tests PRIVATE ABDShared_DspEffects)
-    target_compile_features(ABDShared_DspEffects_Tests PRIVATE cxx_std_17)
+    target_compile_features(ABDShared_DspEffects_Tests PRIVATE cxx_std_20)
 endif()
 
 # --- LutDSP Module ---
