@@ -93,6 +93,14 @@
 #include "DspEffects/DspFlanger.h"
 #include "DspEffects/DspAutoPan.h"
 #include "DspEffects/DspRotarySpeaker.h"
+#include "DspEffects/DspStereoDelay.h"
+#include "DspEffects/DspMultiTapDelay.h"
+#include "DspEffects/DspTapeDelay.h"
+#include "DspEffects/DspAnalogTapeDelay.h"
+#include "DspEffects/DspDuckingDelay.h"
+#include "DspEffects/DspDecimDelay.h"
+#include "DspEffects/DspModDelayRev.h"
+#include "DspEffects/DspShimmerDelay.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6261,6 +6269,85 @@ int main()
         check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspRotarySpeaker produce muestras finitas");
 
         std::printf("  [fase 4] motores DspMidasEQ, DspStereoChorus, DspChorusD, DspFlanger, DspAutoPan y DspRotarySpeaker comprobados\n");
+    }
+
+    // Motores de la Fase 5 (Delays Especializados y de Cinta)
+    {
+        float inL[64];
+        float inR[64];
+        float outL[64];
+        float outR[64];
+        for (int i = 0; i < 64; ++i)
+        {
+            inL[i] = std::sin(static_cast<float>(i) * 0.1f);
+            inR[i] = std::cos(static_cast<float>(i) * 0.1f);
+        }
+
+        // 1. DspStereoDelay
+        abd::dsp::DspStereoDelay sDelay;
+        sDelay.prepare(44100.0);
+        sDelay.setTimeNorm(0.4f);
+        sDelay.setFeedbackLNorm(0.4f);
+        sDelay.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspStereoDelay produce muestras finitas");
+
+        // 2. DspMultiTapDelay
+        abd::dsp::DspMultiTapDelay mtDelay(4);
+        mtDelay.prepare(44100.0);
+        mtDelay.setMasterTimeNorm(0.5f);
+        mtDelay.setFeedbackNorm(0.3f);
+        mtDelay.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspMultiTapDelay produce muestras finitas");
+
+        // 3. DspTapeDelay
+        abd::dsp::DspTapeDelay tDelay;
+        tDelay.prepare(44100.0);
+        tDelay.setDelayNorm(0.4f);
+        tDelay.setSustainNorm(0.5f);
+        tDelay.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspTapeDelay produce muestras finitas");
+
+        // 4. DspAnalogTapeDelay
+        abd::dsp::DspAnalogTapeDelay atDelay;
+        atDelay.prepare(44100.0);
+        atDelay.setTimeNorm(0.35f);
+        atDelay.setFeedbackNorm(0.4f);
+        atDelay.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspAnalogTapeDelay produce muestras finitas");
+
+        // 5. DspDuckingDelay
+        abd::dsp::DspDuckingDelay dDelay;
+        dDelay.prepare(44100.0);
+        dDelay.setTimeNorm(0.35f);
+        dDelay.setThresholdNorm(0.4f);
+        dDelay.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspDuckingDelay produce muestras finitas");
+
+        // 6. DspDecimDelay
+        abd::dsp::DspDecimDelay dcDelay;
+        dcDelay.prepare(44100.0);
+        dcDelay.setTimeNorm(0.4f);
+        dcDelay.setDownSampleNorm(0.5f);
+        dcDelay.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspDecimDelay produce muestras finitas");
+
+        // 7. DspModDelayRev
+        abd::dsp::DspModDelayRev mdr;
+        mdr.prepare(44100.0);
+        mdr.setParameter(0, 0.4f);
+        mdr.setParameter(8, 0.6f);
+        mdr.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspModDelayRev produce muestras finitas");
+
+        // 8. DspShimmerDelay
+        abd::dsp::DspShimmerDelay shim;
+        shim.prepare(44100.0);
+        shim.setTimeNorm(0.4f);
+        shim.setPitchNorm(0.7f);
+        shim.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspShimmerDelay produce muestras finitas");
+
+        std::printf("  [fase 5] motores DspStereoDelay, DspMultiTapDelay, DspTapeDelay, DspAnalogTapeDelay, DspDuckingDelay, DspDecimDelay, DspModDelayRev y DspShimmerDelay comprobados\n");
     }
 
     if (gFailures == 0)

@@ -156,11 +156,17 @@
   17. `FXAutoPan` (Tipo 20) ➔ Delegado a `abd::dsp::DspAutoPan` (Fender / Rhodes AutoPan con envolvente interactiva attack/release y equal-power pan).
   18. `FXRotarySpeaker` (Tipo 16) ➔ Delegado a `abd::dsp::DspRotarySpeaker` (Leslie 122 Horn + Drum/Rotor con crossover a 800 Hz, inercia de aceleración y Doppler estéreo).
 
-### 🟣 Fase 5: Delays Especializados y de Cinta
-* **Objetivo:** Unificar líneas de retardo y degradación de cinta.
-* **Componentes:**
-  11. `FXDelay` (13), `FXMultiTapDelay` (14/15), `FXTapeDelay` (21), `FXAnalogTapeDelay` (40) ➔ `DspEffects/DspDelay.h` + `TapeColour`.
-  12. `FXDuckingDelay` (44), `FXDecimDelay` (34), `FXModDelayRev` (12), `FXShimmerDelay` (41).
+### 🟣 Fase 5: Delays Especializados y de Cinta (Completada)
+* **Objetivo:** Unificar líneas de retardo analógico/digital, degradación de cinta y retardos dinámicos.
+* **Componentes completados:**
+  19. `FXDelay` (Tipo 13) ➔ Delegado a `abd::dsp::DspStereoDelay` (Roland SDE-3000 / Korg SDD-3000 con modos ST/X/M/PP, factores rítmicos y LPF feedback).
+  20. `FXMultiTapDelay` (Tipos 14 y 15) ➔ Delegado a `abd::dsp::DspMultiTapDelay` (Lexicon PCM 70 / Roland SDE-330 con 3-Tap / 4-Tap, paneo, spread y cross-feed).
+  21. `FXTapeDelay` (Tipo 21) ➔ Delegado a `abd::dsp::DspTapeDelay` (Maestro Echoplex EP-3 / T-Ray con saturación no lineal, wow/flutter y tone LPF).
+  22. `FXAnalogTapeDelay` (Tipo 40) ➔ Delegado a `abd::dsp::DspAnalogTapeDelay` (Roland RE-201 / Watkins Copicat con saturación suave, jitter y ruido analógico).
+  23. `FXDuckingDelay` (Tipo 44) ➔ Delegado a `abd::dsp::DspDuckingDelay` (TC Electronic 2290 Dynamic Delay con sidechain ducking inteligente).
+  24. `FXDecimDelay` (Tipo 34) ➔ Delegado a `abd::dsp::DspDecimDelay` (E-mu SP-1200 / AMS DMX con downsampling, bit-crushing y SVF multimodo Pre/Post).
+  25. `FXModDelayRev` (Tipo 12) ➔ Delegado a `abd::dsp::DspModDelayRev` (Lexicon 224/480L híbrido con delay modulado por LFO y reverb Schroeder Serie/Paralelo).
+  26. `FXShimmerDelay` (Tipo 41) ➔ Delegado a `abd::dsp::DspShimmerDelay` (Brian Eno / Eventide Space Shimmer con pitch shift granular +1 octava y difusión).
 
 ### ⚪ Fase 6: Reverbs Avanzadas, Pitch y Procesadores Espectrales / Granulares
 * **Objetivo:** Promover algoritmos de alta complejidad matemática.
