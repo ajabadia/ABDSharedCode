@@ -2,12 +2,12 @@
   "nota": "Huerfanas conocidas en la foto de la suite fijada por los SHA del workflow .github/workflows/shared-code-ci.yml, y medidas contra los SHA de la clave \"foto\" de este mismo fichero. Se aceptan a proposito: sus consumidores estan escritos pero sin commitear en los repos hermanos. Cuando se commiteen, sube los SHA del workflow, borra su entrada con --write-baseline y este script vuelve a exigirla. Si subes un SHA sin regenerar esto, tools/verificar_foto.py lo dice.",
   "generado": "python tools/audit_unconsumed_sources.py --write-baseline",
   "foto": {
-    "ABDBankManager": "a1d6daed45056013914e3a4ac479c2bd2ae01b52",
-    "ABDCZ101": "70689419a1b6bfc22485336fd763fb096b81404d",
-    "ABDEep": "943652c2086288452effbfc66c07586be93a98c8",
-    "ABDMS2000": "351f98a52a50d2a884aa9570d8df84a6eb067194",
-    "ABDNeural": "dd07f4c873f46fedf2904d31ce9271e0f1af7475",
-    "ABDSharedAssets": "065ca6c6aef82e8d41cf6a94d650ab28f5c27e4c"
+    "ABDBankManager": "55c4d5ed75997040dfc8b062b9ec0931b63eb76c",
+    "ABDCZ101": "40d2e81d4e703e1fc0ab7429e3633191c1394832",
+    "ABDEep": "36eb5d30bf2ca27cf67d4ee4da043222cf2129f3",
+    "ABDMS2000": "5d0d93ec3cd679c9e538a47bacc17223188f868c",
+    "ABDNeural": "30c30f793f2da715a6770eabee06c07de4c00047",
+    "ABDSharedAssets": "eea11732a47a6d2cad1ab21c2ba0aa98df3e36f1"
   },
   "fuentes": [
     "AudioComparator/AudioABComparator.cpp",
@@ -16,7 +16,6 @@
     "AudioComparator/AudioABComparator_Spectral.cpp",
     "AudioComparator/AudioABVerdictEngine.cpp",
     "AudioComparator/AudioABVerdictEngine.h",
-    "DspEffects/profiles/Dm12SpaceEchoProfile.h",
     "HardwareDrivers/AiraSysExController.h",
     "HardwareDrivers/CasioCzVirtualController.cpp",
     "HardwareDrivers/CasioCzVirtualController.h",

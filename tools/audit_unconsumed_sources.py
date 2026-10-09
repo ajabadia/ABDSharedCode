@@ -162,18 +162,15 @@ def strip_vars(path):
 # salia con 1 hasta que se quitaran. El modulo sigue en BankManager/, ahora
 # consumido y sin figurar en esta lista.
 # ---------------------------------------------------------------------------
+# El 2026-10-09 se podaron las cinco entradas del corte RE-201/Space Echo
+# (`MultiHeadEcho.h`, `RingMod.h`, `TapeColour.h`, `DiodeBridge.h` y de la
+# linea base `Dm12SpaceEchoProfile.h`) por la misma regla: los consumidores
+# estaban escritos en los repos hermanos y ya estan commiteados en los SHA
+# que fija el workflow, asi que seguir listandas seria un escudo y no un
+# trinquete. `Re201Profile.h` NO se poda: el perfil no lo incluye el motor
+# (se inyecta como argumento de plantilla desde el consumidor), sigue sin
+# cadena alcanzable, y su entrada sigue siendo cierta.
 ALLOWLIST = {
-    'DspEffects/MultiHeadEcho.h':
-        'motor de maquina sin todavia consumidor; sus 3 defectos se corrigieron y '
-        'prueban aqui, y un 4º candidato (releer la linea de cinta) se midio y se '
-        'descarto: el compilador ya lo hace y el tiempo no separa (guia, seccion '
-        '"Auditoria de DspEffects")',
-    'DspEffects/RingMod.h':
-        'motor de maquina sin todavia consumidor; gemelo de MultiHeadEcho',
-    'DspEffects/characters/TapeColour.h':
-        'etapa de caracter de RE-201; solo la usa MultiHeadEcho',
-    'DspEffects/characters/DiodeBridge.h':
-        'etapa de caracter de RE-201; solo la usa MultiHeadEcho',
     'DspEffects/profiles/Re201Profile.h':
         'perfil de datos de RE-201; solo lo usa MultiHeadEcho',
     'LcdDisplay/LcdDisplay.h':

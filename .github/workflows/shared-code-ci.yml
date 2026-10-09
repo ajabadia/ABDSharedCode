@@ -487,14 +487,14 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDEep
-          ref: 943652c2086288452effbfc66c07586be93a98c8
+          ref: 36eb5d30bf2ca27cf67d4ee4da043222cf2129f3
           path: ABDEep
 
       - name: Checkout ABDMS2000 (SHA inmutable)
         uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDMS2000
-          ref: 351f98a52a50d2a884aa9570d8df84a6eb067194
+          ref: 5d0d93ec3cd679c9e538a47bacc17223188f868c
           path: ABDMS2000
 
       # ABDNeural iba apuntando a f907d4d, que es un commit que NUNCA se
@@ -515,21 +515,21 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDNeural
-          ref: dd07f4c873f46fedf2904d31ce9271e0f1af7475
+          ref: 30c30f793f2da715a6770eabee06c07de4c00047
           path: ABDNeural
 
       - name: Checkout ABDCZ101 (SHA inmutable)
         uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDCZ101
-          ref: 70689419a1b6bfc22485336fd763fb096b81404d
+          ref: 40d2e81d4e703e1fc0ab7429e3633191c1394832
           path: ABDCZ101
 
       - name: Checkout ABDSharedAssets (SHA inmutable)
         uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDSharedAssets
-          ref: 065ca6c6aef82e8d41cf6a94d650ab28f5c27e4c
+          ref: eea11732a47a6d2cad1ab21c2ba0aa98df3e36f1
           path: ABDSharedAssets
 
       # ABDBankManager entra en la foto (2026-10-06): es el consumidor del modulo
@@ -543,7 +543,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: ajabadia/ABDBankManager
-          ref: a1d6daed45056013914e3a4ac479c2bd2ae01b52
+          ref: 55c4d5ed75997040dfc8b062b9ec0931b63eb76c
           path: ABDBankManager
 
       - name: Setup Python
