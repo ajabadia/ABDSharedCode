@@ -22,8 +22,8 @@ struct HalfOscillatorWithWidth
 
 } // namespace oscTestDetail
 
-#include "OscillatorFamily.h"
-#include "OscReference.h"
+#include "../OscReference.h"
+#include "../OscillatorFamily.h"
 
 namespace abd::synth::tests
 {

@@ -7,53 +7,97 @@
 // falla. Es lo que permite migrar ABDEep al nucleo compartido sin cambiar ni
 // una muestra de sonido.
 
-#include "ModMatrix.h"
+// Ruta relativa a ESTE fichero: GCC (la CI de ubuntu) solo resuelve el
+// include contra el directorio del fichero que lo emite y los -I, no contra la
+// cadena de incluidores como hace MSVC, asi que "ModMatrix.h" plano no existe
+// desde aqui.
+#include "../ModMatrix.h"
 
 // ── Copia literal de la implementación PREVIA de ABDEep ─────────────────────
 // Deliberadamente NO se llama a la real: si ABDEep cambiara su motor, este
 // test seguiría comparando contra lo que había, que es justo lo que hace falta
 // para probar que la migración no altera el resultado.
 
-namespace legacy {
+namespace legacy
+{
 
-enum class ModSource {
-    kNone = 0, kLFO1, kLFO2, kLFO1Uni, kLFO2Uni,
-    kEnv1VCA, kEnv2VCF, kEnv3MOD, kNoteNumber, kVelocity, kReleaseVelocity,
-    kKeyPressure, kModWheel, kPitchBend, kFootController, kExpressionPedal,
-    kBreathController, kSustainPedal, kControlSequencer, kVoiceNumber,
-    kCC_X, kCC_Y, kCC_Z, kMaxSources
+enum class ModSource
+{
+    kNone = 0,
+    kLFO1,
+    kLFO2,
+    kLFO1Uni,
+    kLFO2Uni,
+    kEnv1VCA,
+    kEnv2VCF,
+    kEnv3MOD,
+    kNoteNumber,
+    kVelocity,
+    kReleaseVelocity,
+    kKeyPressure,
+    kModWheel,
+    kPitchBend,
+    kFootController,
+    kExpressionPedal,
+    kBreathController,
+    kSustainPedal,
+    kControlSequencer,
+    kVoiceNumber,
+    kCC_X,
+    kCC_Y,
+    kCC_Z,
+    kMaxSources
 };
 
-enum class ModDestination {
-    kNone = 0, kOsc1Pitch, kOsc2Pitch, kOsc1SquareWidth, kOsc2ToneMod,
-    kOsc1Level, kOsc2Level, kSubOscLevel, kNoiseLevel, kFilterCutoff,
+enum class ModDestination
+{
+    kNone = 0,
+    kOsc1Pitch,
+    kOsc2Pitch,
+    kOsc1SquareWidth,
+    kOsc2ToneMod,
+    kOsc1Level,
+    kOsc2Level,
+    kSubOscLevel,
+    kNoiseLevel,
+    kFilterCutoff,
     /* ... los 48 del enum real no hacen falta para la equivalencia: lo que se
        compara es la ARITMÉTICA, no el vocabulario ... */
     kMaxDestinations
 };
 
-struct ModRoute { ModSource source = ModSource::kNone;
-                  ModDestination destination = ModDestination::kNone;
-                  float amount = 0.0f; };
+struct ModRoute
+{
+    ModSource source           = ModSource::kNone;
+    ModDestination destination = ModDestination::kNone;
+    float amount               = 0.0f;
+};
 
-class ModulationMatrix {
+class ModulationMatrix
+{
 public:
     static constexpr int kNumSlots = 8;
-    void clear() { for (int i = 0; i < kNumSlots; ++i) routes[i] = ModRoute(); }
+    void clear()
+    {
+        for (int i = 0; i < kNumSlots; ++i) routes[i] = ModRoute();
+    }
     void setRoute(int slotIndex, ModSource src, ModDestination dest, float amount)
     {
-        if (slotIndex >= 0 && slotIndex < kNumSlots) {
-            routes[slotIndex].source = src;
+        if (slotIndex >= 0 && slotIndex < kNumSlots)
+        {
+            routes[slotIndex].source      = src;
             routes[slotIndex].destination = dest;
-            routes[slotIndex].amount = amount;
+            routes[slotIndex].amount      = amount;
         }
     }
     float getModulationValue(ModDestination dest, const float* sourceValues) const
     {
         if (dest == ModDestination::kNone || sourceValues == nullptr) return 0.0f;
         float total = 0.0f;
-        for (int i = 0; i < kNumSlots; ++i) {
-            if (routes[i].destination == dest) {
+        for (int i = 0; i < kNumSlots; ++i)
+        {
+            if (routes[i].destination == dest)
+            {
                 int srcIdx = static_cast<int>(routes[i].source);
                 if (srcIdx > 0 && srcIdx < static_cast<int>(ModSource::kMaxSources))
                     total += sourceValues[srcIdx] * routes[i].amount;
@@ -61,6 +105,7 @@ public:
         }
         return total;
     }
+
 private:
     ModRoute routes[kNumSlots];
 };
@@ -75,21 +120,22 @@ static float byteToAmount(int amountByte) noexcept
 
 // ── La aritmética ─────────────────────────────────────────────────────────
 
-static void testModMatrixAccumulation() {
+static void testModMatrixAccumulation()
+{
     printf("=== ModMatrix: accumulate ===\n");
     using Matrix = ModMatrixT<8>;
 
     constexpr std::size_t kSources = 8;
-    constexpr std::size_t kDests = 16;
+    constexpr std::size_t kDests   = 16;
 
-    const float sources[kSources] = { 0.0f, 0.5f, -0.25f, 1.0f,
-                                      -1.0f, 0.75f, 0.1f, 0.2f };
-    float accum[kDests] = {};
+    const float sources[kSources] = {0.0f, 0.5f, -0.25f, 1.0f,
+                                     -1.0f, 0.75f, 0.1f, 0.2f};
+    float accum[kDests]           = {};
 
     Matrix m;
-    m.setRoute(0, 1, 5, 0.5f);    // LFO1  -> dest 5, amount +0.5
-    m.setRoute(1, 2, 5, -0.4f);   // LFO2  -> dest 5, amount -0.4
-    m.setRoute(2, 3, 5, 1.0f);    // otro  -> dest 5, amount +1.0
+    m.setRoute(0, 1, 5, 0.5f);  // LFO1  -> dest 5, amount +0.5
+    m.setRoute(1, 2, 5, -0.4f); // LFO2  -> dest 5, amount -0.4
+    m.setRoute(2, 3, 5, 1.0f);  // otro  -> dest 5, amount +1.0
 
     m.accumulate(sources, kSources, accum, kDests);
 
@@ -116,14 +162,15 @@ static void testModMatrixAccumulation() {
     check(!m.hasAnyRoute(), "clear() vacía hasAnyRoute()");
 }
 
-static void testModMatrixBounds() {
+static void testModMatrixBounds()
+{
     printf("=== ModMatrix: límites y robustez ===\n");
     using Matrix = ModMatrixT<4>;
 
     constexpr std::size_t kSources = 6;
-    constexpr std::size_t kDests = 6;
-    const float sources[kSources] = { 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-    float accum[kDests] = {};
+    constexpr std::size_t kDests   = 6;
+    const float sources[kSources]  = {0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+    float accum[kDests]            = {};
 
     Matrix m;
     m.setRoute(0, 1, 2, 1.0f);
@@ -132,11 +179,11 @@ static void testModMatrixBounds() {
 
     // Un sourceId FUERA del array declarado no se lee (evita salirse), y un
     // destinationId fuera del buffer de salida no se escribe.
-    float guard = 0.0f;
-    float tiny[2] = { 0.0f, 1.0f };
+    float guard   = 0.0f;
+    float tiny[2] = {0.0f, 1.0f};
     m.clear();
-    m.setRoute(0, 5, 2, 1.0f);          // source 5 >= sourceCount(2)
-    m.accumulate(tiny, 2, &guard, 1);   // dest 2 >= destCount(1)
+    m.setRoute(0, 5, 2, 1.0f);        // source 5 >= sourceCount(2)
+    m.accumulate(tiny, 2, &guard, 1); // dest 2 >= destCount(1)
     check(guard == 0.0f, "un id fuera de rango no se lee ni se escribe");
 
     // nullptr: no debe escribir nada ni reventar. El acumulador se pone a cero
@@ -171,12 +218,13 @@ static void testModMatrixBounds() {
     check(!m.hasAnyRoute(), "amount 0 no cuenta como ruta viva");
 }
 
-static void testModMatrixGet() {
+static void testModMatrixGet()
+{
     printf("=== ModMatrix: get() ===\n");
     using Matrix = ModMatrixT<8>;
 
     constexpr std::size_t kSources = 8;
-    const float sources[kSources] = { 0.0f, 0.5f, 0.25f, -0.75f, 1.0f, -1.0f, 0.0f, 0.0f };
+    const float sources[kSources]  = {0.0f, 0.5f, 0.25f, -0.75f, 1.0f, -1.0f, 0.0f, 0.0f};
 
     Matrix m;
     m.setRoute(0, 1, 20, 0.5f);
@@ -193,7 +241,8 @@ static void testModMatrixGet() {
 
 // ── La prueba que permite migrar sin cambiar el sonido ────────────────────
 
-static void testModMatrixEquivalenceWithAbdeep() {
+static void testModMatrixEquivalenceWithAbdeep()
+{
     printf("=== ModMatrix: equivalencia con la implementación previa de ABDEep ===\n");
 
     // Rutas del DeepMind 12 leídas de los bancos de fábrica: los pares
@@ -204,31 +253,58 @@ static void testModMatrixEquivalenceWithAbdeep() {
     // que dos filas con el mismo slot se anularían entre sí y la prueba
     // compararía una matriz vacía contra otra también vacía: verde y sin
     // valor. Con un slot por fila, las 8 rutas están vivas a la vez.
-    struct FactoryRoute { int slot; int src; int dest; int amountByte; };
+    struct FactoryRoute
+    {
+        int slot;
+        int src;
+        int dest;
+        int amountByte;
+    };
     const FactoryRoute routes[] = {
-        { 0,  2, 17, 255 },   // LFO2 -> dest 17, a tope
-        { 1,  2, 18, 200 },   // LFO2 -> dest 18
-        { 2,  5, 17,  74 },   // dos rutas al MISMO destino 17
-        { 3,  6, 17, 128 },   // y una tercera: se suman
-        { 4,  7, 60, 128 },
-        { 5, 12, 22, 255 },
-        { 6,  9, 64, 138 },
-        { 7, 19, 12,   1 },   // cantidad casi nula
+        {0, 2, 17, 255}, // LFO2 -> dest 17, a tope
+        {1, 2, 18, 200}, // LFO2 -> dest 18
+        {2, 5, 17, 74},  // dos rutas al MISMO destino 17
+        {3, 6, 17, 128}, // y una tercera: se suman
+        {4, 7, 60, 128},
+        {5, 12, 22, 255},
+        {6, 9, 64, 138},
+        {7, 19, 12, 1}, // cantidad casi nula
     };
     constexpr auto kRouteCount = sizeof(routes) / sizeof(routes[0]);
 
     // Fuentes del DeepMind en el ORDEN DEL BYTE (docs/sysex_format.md 0..22).
     const float sources[23] = {
-        0.0f, 0.5f, 0.25f, -0.75f, 1.0f, -1.0f, 0.1f, 0.2f,
-        0.3f, -0.2f, 0.4f, 0.6f, -0.9f, 0.15f, -0.35f, 0.8f,
-        0.05f, -0.05f, 0.45f, -0.55f, 0.65f, 0.35f, -0.15f,
+        0.0f,
+        0.5f,
+        0.25f,
+        -0.75f,
+        1.0f,
+        -1.0f,
+        0.1f,
+        0.2f,
+        0.3f,
+        -0.2f,
+        0.4f,
+        0.6f,
+        -0.9f,
+        0.15f,
+        -0.35f,
+        0.8f,
+        0.05f,
+        -0.05f,
+        0.45f,
+        -0.55f,
+        0.65f,
+        0.35f,
+        -0.15f,
     };
     constexpr std::size_t kSources = 23;
-    constexpr std::size_t kDests = 130;
+    constexpr std::size_t kDests   = 130;
 
     // Que el fixture sea el que creemos: 8 slots vivos, todos distintos.
     bool fixtureOk = true;
-    for (std::size_t i = 0; i < kRouteCount; ++i) {
+    for (std::size_t i = 0; i < kRouteCount; ++i)
+    {
         for (std::size_t j = i + 1; j < kRouteCount; ++j)
             if (routes[i].slot == routes[j].slot) fixtureOk = false;
         if (routes[i].src == 0 || routes[i].dest == 0) fixtureOk = false;
@@ -238,7 +314,8 @@ static void testModMatrixEquivalenceWithAbdeep() {
     legacy::ModulationMatrix legacyMatrix;
     ModMatrixT<8> newMatrix;
 
-    for (const auto& r : routes) {
+    for (const auto& r : routes)
+    {
         const float amount = byteToAmount(r.amountByte);
         legacyMatrix.setRoute(r.slot,
                               static_cast<legacy::ModSource>(r.src),
@@ -254,7 +331,8 @@ static void testModMatrixEquivalenceWithAbdeep() {
 
     // get(): la firma que ABDEep sustituye. Bit a bit, sin tolerancia.
     bool allEqual = true;
-    for (std::size_t d = 0; d < kDests; ++d) {
+    for (std::size_t d = 0; d < kDests; ++d)
+    {
         const float legacyValue = legacyMatrix.getModulationValue(
             static_cast<legacy::ModDestination>(d), sources);
         const float newValue = newMatrix.get(static_cast<ModDestinationId>(d),
@@ -282,10 +360,11 @@ static void testModMatrixEquivalenceWithAbdeep() {
     newMatrix.accumulate(sources, kSources, newAccum, kDests);
 
     bool accumMatchesGet = true;
-    for (std::size_t d = 0; d < kDests; ++d) {
-        if (d == 0) continue;   // el 0 nunca acumula
+    for (std::size_t d = 0; d < kDests; ++d)
+    {
+        if (d == 0) continue; // el 0 nunca acumula
         if (newAccum[d] != newMatrix.get(static_cast<ModDestinationId>(d),
-                                          sources, kSources))
+                                         sources, kSources))
             accumMatchesGet = false;
     }
     check(accumMatchesGet, "accumulate() y get() dan el mismo valor en los 130 destinos");
@@ -296,7 +375,8 @@ static void testModMatrixEquivalenceWithAbdeep() {
 
 // ── El descriptor: donde vive la política ─────────────────────────────────
 
-static void testModDestinationDescriptor() {
+static void testModDestinationDescriptor()
+{
     printf("=== ModMatrix: descriptor de destinos ===\n");
 
     // Un trozo de la tabla de ABDNeural tal cual la declara hoy. El punto es
@@ -304,11 +384,11 @@ static void testModDestinationDescriptor() {
     // `replaces` son la política de síntesis de reemplazo que no puede
     // perderse al migrar el `switch` de 31 casos.
     const ModDestinationDescriptor table[] = {
-        {  0, "Off",            nullptr,      0.0f,     1.0f,  1.0f,  false, false },
-        {  1, "Osc Level",      "oscLevel",   0.0f,     1.0f,  1.0f,  false, false },
-        {  2, "Filter Cutoff",  "filterCutoff", 20.0f, 20000.0f, 1.0f, true,  true  },
-        { 12, "Filter Env Amt", nullptr,      0.0f,     1.0f,  1.0f,  true,  true  },
-        { 28, "Morph Z",        "morphZ",     0.0f,     1.0f,  1.0f,  false, false },
+        {0, "Off", nullptr, 0.0f, 1.0f, 1.0f, false, false},
+        {1, "Osc Level", "oscLevel", 0.0f, 1.0f, 1.0f, false, false},
+        {2, "Filter Cutoff", "filterCutoff", 20.0f, 20000.0f, 1.0f, true, true},
+        {12, "Filter Env Amt", nullptr, 0.0f, 1.0f, 1.0f, true, true},
+        {28, "Morph Z", "morphZ", 0.0f, 1.0f, 1.0f, false, false},
     };
     constexpr std::size_t kTableSize = sizeof(table) / sizeof(table[0]);
 
@@ -322,8 +402,9 @@ static void testModDestinationDescriptor() {
     check(cutoff.max - cutoff.min > 1000.0f, "el cutoff lleva su rango real");
 
     int perNoteCount = 0, replacesCount = 0, withoutParam = 0;
-    for (std::size_t i = 0; i < kTableSize; ++i) {
-        if (table[i].perNote)  ++perNoteCount;
+    for (std::size_t i = 0; i < kTableSize; ++i)
+    {
+        if (table[i].perNote) ++perNoteCount;
         if (table[i].replaces) ++replacesCount;
         if (table[i].parameterId == nullptr) ++withoutParam;
     }
@@ -344,7 +425,8 @@ static void testModDestinationDescriptor() {
 
 // ── El índice 0: una diferencia REAL entre los tres synths ────────────────
 
-static void testModMatrixZeroIdIsNotAlwaysInert() {
+static void testModMatrixZeroIdIsNotAlwaysInert()
+{
     printf("=== ModMatrix: el índice 0 no siempre es inerte ===\n");
 
     // ABDMS2000: `enum class PatchSource { EG1 = 0, ... }`. El 0 es el EG1, una
@@ -357,14 +439,14 @@ static void testModMatrixZeroIdIsNotAlwaysInert() {
     using Ms2000Matrix = ModMatrixT<4, /* kZeroIdInert */ false>;
 
     constexpr std::size_t kSources = 8;
-    constexpr std::size_t kDests = 8;
+    constexpr std::size_t kDests   = 8;
 
     // sources[0] = EG1, sources[1] = EG2, sources[2] = LFO1
-    const float sources[kSources] = { 0.5f, 0.25f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-    float accum[kDests] = {};
+    const float sources[kSources] = {0.5f, 0.25f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    float accum[kDests]           = {};
 
     Ms2000Matrix m;
-    m.setRoute(0, 0, 0, 1.0f);   // EG1 (fuente 0) -> Pitch (destino 0)
+    m.setRoute(0, 0, 0, 1.0f); // EG1 (fuente 0) -> Pitch (destino 0)
 
     m.accumulate(sources, kSources, accum, kDests);
 
