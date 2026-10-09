@@ -147,7 +147,8 @@ public:
             for (int h = 0; h < 3; ++h)
                 maxRatio = jmax(maxRatio, Profile::getHeadRatio(m, h));
 
-        delaySamples_ = static_cast<int>(sampleRate * Profile::maxDelaySeconds * maxRatio) + 2;
+        const float maxMod = 1.0f + Profile::wowAmount + Profile::flutterAmount;
+        delaySamples_ = static_cast<int>(sampleRate * Profile::maxDelaySeconds * maxRatio * maxMod) + 32;
         tankSamples_  = static_cast<int>(sampleRate * Profile::maxDelaySeconds) + 1;
 
         tapeBuffer.setSize(2, delaySamples_, false, false, true);
@@ -210,8 +211,7 @@ public:
         const float clampedDelay = jlimit(Profile::minDelaySeconds,
                                           Profile::maxDelaySeconds,
                                           delaySeconds);
-        const int delaySamples   = jlimit(1, delaySamples_,
-                                          static_cast<int>(clampedDelay * sampleRate_));
+        const float baseDelaySamples = clampedDelay * static_cast<float>(sampleRate_);
 
         // Deriva de la cinta: la lectura se alarga o se acorta con ella. Las
         // dos senales son del motor, no de la etapa de color (ver TapeColour.h).
@@ -246,28 +246,7 @@ public:
                 // La lectura NO puede pasar del final de la linea de cinta. Es
                 // RED, no un arreglo de un fallo medido: con los perfiles que hay
                 // hoy el envuelto no llega a ocurrir.
-                //
-                // El caso de borde existe porque `prepare` dimensiona la linea a
-                // `maxDelaySeconds * maxRatio` y la lectura es
-                // `headRatio * retardo * wowMod`, con `wowMod` hasta
-                // `1 + wowAmount + flutterAmount`. Con `Re201Profile` eso da
-                // 3 x 0.5 x 1.004 = 1.506 s contra un buffer de 1.50005 s: un
-                // 0.4% por encima. MEDIDO, sin este recorte, barreando 501 puntos
-                // de 0.480 a 0.500 s y tomando la posicion del MAXIMO de la cola
-                // (que el siseo no puede falsear): 0 envueltos de 501. El eco cae
-                // en 1.49512 s con recorte y en 1.49512 s sin el, porque en los
-                // perfiles actuales la deriva se contrae justo cuando se lee el
-                // eco. O sea que hoy el recorte no cambia ni una muestra.
-                //
-                // Se queda por dos razones. La primera es que el modulo existe
-                // para que AÑADIR una maquina sea escribir un `struct`: un perfil
-                // futuro con mas `headRatio` o mas wow se encontraria con la
-                // lectura colgando del final de la linea sin ninguna garantia,
-                // y dependeria de en que fase de la deriva cae la lectura. La
-                // segunda es que `readTape` ya envuelve con un cociente como red
-                // de ultimo recurso, y un envolverse es un salto de fase: mejor
-                // saturar en el tope que dar un salto.
-                const float wanted   = Profile::getHeadRatio(mode_, h) * static_cast<float>(delaySamples) * wowMod;
+                const float wanted   = Profile::getHeadRatio(mode_, h) * baseDelaySamples * wowMod;
                 const float distance = jmin(static_cast<float>(delaySamples_ - 1), wanted);
                 const float hGain    = Profile::getHeadGain(mode_, h, gainPerHead);
 

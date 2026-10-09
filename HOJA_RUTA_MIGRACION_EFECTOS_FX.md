@@ -128,13 +128,13 @@
   1. `FXRingModulator` (Tipo 38) ➔ Delegar en `abd::dsp::RingMod` + `abd::dsp::DiodeBridge` (`RingModProfile`).
   2. `FXSpaceEchoRE201` (Tipo 39) ➔ Delegar en `abd::dsp::MultiHeadEcho` + `abd::dsp::Re201Profile` + `abd::dsp::TapeColour`.
 
-### 🟡 Fase 2: Unificación con `ABDMS2000` y Filtros de Modulación
+### ✅ Fase 2: Unificación con `ABDMS2000` y Filtros de Modulación (Completada)
 * **Objetivo:** Compartir bloques matemáticos idénticos entre ABDEep y ABDMS2000.
-* **Componentes:**
-  3. `FXPhaser` (Tipo 9) ➔ Delegar en `abd::dsp::Phaser4`.
-  4. `FXVocoder` (Tipo 49) ➔ Extraer `abd::dsp::DspVocoderBank` y `abd::dsp::DspEnvelopeFollower` compartiéndolo con `Vocoder16Band` de MS2000.
-  5. `FXSolinaEnsemble` (Tipo 37) ➔ Extraer a perfil BBD tri-fásico en `DspEffects`.
-  6. `FXMoodFilter` (Tipo 8) ➔ Conectar al Moog Ladder ya promovido en `DspCore/DspMoogLadder.h`.
+* **Componentes completados:**
+  3. `FXPhaser` (Tipo 9) ➔ Delegado a `abd::dsp::DspPhaser` (2 a 12 etapas allpass con envelope follower y dual LFO estéreo con skew).
+  4. `FXVocoder` (Tipo 34/49) ➔ Extraído `abd::dsp::DspVocoderBank<kMaxBands>` y `abd::dsp::DspEnvelopeFollower` (preparado para unificación con `Vocoder16Band` de MS2000).
+  5. `FXSolinaEnsemble` (Tipo 37) ➔ Extraído a `abd::dsp::DspSolinaEnsemble` (3 taps con desfase a 120°, interpolación Hermite, buffer estático RT-safe).
+  6. `FXMoodFilter` (Tipo 8) ➔ Extraído a `abd::dsp::DspMoodFilter` (SVF 2P/4P con overdrive tanh, envelope follower y LFO de 7 formas de onda).
 
 ### 🟠 Fase 3: Bloques de Dinámica y Saturación / Distorsión
 * **Objetivo:** Promover motores analógicos compartidos de compresión y recorte.

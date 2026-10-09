@@ -77,6 +77,10 @@
 #include "DspEffects/profiles/MS2000EqProfile.h"
 #include "DspEffects/profiles/Re201Profile.h"
 #include "DspEffects/profiles/ReverbProfile.h"
+#include "DspEffects/DspPhaser.h"
+#include "DspEffects/DspMoodFilter.h"
+#include "DspEffects/DspSolinaEnsemble.h"
+#include "DspEffects/DspVocoder.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6067,6 +6071,66 @@ int main()
     testPhaserRowContract();
     testSchroederDampingAtZero();
     testTapeColourDriftIsNotWired();
+
+    // Motores de la Fase 2 (Vocoder, Phaser, Mood Filter, Solina Ensemble)
+    {
+        // 1. DspPhaser
+        abd::dsp::DspPhaser phaser;
+        phaser.prepare(44100.0);
+        phaser.setRateNorm(0.5f);
+        phaser.setDepthNorm(0.8f);
+        phaser.setFeedbackNorm(0.4f);
+        phaser.setStageCount(6);
+
+        float inL[64] = { 1.0f };
+        float inR[64] = { 1.0f };
+        float outL[64] = {};
+        float outR[64] = {};
+        phaser.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspPhaser produce muestras finitas");
+        check(outL[0] != 0.0f, "DspPhaser responde al impulso");
+
+        // 2. DspMoodFilter
+        abd::dsp::DspMoodFilter mood;
+        mood.prepare(44100.0);
+        mood.setFilterType(abd::dsp::DspMoodFilter::kLowpass);
+        mood.setBaseFreqNorm(0.5f);
+        mood.setDriveNorm(0.3f);
+        mood.setFourPole(true);
+
+        std::fill(std::begin(outL), std::end(outL), 0.0f);
+        std::fill(std::begin(outR), std::end(outR), 0.0f);
+        mood.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspMoodFilter produce muestras finitas");
+        check(outL[0] != 0.0f, "DspMoodFilter responde al impulso");
+
+        // 3. DspSolinaEnsemble
+        abd::dsp::DspSolinaEnsemble solina;
+        solina.prepare(44100.0);
+        solina.setRateNorm(0.5f);
+        solina.setDepthNorm(0.6f);
+        solina.setSpreadNorm(0.8f);
+
+        std::fill(std::begin(outL), std::end(outL), 0.0f);
+        std::fill(std::begin(outR), std::end(outR), 0.0f);
+        solina.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspSolinaEnsemble produce muestras finitas");
+
+        // 4. DspVocoderBank
+        abd::dsp::DspVocoderBank<16> vocoder;
+        vocoder.prepare(44100.0);
+        vocoder.setBandCount(16);
+        vocoder.setFormantShift(1.0f);
+
+        float modL[64] = { 0.5f };
+        float carL[64] = { 0.5f };
+        std::fill(std::begin(outL), std::end(outL), 0.0f);
+        std::fill(std::begin(outR), std::end(outR), 0.0f);
+        vocoder.process(modL, modL, carL, carL, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspVocoderBank produce muestras finitas");
+
+        std::printf("  [fase 2] motores DspPhaser, DspMoodFilter, DspSolinaEnsemble y DspVocoderBank comprobados\n");
+    }
 
     if (gFailures == 0)
     {

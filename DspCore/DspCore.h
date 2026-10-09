@@ -2570,3 +2570,4 @@ private:
 #include "DspKorgMS20.h"
 #include "DspVcfVoicing.h"
 #include "DspJunoVCF.h"
+#include "DspEnvelopeFollower.h"
