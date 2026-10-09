@@ -81,6 +81,12 @@
 #include "DspEffects/DspMoodFilter.h"
 #include "DspEffects/DspSolinaEnsemble.h"
 #include "DspEffects/DspVocoder.h"
+#include "DspEffects/DspFairComp.h"
+#include "DspEffects/DspNoiseGate.h"
+#include "DspEffects/DspWaveShaper.h"
+#include "DspEffects/DspOversamplingDistortion.h"
+#include "DspEffects/DspMultiBandDist.h"
+#include "DspEffects/DspRackAmp.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6130,6 +6136,64 @@ int main()
         check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspVocoderBank produce muestras finitas");
 
         std::printf("  [fase 2] motores DspPhaser, DspMoodFilter, DspSolinaEnsemble y DspVocoderBank comprobados\n");
+    }
+
+    // Motores de la Fase 3 (Dinámica y Saturación / Distorsión)
+    {
+        float inL[64];
+        float inR[64];
+        float outL[64];
+        float outR[64];
+        for (int i = 0; i < 64; ++i)
+        {
+            inL[i] = std::sin(static_cast<float>(i) * 0.1f);
+            inR[i] = std::cos(static_cast<float>(i) * 0.1f);
+        }
+
+        // 1. DspFairComp
+        abd::dsp::DspFairComp fairComp;
+        fairComp.prepare(44100.0);
+        fairComp.setMode(abd::dsp::DspFairComp::kStereo);
+        fairComp.setThresholdLM(0.4f);
+        fairComp.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspFairComp produce muestras finitas");
+
+        // 2. DspNoiseGate
+        abd::dsp::DspNoiseGate gate;
+        gate.prepare(44100.0);
+        gate.setThresholdNorm(0.3f);
+        gate.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspNoiseGate produce muestras finitas");
+
+        // 3. DspWaveShaper
+        abd::dsp::DspWaveShaper shaper;
+        shaper.prepare(44100.0);
+        shaper.setShapeNorm(0.5f);
+        shaper.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspWaveShaper produce muestras finitas");
+
+        // 4. DspOversamplingDistortion
+        abd::dsp::DspOversamplingDistortion overDist;
+        overDist.prepare(44100.0);
+        overDist.setDriveNorm(0.5f);
+        overDist.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspOversamplingDistortion produce muestras finitas");
+
+        // 5. DspMultiBandDist
+        abd::dsp::DspMultiBandDist mbDist;
+        mbDist.prepare(44100.0);
+        mbDist.setDistType(1);
+        mbDist.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspMultiBandDist produce muestras finitas");
+
+        // 6. DspRackAmp
+        abd::dsp::DspRackAmp rackAmp;
+        rackAmp.prepare(44100.0);
+        rackAmp.setDriveNorm(0.6f);
+        rackAmp.process(inL, inR, outL, outR, 64);
+        check(std::isfinite(outL[0]) && std::isfinite(outR[0]), "DspRackAmp produce muestras finitas");
+
+        std::printf("  [fase 3] motores DspFairComp, DspNoiseGate, DspWaveShaper, DspOversamplingDistortion, DspMultiBandDist y DspRackAmp comprobados\n");
     }
 
     if (gFailures == 0)

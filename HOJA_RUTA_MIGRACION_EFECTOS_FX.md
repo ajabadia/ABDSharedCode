@@ -136,11 +136,15 @@
   5. `FXSolinaEnsemble` (Tipo 37) ➔ Extraído a `abd::dsp::DspSolinaEnsemble` (3 taps con desfase a 120°, interpolación Hermite, buffer estático RT-safe).
   6. `FXMoodFilter` (Tipo 8) ➔ Extraído a `abd::dsp::DspMoodFilter` (SVF 2P/4P con overdrive tanh, envelope follower y LFO de 7 formas de onda).
 
-### 🟠 Fase 3: Bloques de Dinámica y Saturación / Distorsión
+### ✅ Fase 3: Bloques de Dinámica y Saturación / Distorsión (Completada)
 * **Objetivo:** Promover motores analógicos compartidos de compresión y recorte.
-* **Componentes:**
-  7. `FXSimpleComp` (21), `FXFairComp` (31), `FXNoiseGate` (33) ➔ `DspEffects/DspDynamics.h`.
-  8. `FXWaveShaper` (51), `FXOversamplingDistortion` (50), `FXMultiBandDist` (32), `FXRackAmp` (7) ➔ `DspEffects/DspSaturation.h` / `DspWaveShaper.h`.
+* **Componentes completados:**
+  7. `FXFairComp` (Tipo 31) y `FXSimpleComp` (compatibilidad) ➔ Delegados a `abd::dsp::DspFairComp` (Fairchild 670 Vari-Mu, 6 constantes de tiempo oficiales, soft knee y modos Stereo/Dual/MS).
+  8. `FXNoiseGate` (Tipo 33) ➔ Delegado a `abd::dsp::DspNoiseGate` (Gate, Transient Punch y Ducker estilo Drawmer DS201).
+  9. `FXWaveShaper` (Tipo 51) ➔ Delegado a `abd::dsp::DspWaveShaper` (familias de transferencia continua tanh/fold/sine con simetría par/impar).
+  10. `FXOversamplingDistortion` (Tipo 50) ➔ Delegado a `abd::dsp::DspOversamplingDistortion` (sobremuestreo 4x y diezmado FIR antialiasing, buffers 100% estáticos RT-safe).
+  11. `FXMultiBandDist` (Tipo 32) ➔ Delegado a `abd::dsp::DspMultiBandDist` (crossover de 3 bandas, 6 modos de distorsión y emulación de altavoz/cabinet).
+  12. `FXRackAmp` (Tipo 7) ➔ Delegado a `abd::dsp::DspRackAmp` (previo, buzz, punch, crunch asimétrico, EQ 2 bandas y cabinet de 2 polos estilo SansAmp).
 
 ### 🔵 Fase 4: Ecualización y Modulación Estándar
 * **Objetivo:** Promover ecualizadores de consola y coros/flangers clásicos.
