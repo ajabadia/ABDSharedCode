@@ -199,6 +199,9 @@ ALLOWLIST = {
         'el arnes anterior en su unico fuente; lo corre tools/run_dsp_math_harness.py',
     'DspCore/DspCoreTests.cpp':
         'el test standalone del propio modulo; lo compila su CMake, ningun producto',
+    'LutDSP/LutDSPTests.cpp':
+        'el test standalone del propio modulo (el miembro LUT de la familia de '
+        'filtros); lo compila su CMake, ningun producto lo enlaza todavia',
     'DspEffects/DspEffectsTests.cpp':
         'el test standalone del propio modulo; lo compila su CMake, ningun producto',
     'SynthCore/SynthCoreTests.cpp':
@@ -248,6 +251,11 @@ ALLOWLIST = {
 # solo entran las TU que el modulo COMPILA de verdad, que se comprueba abajo.
 TESTS_PROPIOS = {
     'DspCore/DspCoreTests.cpp',
+    # LutDSP no tenia test propio hasta que llego su miembro de la familia de
+    # filtros: las cabeceras de la familia (DspCore/DspFilterFamily.h y sus dos
+    # miembros del sustrato) se alcanzan desde las DOS raices, y sin esta entrada
+    # lo que incluye el test de LutDSP saldria como huerfano NUEVO en cada pasada.
+    'LutDSP/LutDSPTests.cpp',
     'DspEffects/DspEffectsTests.cpp',
     'SynthCore/SynthCoreTests.cpp',
     'Segmented/SegmentedProbe.cpp',

@@ -45,6 +45,7 @@ void operator delete(void* ptr, std::size_t) noexcept { std::free(ptr); }
 #include "LfoAnalog.h"
 #include "OscHalfbandDecimator.h"
 #include "OscPolyBlep.h"
+#include "OscReference.h"
 #include "OscVcoCa72.h"
 #include "OscVcoCa72Profile.h"
 #include "OscillatorFamily.h"
