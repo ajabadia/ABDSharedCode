@@ -2561,13 +2561,13 @@ private:
 // sustrato: un filtro del sustrato que no pudiera declararse de la familia seria
 // un filtro que no se puede cambiar por otro, que es justo lo que la familia
 // existe para evitar.
+#include "DspEnvelopeFollower.h"
 #include "DspFilterEquation.h"
 #include "DspFilterFamily.h"
 #include "DspFilterTpt.h"
 #include "DspJunoHPF.h"
-#include "DspVAOnePole.h"
-#include "DspMoogLadder.h"
-#include "DspKorgMS20.h"
-#include "DspVcfVoicing.h"
 #include "DspJunoVCF.h"
-#include "DspEnvelopeFollower.h"
+#include "DspKorgMS20.h"
+#include "DspMoogLadder.h"
+#include "DspVAOnePole.h"
+#include "DspVcfVoicing.h"

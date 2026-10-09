@@ -1794,7 +1794,7 @@ void testJunoHPF()
     check(std::abs(abd::dsp::getJuno60HPFFreq(3) - 571.0f) < 1.0f, "J60 HPF pos 3 es ~571 Hz");
 
     check(abd::dsp::getJuno106HPFFreq(0) == -1.0f, "J106 HPF pos 0 es centinela Bass Boost (-1 Hz)");
-    check(abd::dsp::getJuno106HPFFreq(1) == 0.0f,  "J106 HPF pos 1 es FLAT (0 Hz)");
+    check(abd::dsp::getJuno106HPFFreq(1) == 0.0f, "J106 HPF pos 1 es FLAT (0 Hz)");
     check(std::abs(abd::dsp::getJuno106HPFFreq(2) - 236.0f) < 1.0f, "J106 HPF pos 2 es ~236 Hz");
     check(std::abs(abd::dsp::getJuno106HPFFreq(3) - 754.0f) < 1.0f, "J106 HPF pos 3 es ~754 Hz");
 
@@ -1802,11 +1802,15 @@ void testJunoHPF()
     check(std::abs(abd::dsp::getJuno6HPFFreqPCHIP(0.0f) - 38.6f) < 0.01f, "PCHIP en 0.0 es 38.6 Hz");
     check(std::abs(abd::dsp::getJuno6HPFFreqPCHIP(1.0f) - 1394.2f) < 0.01f, "PCHIP en 1.0 es 1394.2 Hz");
     bool pchipMonotonic = true;
-    float prevVal = abd::dsp::getJuno6HPFFreqPCHIP(0.0f);
+    float prevVal       = abd::dsp::getJuno6HPFFreqPCHIP(0.0f);
     for (int step = 1; step <= 100; ++step)
     {
         float val = abd::dsp::getJuno6HPFFreqPCHIP(static_cast<float>(step) / 100.0f);
-        if (val < prevVal) { pchipMonotonic = false; break; }
+        if (val < prevVal)
+        {
+            pchipMonotonic = false;
+            break;
+        }
         prevVal = val;
     }
     check(pchipMonotonic, "PCHIP es estrictamente monotona en todo el recorrido [0..1]");
@@ -1983,7 +1987,7 @@ void testAnalogModeledFilters()
         for (int i = 0; i < 4096; ++i)
         {
             float sine = std::sin(2.0f * 3.14159265f * 5000.0f * static_cast<float>(i) / static_cast<float>(sr));
-            float out = moog.process(sine);
+            float out  = moog.process(sine);
             if (i >= 2048) hfMax = std::max(hfMax, std::abs(out));
         }
         check(hfMax < 0.1f, "MoogLadderVCF rechaza HF (5 kHz a 100 Hz LP < 0.1)");
@@ -2041,7 +2045,7 @@ void testAnalogModeledFilters()
         for (int i = 0; i < 4096; ++i)
         {
             float sine = std::sin(2.0f * 3.14159265f * 5000.0f * static_cast<float>(i) / static_cast<float>(sr));
-            float out = korg.process(sine);
+            float out  = korg.process(sine);
             if (i >= 2048) hfMax = std::max(hfMax, std::abs(out));
         }
         check(hfMax < 0.15f, "KorgMS20VCF rechaza HF (5 kHz a 100 Hz LP < 0.15)");
@@ -2064,7 +2068,7 @@ void testJunoVCF()
     check(vcf.getOversample() == 1, "JunoVCF_ZDF oversample por defecto es 1");
 
     // 2. Curva de resonancia y soft-clip
-    float k0 = abd::dsp::JunoVCF_ZDF::ResK_J106(0.0f);
+    float k0   = abd::dsp::JunoVCF_ZDF::ResK_J106(0.0f);
     float kMid = abd::dsp::JunoVCF_ZDF::ResK_J106(0.5f);
     float kMax = abd::dsp::JunoVCF_ZDF::ResK_J106(1.0f);
     check(std::abs(k0) < 1.0e-5f, "ResK_J106 a 0 es 0");

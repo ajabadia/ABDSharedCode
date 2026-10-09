@@ -42,9 +42,9 @@ public:
     void prepare(double sampleRate) noexcept
     {
         sampleRate_ = (sampleRate > 1000.0) ? sampleRate : 44100.0;
-        envelope_ = 0.0f;
-        setAttackTime(0.005f);   // 5ms por defecto
-        setReleaseTime(0.050f);  // 50ms por defecto
+        envelope_   = 0.0f;
+        setAttackTime(0.005f);  // 5ms por defecto
+        setReleaseTime(0.050f); // 50ms por defecto
     }
 
     /** Restablece el nivel de envolvente acumulado a cero. */
@@ -104,12 +104,12 @@ public:
     }
 
 private:
-    double sampleRate_ { 44100.0 };
-    float envelope_ { 0.0f };
-    float attackTime_ { 0.005f };
-    float releaseTime_ { 0.050f };
-    float attackCoef_ { 0.0f };
-    float releaseCoef_ { 0.999f };
+    double sampleRate_{44100.0};
+    float envelope_{0.0f};
+    float attackTime_{0.005f};
+    float releaseTime_{0.050f};
+    float attackCoef_{0.0f};
+    float releaseCoef_{0.999f};
 };
 
 } // namespace abd::dsp

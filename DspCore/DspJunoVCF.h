@@ -1,10 +1,10 @@
 #pragma once
+#include "DspVcfVoicing.h"
+#include <algorithm>
 #include <array>
 #include <cmath>
-#include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include "DspVcfVoicing.h"
 
 namespace abd::dsp
 {
@@ -20,14 +20,13 @@ static constexpr double kResamplerCoefs2x[kNumResamplerCoefs] = {
     0.036681502163648017, 0.13654762463195794, 0.27463175937945444,
     0.42313861743656711, 0.56109869787919531, 0.67754004997416184,
     0.76974183386322703, 0.83988962484963892, 0.89226081800387902,
-    0.9315419599631839,  0.96209454837808417, 0.98781637073289585
-};
+    0.9315419599631839, 0.96209454837808417, 0.98781637073289585};
 
 struct Upsampler2x
 {
     float coef[kNumResamplerCoefs] = {};
-    float x[kNumResamplerCoefs] = {};
-    float y[kNumResamplerCoefs] = {};
+    float x[kNumResamplerCoefs]    = {};
+    float y[kNumResamplerCoefs]    = {};
 
     inline void setCoefs(const double c[kNumResamplerCoefs]) noexcept
     {
@@ -47,11 +46,14 @@ struct Upsampler2x
         float odd  = input;
         for (int i = 0; i < kNumResamplerCoefs; i += 2)
         {
-            float t0 = (even - y[i])     * coef[i]     + x[i];
-            float t1 = (odd  - y[i + 1]) * coef[i + 1] + x[i + 1];
-            x[i]     = even;   x[i + 1] = odd;
-            y[i]     = t0;     y[i + 1] = t1;
-            even = t0;          odd = t1;
+            float t0 = (even - y[i]) * coef[i] + x[i];
+            float t1 = (odd - y[i + 1]) * coef[i + 1] + x[i + 1];
+            x[i]     = even;
+            x[i + 1] = odd;
+            y[i]     = t0;
+            y[i + 1] = t1;
+            even     = t0;
+            odd      = t1;
         }
         out0 = even;
         out1 = odd;
@@ -61,8 +63,8 @@ struct Upsampler2x
 struct Downsampler2x
 {
     float coef[kNumResamplerCoefs] = {};
-    float x[kNumResamplerCoefs] = {};
-    float y[kNumResamplerCoefs] = {};
+    float x[kNumResamplerCoefs]    = {};
+    float y[kNumResamplerCoefs]    = {};
 
     inline void setCoefs(const double c[kNumResamplerCoefs]) noexcept
     {
@@ -82,11 +84,14 @@ struct Downsampler2x
         float spl1 = in[0];
         for (int i = 0; i < kNumResamplerCoefs; i += 2)
         {
-            float t0 = (spl0 - y[i])     * coef[i]     + x[i];
+            float t0 = (spl0 - y[i]) * coef[i] + x[i];
             float t1 = (spl1 - y[i + 1]) * coef[i + 1] + x[i + 1];
-            x[i]     = spl0;   x[i + 1] = spl1;
-            y[i]     = t0;     y[i + 1] = t1;
-            spl0 = t0;          spl1 = t1;
+            x[i]     = spl0;
+            x[i + 1] = spl1;
+            y[i]     = t0;
+            y[i + 1] = t1;
+            spl0     = t0;
+            spl1     = t1;
         }
         return 0.5f * (spl0 + spl1);
     }
@@ -94,17 +99,15 @@ struct Downsampler2x
 
 namespace detail
 {
-    inline float junoFastTan(float x) noexcept
-    {
-        x = std::clamp(x, 0.0f, 1.425f);
-        float x2 = x * x;
-        float s = x * (1.0f + x2 * (-1.0f / 6.0f + x2 * (1.0f / 120.0f + x2 * (-1.0f / 5040.0f
-                  + x2 * (1.0f / 362880.0f + x2 * (-1.0f / 39916800.0f))))));
-        float c = 1.0f + x2 * (-1.0f / 2.0f + x2 * (1.0f / 24.0f + x2 * (-1.0f / 720.0f
-                  + x2 * (1.0f / 40320.0f + x2 * (-1.0f / 3628800.0f)))));
-        return (c > 1.0e-7f) ? (s / c) : (s * 1.0e7f);
-    }
+inline float junoFastTan(float x) noexcept
+{
+    x        = std::clamp(x, 0.0f, 1.425f);
+    float x2 = x * x;
+    float s  = x * (1.0f + x2 * (-1.0f / 6.0f + x2 * (1.0f / 120.0f + x2 * (-1.0f / 5040.0f + x2 * (1.0f / 362880.0f + x2 * (-1.0f / 39916800.0f))))));
+    float c  = 1.0f + x2 * (-1.0f / 2.0f + x2 * (1.0f / 24.0f + x2 * (-1.0f / 720.0f + x2 * (1.0f / 40320.0f + x2 * (-1.0f / 3628800.0f)))));
+    return (c > 1.0e-7f) ? (s / c) : (s * 1.0e7f);
 }
+} // namespace detail
 
 /**
  * JunoVCF_ZDF — TPT ZDF OTA Ladder Filter (IR3109 / 80017A model)
@@ -126,8 +129,8 @@ public:
 
     enum class PoleMode
     {
-        FourPole,   // 24 dB/oct — 4 integrators in cascade
-        TwoPole     // 12 dB/oct — 2 integrators in cascade
+        FourPole, // 24 dB/oct — 4 integrators in cascade
+        TwoPole   // 12 dB/oct — 2 integrators in cascade
     };
 
     inline JunoVCF_ZDF()
@@ -194,17 +197,16 @@ public:
     inline void prepare(double newSampleRate) noexcept
     {
         sampleRate = newSampleRate;
-        mEnvDecay = std::exp(-1.0f / (VcfCalibration::kInputEnvTauSec * static_cast<float>(sampleRate)
-                                        * static_cast<float>(mOversample)));
+        mEnvDecay  = std::exp(-1.0f / (VcfCalibration::kInputEnvTauSec * static_cast<float>(sampleRate) * static_cast<float>(mOversample)));
         reset();
     }
 
     inline void setOversample(int factor) noexcept
     {
-        int prev = mOversample;
-        mOversample = (factor <= 1) ? 1 : (factor == 2) ? 2 : 4;
-        mEnvDecay = std::exp(-1.0f / (VcfCalibration::kInputEnvTauSec * static_cast<float>(sampleRate)
-                                        * static_cast<float>(mOversample)));
+        int prev    = mOversample;
+        mOversample = (factor <= 1) ? 1 : (factor == 2) ? 2
+                                                        : 4;
+        mEnvDecay   = std::exp(-1.0f / (VcfCalibration::kInputEnvTauSec * static_cast<float>(sampleRate) * static_cast<float>(mOversample)));
         if (mOversample == 4 && prev == 2)
         {
             mUp2.clearBuffers();
@@ -233,7 +235,7 @@ public:
         else
             k = ResK_J106(res);
 
-        k = SoftClipK(k);
+        k             = SoftClipK(k);
         float kPassed = k;
 
         if (frq > 0.5f)
@@ -242,8 +244,8 @@ public:
         if (std::abs(mLastOutFrq - frq) > kJunoVCFCacheEps ||
             std::abs(mLastOutK - k) > kJunoVCFCacheEps)
         {
-            mLastOutFrq = frq;
-            mLastOutK = k;
+            mLastOutFrq     = frq;
+            mLastOutK       = k;
             mCachedFreqComp = FreqCompensationClamped(k, frq * 0.25f);
         }
         mFreqComp = mCachedFreqComp;
@@ -273,7 +275,7 @@ public:
         if (k > 4.0f)
         {
             float excess = k - 4.0f;
-            k = 4.0f + excess / (1.0f + excess * 0.2f);
+            k            = 4.0f + excess / (1.0f + excess * 0.2f);
         }
         return std::min(k, 6.6f);
     }
@@ -292,19 +294,19 @@ private:
     {
         if (x > 3.f || x < -3.f) return 0.f;
         float x2 = x * x;
-        float d = 27.f + 9.f * x2;
+        float d  = 27.f + 9.f * x2;
         return 27.f * (27.f - 3.f * x2) / (d * d);
     }
 
     // Non-linear stage solver via Newton-Raphson
     static inline float NLStage(float& st, float x, float g, float g1, float otaScale) noexcept
     {
-        float y = st + g1 * (x - st);
+        float y    = st + g1 * (x - st);
         float diff = x - y;
-        float sd = diff * otaScale;
-        float t = OTASat(sd) / otaScale;
-        float f = y - st - g * t;
-        float df = 1.f + g * OTASatDeriv(sd);
+        float sd   = diff * otaScale;
+        float t    = OTASat(sd) / otaScale;
+        float f    = y - st - g * t;
+        float df   = 1.f + g * OTASatDeriv(sd);
         y -= f / df;
         st = 2.f * y - st;
         return y;
@@ -312,7 +314,7 @@ private:
 
     static inline float FreqCompensationClamped(float k, float frq) noexcept
     {
-        float lowQ = std::max(1.0f, 0.42f * std::pow(std::max(frq, 1e-6f), -0.12f));
+        float lowQ    = std::max(1.0f, 0.42f * std::pow(std::max(frq, 1e-6f), -0.12f));
         float logdist = std::log(std::max(frq, 1e-6f) / 0.012f);
         lowQ += 0.20f * std::exp(-logdist * logdist / 1.0f);
         float blend = std::min(k * k * 0.0625f, 1.f);
@@ -321,9 +323,9 @@ private:
 
     static inline float InputComp(float k, float frq) noexcept
     {
-        float qComp = 0.379f + 0.087f * k;
+        float qComp    = 0.379f + 0.087f * k;
         float freqGain = std::pow(std::max(frq, 1e-6f) * (1.f / 0.00445f), -0.10f);
-        freqGain = std::clamp(freqGain, 0.65f, 1.2f);
+        freqGain       = std::clamp(freqGain, 0.65f, 1.2f);
         return qComp * freqGain;
     }
 
@@ -338,20 +340,20 @@ private:
         }
         if (res > 0.f)
         {
-            float resK = ResK_J106(res);
+            float resK     = ResK_J106(res);
             float resBlend = std::min(resK * resK * 0.0625f, 1.f);
-            scale = scale + resBlend * (kOTAScaleBase - scale);
+            scale          = scale + resBlend * (kOTAScaleBase - scale);
         }
         return scale;
     }
 
     inline void invalidateCoefficientCaches() noexcept
     {
-        mLastOutFrq = -1.0f;
-        mLastOutK = -1.0f;
-        mLastIntFrq = -1.0f;
-        mLastIntRes = -1.0f;
-        mLastIntK = -1.0f;
+        mLastOutFrq      = -1.0f;
+        mLastOutK        = -1.0f;
+        mLastIntFrq      = -1.0f;
+        mLastIntRes      = -1.0f;
+        mLastIntK        = -1.0f;
         mLastIntFreqComp = -1.0f;
     }
 
@@ -361,8 +363,8 @@ private:
         mUp1.processSample(up[0], up[1], input);
 
         float frq2x = frq * 0.5f;
-        down[0] = processSampleInternal(up[0], frq2x, res, k);
-        down[1] = processSampleInternal(up[1], frq2x, res, k);
+        down[0]     = processSampleInternal(up[0], frq2x, res, k);
+        down[1]     = processSampleInternal(up[1], frq2x, res, k);
 
         return mDown1.processSample(down);
     }
@@ -393,12 +395,12 @@ private:
 
     inline float processSampleInternal(float input, float frq, float res, float k) noexcept
     {
-        mNoiseSeed = mNoiseSeed * 196314165u + 907633515u;
-        float white = static_cast<float>(mNoiseSeed) / static_cast<float>(0xFFFFFFFFu) * 2.0f - 1.0f;
-        mInputEnv = std::max(std::abs(input), mInputEnv * mEnvDecay);
+        mNoiseSeed        = mNoiseSeed * 196314165u + 907633515u;
+        float white       = static_cast<float>(mNoiseSeed) / static_cast<float>(0xFFFFFFFFu) * 2.0f - 1.0f;
+        mInputEnv         = std::max(std::abs(input), mInputEnv * mEnvDecay);
         float stateEnergy = std::abs(s[0]) + std::abs(s[1]) + std::abs(s[2]) + std::abs(s[3]);
-        float energy = std::max(mInputEnv, stateEnergy);
-        float noiseLevel = VcfCalibration::kNoiseLevelBase / (static_cast<float>(mOversample) * (1.0f + energy * VcfCalibration::kNoiseEnergyGain));
+        float energy      = std::max(mInputEnv, stateEnergy);
+        float noiseLevel  = VcfCalibration::kNoiseLevelBase / (static_cast<float>(mOversample) * (1.0f + energy * VcfCalibration::kNoiseEnergyGain));
         input += white * noiseLevel;
 
         if (frq > 0.5f)
@@ -410,22 +412,22 @@ private:
             std::abs(mLastIntK - k) > kJunoVCFCacheEps ||
             mLastIntFreqComp != mFreqComp)
         {
-            mLastIntFrq = frq;
-            mLastIntRes = res;
-            mLastIntK = k;
+            mLastIntFrq      = frq;
+            mLastIntRes      = res;
+            mLastIntK        = k;
             mLastIntFreqComp = mFreqComp;
-            g = detail::junoFastTan(frq * kJunoVCFPi * 0.5f);
+            g                = detail::junoFastTan(frq * kJunoVCFPi * 0.5f);
             g *= mFreqComp;
-            g1 = g / (1.0f + g);
-            comp = InputComp(k, frq);
-            mCachedG = g;
-            mCachedG1 = g1;
+            g1          = g / (1.0f + g);
+            comp        = InputComp(k, frq);
+            mCachedG    = g;
+            mCachedG1   = g1;
             mCachedComp = comp;
         }
         else
         {
-            g = mCachedG;
-            g1 = mCachedG1;
+            g    = mCachedG;
+            g1   = mCachedG1;
             comp = mCachedComp;
         }
 
@@ -444,23 +446,23 @@ private:
         }
 
         float kFbScale = 4.20f * std::clamp((k - 2.5f) * 1.0f, 0.3f, 1.0f);
-        float fbSig = OTASat(S * kFbScale) / kFbScale;
+        float fbSig    = OTASat(S * kFbScale) / kFbScale;
 
         float u = (input * comp * mVoicing.stageSaturationAmount - k * fbSig) / (1.0f + k * G);
 
         float stateAmp = std::abs(s[3]);
-        float dfGain = 1.0f / std::sqrt(1.0f + 0.6f * stateAmp * stateAmp);
-        dfGain = std::max(dfGain, 0.65f);
+        float dfGain   = 1.0f / std::sqrt(1.0f + 0.6f * stateAmp * stateAmp);
+        dfGain         = std::max(dfGain, 0.65f);
 
         float hfFade = std::clamp((0.12f - frq) * 25.0f, 0.0f, 1.0f);
-        dfGain = 1.0f - hfFade * (1.0f - dfGain);
-        float g1NL = g1 / dfGain;
-        g1NL = std::min(g1NL, 0.98f);
+        dfGain       = 1.0f - hfFade * (1.0f - dfGain);
+        float g1NL   = g1 / dfGain;
+        g1NL         = std::min(g1NL, 0.98f);
 
         float gNL = g1NL / (1.0f - g1NL);
         float ota = OTAScaleForFreq(frq, res);
 
-        float lp1 = NLStage(s[0], u,   gNL, g1NL, ota);
+        float lp1 = NLStage(s[0], u, gNL, g1NL, ota);
         float lp2 = NLStage(s[1], lp1, gNL, g1NL, ota);
 
         float output = 0.0f;
@@ -472,7 +474,7 @@ private:
         {
             float lp3 = NLStage(s[2], lp2, gNL, g1NL, ota);
             float lp4 = NLStage(s[3], lp3, gNL, g1NL, ota);
-            output = lp4;
+            output    = lp4;
         }
 
         for (auto& st : s)
@@ -481,8 +483,8 @@ private:
                 st = 0.0f;
         }
 
-        float frqFactor  = std::clamp((frq - VcfCalibration::kOutTameFreqFloor) * VcfCalibration::kOutTameFreqSlope, 0.0f, 1.0f);
-        float resFactor  = std::clamp((k - VcfCalibration::kOutTameResStart) * VcfCalibration::kOutTameResSlope, 0.0f, 1.0f);
+        float frqFactor   = std::clamp((frq - VcfCalibration::kOutTameFreqFloor) * VcfCalibration::kOutTameFreqSlope, 0.0f, 1.0f);
+        float resFactor   = std::clamp((k - VcfCalibration::kOutTameResStart) * VcfCalibration::kOutTameResSlope, 0.0f, 1.0f);
         float outputScale = 1.0f - frqFactor * resFactor * VcfCalibration::kOutTameMaxReduction;
 
         if (mVoicing.gainCompCurve)
@@ -495,31 +497,31 @@ private:
     float lastOutput = 0.0f;
 
     double sampleRate = 44100.0;
-    int mOversample = 1;
+    int mOversample   = 1;
 
     uint32_t mNoiseSeed = 123456789u;
-    float mInputEnv = 0.f;
-    float mEnvDecay = 0.999f;
-    float mFreqComp = 1.f;
+    float mInputEnv     = 0.f;
+    float mEnvDecay     = 0.999f;
+    float mFreqComp     = 1.f;
 
     static constexpr float kJunoVCFCacheEps = 1.0e-4f;
 
-    float mLastOutFrq = -1.0f;
-    float mLastOutK = -1.0f;
+    float mLastOutFrq     = -1.0f;
+    float mLastOutK       = -1.0f;
     float mCachedFreqComp = 1.f;
 
-    float mLastIntFrq = -1.0f;
-    float mLastIntRes = -1.0f;
-    float mLastIntK = -1.0f;
+    float mLastIntFrq      = -1.0f;
+    float mLastIntRes      = -1.0f;
+    float mLastIntK        = -1.0f;
     float mLastIntFreqComp = -1.0f;
-    float mCachedG = 0.0f;
-    float mCachedG1 = 0.0f;
-    float mCachedComp = 0.0f;
+    float mCachedG         = 0.0f;
+    float mCachedG1        = 0.0f;
+    float mCachedComp      = 0.0f;
 
     Upsampler2x mUp1, mUp2;
     Downsampler2x mDown1, mDown2;
 
-    Mode mMode = Mode::DeepMind;
+    Mode mMode         = Mode::DeepMind;
     PoleMode mPoleMode = PoleMode::FourPole;
     VcfVoicing mVoicing;
 };

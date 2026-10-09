@@ -42,11 +42,16 @@ inline float getJuno60HPFFreq(int position) noexcept
 {
     switch (position)
     {
-        case 0:  return 0.f;     // FLAT (bypass)
-        case 1:  return 122.f;   // .022µF, ngspice: 122 Hz
-        case 2:  return 269.f;   // .01µF,  ngspice: 269 Hz
-        case 3:  return 571.f;   // .0047µF, ngspice: 571 Hz
-        default: return 0.f;
+        case 0:
+            return 0.f; // FLAT (bypass)
+        case 1:
+            return 122.f; // .022µF, ngspice: 122 Hz
+        case 2:
+            return 269.f; // .01µF,  ngspice: 269 Hz
+        case 3:
+            return 571.f; // .0047µF, ngspice: 571 Hz
+        default:
+            return 0.f;
     }
 }
 
@@ -59,11 +64,16 @@ inline float getJuno106HPFFreq(int position) noexcept
 {
     switch (position)
     {
-        case 0:  return -1.f;    // Bass boost
-        case 1:  return 0.f;     // FLAT (bypass)
-        case 2:  return 236.f;   // .015µF
-        case 3:  return 754.f;   // .0047µF
-        default: return 0.f;
+        case 0:
+            return -1.f; // Bass boost
+        case 1:
+            return 0.f; // FLAT (bypass)
+        case 2:
+            return 236.f; // .015µF
+        case 3:
+            return 754.f; // .0047µF
+        default:
+            return 0.f;
     }
 }
 
@@ -76,16 +86,15 @@ inline float getJuno6HPFFreqPCHIP(float x) noexcept
 {
     static constexpr float y[] = {
         38.6f, 83.5f, 181.3f, 394.7f, 418.4f,
-        437.1f, 455.8f, 605.5f, 988.6f, 1183.2f, 1394.2f
-    };
-    static constexpr int N = 11;
+        437.1f, 455.8f, 605.5f, 988.6f, 1183.2f, 1394.2f};
+    static constexpr int N   = 11;
     static constexpr float h = 0.1f;
 
     if (x <= 0.0f) return y[0];
     if (x >= 1.0f) return y[N - 1];
 
     float x_scaled = x * 10.0f;
-    int i = static_cast<int>(x_scaled);
+    int i          = static_cast<int>(x_scaled);
     if (i >= N - 1) i = N - 2;
     float t = x_scaled - static_cast<float>(i);
 
@@ -97,11 +106,11 @@ inline float getJuno6HPFFreqPCHIP(float x) noexcept
         return 2.0f / (1.0f / d_prev + 1.0f / d_next);
     };
 
-    float m_i = get_slope(i);
+    float m_i    = get_slope(i);
     float m_next = get_slope(i + 1);
 
-    float t2 = t * t;
-    float t3 = t2 * t;
+    float t2  = t * t;
+    float t3  = t2 * t;
     float h00 = 2.0f * t3 - 3.0f * t2 + 1.0f;
     float h10 = t3 - 2.0f * t2 + t;
     float h01 = -2.0f * t3 + 3.0f * t2;
@@ -163,11 +172,11 @@ struct BassBoostFilter
         const float K  = 2.f * sampleRate;
         const float K2 = K * K;
         const float a0 = D0 + D1 * K + D2 * K2;
-        b0 = (N0 + N1 * K + N2 * K2) / a0;
-        b1 = 2.f * (N0 - N2 * K2) / a0;
-        b2 = (N0 - N1 * K + N2 * K2) / a0;
-        a1 = 2.f * (D0 - D2 * K2) / a0;
-        a2 = (D0 - D1 * K + D2 * K2) / a0;
+        b0             = (N0 + N1 * K + N2 * K2) / a0;
+        b1             = 2.f * (N0 - N2 * K2) / a0;
+        b2             = (N0 - N1 * K + N2 * K2) / a0;
+        a1             = 2.f * (D0 - D2 * K2) / a0;
+        a2             = (D0 - D1 * K + D2 * K2) / a0;
 
         reset();
     }
@@ -177,8 +186,8 @@ struct BassBoostFilter
     float process(float x) noexcept
     {
         float y = b0 * x + static_cast<float>(z1);
-        z1 = b1 * x - a1 * y + z2;
-        z2 = b2 * x - a2 * y;
+        z1      = b1 * x - a1 * y + z2;
+        z2      = b2 * x - a2 * y;
         return y;
     }
 };
@@ -200,11 +209,11 @@ struct JunoHPFSwitched
     float hpState = 0.f;
     float hpG     = 0.f;
 
-    HPFMode mode          = HPFMode::J106;
-    int   currentPos       = 1;
-    float currentFreqHz    = 0.f;
-    float sampleRate       = 44100.f;
-    float bassBoostGain    = 1.0f;
+    HPFMode mode        = HPFMode::J106;
+    int currentPos      = 1;
+    float currentFreqHz = 0.f;
+    float sampleRate    = 44100.f;
+    float bassBoostGain = 1.0f;
 
     void prepare(double sr) noexcept
     {
@@ -256,16 +265,22 @@ struct JunoHPFSwitched
         if (mode == HPFMode::J60)
         {
             currentFreqHz = getJuno60HPFFreq(currentPos);
-            if (currentPos == 1 && freq1Hz > 0.f) currentFreqHz = freq1Hz;
-            else if (currentPos == 2 && freq2Hz > 0.f) currentFreqHz = freq2Hz;
-            else if (currentPos == 3 && freq3Hz > 0.f) currentFreqHz = freq3Hz;
+            if (currentPos == 1 && freq1Hz > 0.f)
+                currentFreqHz = freq1Hz;
+            else if (currentPos == 2 && freq2Hz > 0.f)
+                currentFreqHz = freq2Hz;
+            else if (currentPos == 3 && freq3Hz > 0.f)
+                currentFreqHz = freq3Hz;
         }
         else // J106
         {
             currentFreqHz = getJuno106HPFFreq(currentPos);
-            if (currentPos == 1 && freq1Hz >= 0.f) currentFreqHz = freq1Hz;
-            else if (currentPos == 2 && freq2Hz > 0.f) currentFreqHz = freq2Hz;
-            else if (currentPos == 3 && freq3Hz > 0.f) currentFreqHz = freq3Hz;
+            if (currentPos == 1 && freq1Hz >= 0.f)
+                currentFreqHz = freq1Hz;
+            else if (currentPos == 2 && freq2Hz > 0.f)
+                currentFreqHz = freq2Hz;
+            else if (currentPos == 3 && freq3Hz > 0.f)
+                currentFreqHz = freq3Hz;
         }
 
         updateCoefs();
@@ -284,7 +299,7 @@ struct JunoHPFSwitched
         if (currentFreqHz > 0.f)
         {
             float fc = std::min(currentFreqHz / sampleRate, 0.49f);
-            hpG = std::tan(MathConstants<float>::pi * fc);
+            hpG      = std::tan(MathConstants<float>::pi * fc);
         }
         else
         {
@@ -309,9 +324,9 @@ struct JunoHPFSwitched
 
         // 1-pole TPT HPF
         if (hpG <= 0.f) return x;
-        float v   = (x - hpState) * hpG / (1.f + hpG);
-        float lp  = hpState + v;
-        hpState   = lp + v;
+        float v  = (x - hpState) * hpG / (1.f + hpG);
+        float lp = hpState + v;
+        hpState  = lp + v;
         return x - lp;
     }
 
@@ -337,10 +352,10 @@ struct JunoHPFContinuous
     float hpState = 0.f;
     float hpG     = 0.f;
 
-    float currentFreqHz   = 0.f;
-    float sampleRate      = 44100.f;
-    float bassBoostGain   = 1.0f;
-    bool  bassBoostActive = false;
+    float currentFreqHz  = 0.f;
+    float sampleRate     = 44100.f;
+    float bassBoostGain  = 1.0f;
+    bool bassBoostActive = false;
 
     void prepare(double sr) noexcept
     {
@@ -366,7 +381,7 @@ struct JunoHPFContinuous
     void setCutoff(float cutoffHz) noexcept
     {
         float clamped = std::max(cutoffHz, 0.f);
-        if (clamped == currentFreqHz) return;  // hot-path guard
+        if (clamped == currentFreqHz) return; // hot-path guard
         currentFreqHz = clamped;
         updateCoefs();
     }
@@ -376,7 +391,7 @@ struct JunoHPFContinuous
     void setContinuousPosition(float sliderVal) noexcept
     {
         float freq = getJuno6HPFFreqPCHIP(sliderVal);
-        if (freq == currentFreqHz) return;  // hot-path guard
+        if (freq == currentFreqHz) return; // hot-path guard
         currentFreqHz = freq;
         updateCoefs();
     }
@@ -396,7 +411,7 @@ struct JunoHPFContinuous
         if (currentFreqHz > 0.f)
         {
             float fc = std::min(currentFreqHz / sampleRate, 0.49f);
-            hpG = std::tan(MathConstants<float>::pi * fc);
+            hpG      = std::tan(MathConstants<float>::pi * fc);
         }
         else
         {
@@ -415,7 +430,7 @@ struct JunoHPFContinuous
             float v  = (y - hpState) * hpG / (1.f + hpG);
             float lp = hpState + v;
             hpState  = lp + v;
-            y = y - lp;
+            y        = y - lp;
         }
 
         // Bass boost (independent, always available)
