@@ -38,6 +38,10 @@ ABDSharedCode/
 │   ├── DspFilterFamily.h           ← EL CONTRATO de la familia de filtros
 │   ├── DspFilterTpt.h              ← miembro TPT (paso bajo / alto / banda)
 │   ├── DspFilterEquation.h         ← miembro de ecuación (escalera de 4 polos)
+│   ├── DspJunoHPF.h                ← filtro paso alto Juno-60/106 (conmutado y continuo)
+│   ├── DspVAOnePole.h              ← integrador elemental TPT ZDF de 1 polo
+│   ├── DspMoogLadder.h             ← filtro de escalera de transistores Moog (24/12 dB, LP/BP/HP)
+│   ├── DspKorgMS20.h               ← filtro Sallen-Key Korg MS-20 K35 (LP/HP, diodo tanh)
 │   └── DspMidiMessage.h / DspMidiBuffer.h
 ├── DspEffects/                 ← Efectos sobre DspCore, INTERFACE (header-only)
 │   ├── EffectPolicy.h            ← contrato de política inyectada
@@ -244,14 +248,18 @@ autoUpdater->setUpdateCallback(
 **`DspCore`** — el sustrato. Portado de `juce_core` / `juce_audio_basics`, sin
 JUCE: `DspCore.h` (2566 líneas: `MathConstants`, `Range`, `FloatVectorOperations`,
 `AudioBuffer`, `ScopedNoDenormals`, …), `DspMath.h`, `DspDebug.h`,
-`DspLeakedObjectDetector.h`, `DspMidiMessage.h`, `DspMidiBuffer.h`, y los tres
+`DspLeakedObjectDetector.h`, `DspMidiMessage.h`, `DspMidiBuffer.h`, los tres
 ficheros de **la familia de filtros** (`DspFilterFamily.h` con el contrato,
 `DspFilterTpt.h` y `DspFilterEquation.h` con sus dos miembros del sustrato; el
-tercero, el de la tabla medida, vive en `LutDSP/`). Ver *La familia de filtros*
-más abajo. Su familia hermana —la de **osciladores**— no vive aquí sino en
-`SynthCore/`: los primitivos de oscilador (`PolyBLEP`, `DSPUtils`) ya estaban en
-esa carpeta y un oscilador no necesita el sustrato que un filtro sí usa. Las dos
-son gemelas en contrato, no en módulo. Ver *La familia de osciladores*.
+tercero, el de la tabla medida, vive en `LutDSP/`), el filtro pasa-alto analógico
+Juno (`DspJunoHPF.h`), y los filtros analógicos modelados promovidos de ABDEep:
+`DspVAOnePole.h` (integrador elemental TPT ZDF de 1 polo), `DspMoogLadder.h` (escalera
+de 4 polos con saturación tanh y compensación de graves), y `DspKorgMS20.h` (topología
+Sallen-Key K35 con saturación de diodo). Ver *La familia de filtros* más abajo y
+`docs/ANALOG_FILTERS_DESIGN_AND_INTEGRATION.md`. Su familia hermana —la de **osciladores**—
+no vive aquí sino en `SynthCore/`: los primitivos de oscilador (`PolyBLEP`, `DSPUtils`)
+ya estaban en esa carpeta y un oscilador no necesita el sustrato que un filtro sí usa.
+Las dos son gemelas en contrato, no en módulo. Ver *La familia de osciladores*.
 
 **`DspEffects`** — cuatro clases de cosa, y distinguirlas es medio de usar bien el
 módulo:

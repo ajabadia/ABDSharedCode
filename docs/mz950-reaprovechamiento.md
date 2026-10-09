@@ -57,7 +57,7 @@ todo lo que se escriba aquí es reutilizado de verdad.
 
 | # | Idea del S950 | Origen | Destino | Nota |
 |---|---|---|---|---|
-| C1 | **Butterworth de 6º orden con resonancia que se autoseudoscila**: 3 secciones en cascada con Q 0.52 / 0.71 / 1.93 (las que hacen Butterworth en vez de tres resonantes iguales), la tercera como **SVF TPT** de Zavalishin en vez de biquad, con damping `k = k0 + beta*power` | `Plugin/Source/S950/Filter.h` | `DspCore/DspResonantFilter.h` (`abd::dsp::ResonantFilterStage`) | **Hecho, pero solo la ETAPA** (2026-09-29): la sección reusable con TPT y AGC por potencia de banda. La cascada de 3 secciones del S950 es de ESA maquina, no del sustrato, asi que sigue sin hacer |
+| C1 | **Butterworth de 6º orden con resonancia que se autoseudoscila**: 3 secciones en cascada con Q 0.52 / 0.71 / 1.93 (las que hacen Butterworth en vez de tres resonantes iguales), la tercera como **SVF TPT** de Zavalishin en vez de biquad, con damping `k = k0 + beta*power` | `Plugin/Source/S950/Filter.h` | `DspCore/DspResonantFilter.h` (`abd::dsp::ResonantFilterStage`) | **Hecho, pero solo la ETAPA** (2026-09-29): la sección reusable con TPT y AGC por potencia de banda. La cascada de 3 secciones del S950 es de ESA maquina, no del sustrato, asi que sigue sin hacer. Y desde 2026-10-06 la etapa tiene **familia** (`DspFilterFamily.h`): contrato común de los filtros, con un miembro TPT del que ya forma parte y cuya paridad con esta etapa se comprueba a 1e-12 |
 | C2 | **El filtro corre PRIMERO en la cascada**, con el nivel de la etapa resonante al alza: lo que añade sobre el cutoff recibe 24 dB/octava de las dos secciones siguientes | `Filter.h` (comentario) | `DspCore` | Detalle de orden con motivo, no arbitrario |
 | C3 | **Trims atómicos**: los parámetros de "Perform" son *offsets* sobre los del programa, y se aplican a todos los keygroups a la vez, en el hilo de audio, sin bloqueo | `S950/Engine.h` (`AtomicTrims`), `S950/Voice.h` (`Trims`) | `SynthCore/AudioThreadSnapshot.h` ya tiene el patrón | La idea ya está: **el offset se suma al valor del keygroup, no lo sustituye** |
 | C4 | **Ring de notas sin bloqueo** entre hilo de mensaje y hilo de audio | `S950/Engine.h`, `Engine.cpp:120` | `DspCore/DspMidiBuffer.h` | Ya cubierto |
@@ -141,7 +141,18 @@ Nueve tests en `DspCore/DspCoreTests.cpp`. Los que importan:
 - Retune sin click, recortes de valores de panel hostiles, `reset()` que no toca los ajustes,
   y cero exacto en silencio (nada de denormales).
 
-**Suite del módulo: 2281 comprobaciones verdes.**
+**Y desde 2026-10-06 esta etapa tiene familia.** El contrato común de los filtros
+(`DspCore/DspFilterFamily.h`) fija el idioma de sus parámetros —corte en Hz y resonancia
+0..1, con el mismo significado en todos los miembros—, y su miembro TPT
+(`DspCore/DspFilterTpt.h`) expone los tres taps del mismo par de estados, más el
+`processBlock` y el rasgo `IsFilterStage` que comprueban el contrato al compilar. La etapa
+compartida **no se ha tocado**: sigue con su AGC, y la cascada de tres secciones sigue
+siendo del host. Lo que sí se comprueba ahora es que las dos formulaciones son la misma:
+un test compara las dos salidas de paso bajo a resonancia 0 (con la AGC de la etapa
+apagada) y exige **1e-12**.
+
+**Suite de DspCore: 2316 comprobaciones verdes** (2281 cuando se escribió esta sección,
+más las de la familia), **y 33 más en LutDSP**.
 
 ## B3 — el catálogo de patches (`SynthCore/S950PatchFields.h`)
 
@@ -418,8 +429,8 @@ Y dos expectativas mías que resultaron ser aritmética: el punto medio de un ej
 panel 0..99 es **49.5**, no 50. Leyendo 50 y esperando el valor de 49, la
 interpolación salía "mal" un 1.9%.
 
-**Verde: 1954 comprobaciones en SynthCore** (g++ y MSVC), sin tocar las 2281 de
-DspCore.
+**Verde: 1954 comprobaciones en SynthCore** (g++ y MSVC), sin tocar las de DspCore
+(2281 entonces, 2316 hoy: la familia de filtros añadió las suyas el 2026-10-06).
 
 ### B4b — la frontera con el panel, y por qué no se puede "comparar los rangos"
 

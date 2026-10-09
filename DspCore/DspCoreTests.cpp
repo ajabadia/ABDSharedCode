@@ -1907,6 +1907,151 @@ void testJunoHPF()
     }
 }
 
+void testAnalogModeledFilters()
+{
+    const double sr = 44100.0;
+
+    // 1. VAOnePoleFilter
+    {
+        abd::dsp::VAOnePoleFilter pole;
+        pole.reset();
+        check(pole.getLP() == 0.0f, "VAOnePoleFilter reset pone estado a cero");
+
+        pole.setCutoff(1000.0f, sr);
+        // Procesar DC
+        float lp = 0.0f;
+        for (int i = 0; i < 1024; ++i)
+            lp = pole.process(1.0f);
+        check(std::isfinite(lp) && std::abs(lp - 1.0f) < 0.01f, "VAOnePoleFilter DC converge a 1.0");
+
+        // Identidad sustractiva: lp + hp == input
+        float lpOut = 0.0f, hpOut = 0.0f;
+        pole.process(0.75f, lpOut, hpOut);
+        check(std::abs((lpOut + hpOut) - 0.75f) < 1.0e-6f, "VAOnePoleFilter cumple identidad sustractiva lp + hp == input");
+    }
+
+    // 2. MoogLadderVCF
+    {
+        abd::dsp::MoogLadderVCF moog;
+        moog.prepare(sr);
+        moog.setCutoff(1000.0f);
+        moog.setResonance(0.0f);
+        moog.setPoleMode(0);
+
+        float maxAbs = 0.0f;
+        for (int i = 0; i < 1024; ++i)
+        {
+            float out = moog.process(1.0f);
+            check(std::isfinite(out), "MoogLadderVCF DC output es finito");
+            maxAbs = std::max(maxAbs, std::abs(out));
+        }
+        check(maxAbs <= 2.0f, "MoogLadderVCF DC output acotado <= 2.0");
+
+        // Convergencia cerca de tanh(1.0) ≈ 0.762
+        moog.prepare(sr);
+        moog.setCutoff(100.0f);
+        moog.setResonance(0.0f);
+        moog.setPoleMode(0);
+        float out4 = 0.0f;
+        for (int i = 0; i < 2048; ++i) out4 = moog.process(1.0f);
+
+        moog.prepare(sr);
+        moog.setCutoff(100.0f);
+        moog.setResonance(0.0f);
+        moog.setPoleMode(1);
+        float out2 = 0.0f;
+        for (int i = 0; i < 2048; ++i) out2 = moog.process(1.0f);
+
+        check(std::abs(out4 - 0.762f) < 0.1f, "MoogLadderVCF 4-pole converge cerca de tanh(1.0)≈0.762");
+        check(std::abs(out2 - 0.762f) < 0.1f, "MoogLadderVCF 2-pole converge cerca de tanh(1.0)≈0.762");
+
+        // Alta resonancia: estabilidad acotada <= 3.0 por soft-clip tanh
+        moog.prepare(sr);
+        moog.setCutoff(2000.0f);
+        moog.setResonance(1.0f);
+        float maxResOut = 0.0f;
+        for (int i = 0; i < 4096; ++i)
+            maxResOut = std::max(maxResOut, std::abs(moog.process(0.5f)));
+        check(maxResOut <= 3.0f, "MoogLadderVCF salida a max-res acotada <= 3.0");
+
+        // Rechazo HF: 5 kHz atenuado a fc = 100 Hz
+        moog.prepare(sr);
+        moog.setCutoff(100.0f);
+        moog.setResonance(0.0f);
+        moog.setPoleMode(0);
+        float hfMax = 0.0f;
+        for (int i = 0; i < 4096; ++i)
+        {
+            float sine = std::sin(2.0f * 3.14159265f * 5000.0f * static_cast<float>(i) / static_cast<float>(sr));
+            float out = moog.process(sine);
+            if (i >= 2048) hfMax = std::max(hfMax, std::abs(out));
+        }
+        check(hfMax < 0.1f, "MoogLadderVCF rechaza HF (5 kHz a 100 Hz LP < 0.1)");
+
+        // Submodos (LP, BP, HP)
+        moog.setSubMode(1); // BP
+        check(std::isfinite(moog.process(0.5f)), "MoogLadderVCF BP genera salida finita");
+        moog.setSubMode(2); // HP
+        check(std::isfinite(moog.process(0.5f)), "MoogLadderVCF HP genera salida finita");
+    }
+
+    // 3. KorgMS20VCF
+    {
+        abd::dsp::KorgMS20VCF korg;
+        korg.prepare(sr);
+        korg.setCutoff(1000.0f);
+        korg.setResonance(0.0f);
+        korg.setPoleMode(0);
+
+        for (int i = 0; i < 1024; ++i)
+            check(std::isfinite(korg.process(1.0f)), "KorgMS20VCF salida es finita");
+
+        korg.prepare(sr);
+        korg.setCutoff(100.0f);
+        korg.setResonance(0.0f);
+        korg.setPoleMode(0);
+        float out4 = 0.0f;
+        for (int i = 0; i < 2048; ++i) out4 = korg.process(1.0f);
+
+        korg.prepare(sr);
+        korg.setCutoff(100.0f);
+        korg.setResonance(0.0f);
+        korg.setPoleMode(1);
+        float out2 = 0.0f;
+        for (int i = 0; i < 2048; ++i) out2 = korg.process(1.0f);
+
+        check(std::abs(out4 - 1.0f) < 0.2f, "KorgMS20VCF 4-pole converge cerca de 1.0");
+        check(std::abs(out2 - 1.0f) < 0.2f, "KorgMS20VCF 2-pole converge cerca de 1.0");
+
+        // Resonancia máxima: acotada <= 10.0 por clipper diodo tanh
+        korg.prepare(sr);
+        korg.setCutoff(2000.0f);
+        korg.setResonance(1.0f);
+        float maxResOut = 0.0f;
+        for (int i = 0; i < 4096; ++i)
+            maxResOut = std::max(maxResOut, std::abs(korg.process(0.5f)));
+        check(maxResOut <= 10.0f, "KorgMS20VCF salida a max-res acotada <= 10.0");
+
+        // Rechazo HF: 5 kHz a fc = 100 Hz
+        korg.prepare(sr);
+        korg.setCutoff(100.0f);
+        korg.setResonance(0.0f);
+        korg.setPoleMode(0);
+        float hfMax = 0.0f;
+        for (int i = 0; i < 4096; ++i)
+        {
+            float sine = std::sin(2.0f * 3.14159265f * 5000.0f * static_cast<float>(i) / static_cast<float>(sr));
+            float out = korg.process(sine);
+            if (i >= 2048) hfMax = std::max(hfMax, std::abs(out));
+        }
+        check(hfMax < 0.15f, "KorgMS20VCF rechaza HF (5 kHz a 100 Hz LP < 0.15)");
+
+        // K35 Highpass mode
+        korg.setSubMode(1);
+        check(std::isfinite(korg.process(0.5f)), "KorgMS20VCF K35 HP genera salida finita");
+    }
+}
+
 } // namespace
 
 //==============================================================================
@@ -1939,6 +2084,7 @@ int main()
     testFilterEquationIsANonlinearLadder();
     testFilterFamilyBlockProcessing();
     testJunoHPF();
+    testAnalogModeledFilters();
 
     if (gFailures == 0)
     {

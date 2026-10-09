@@ -1,6 +1,7 @@
 # Fuentes de ABDSharedCode sin ningún proyecto consumidor
 
-> **Fecha:** 2026-09-28
+> **Fecha:** 2026-09-28 (recuentos y §3.5 actualizados el 2026-10-06: llega la familia
+> de filtros y se refresca la medición del §3)
 > **Alcance:** los `.h` / `.cpp` de `ABDSharedCode/` del workspace `ABDSynths`.
 > **Objetivo:** que una extracción a medias deje de esconderse. El fichero está
 > escrito, está documentado, tiene sus propios tests, compila — y no lo usa
@@ -45,8 +46,21 @@ Comprobado: con el árbol limpio devuelve 0; al añadir un `.h` suelto en
 
 ## 3. Lo que hay
 
-**117 fuentes, 101 alcanzables desde un producto, 16 huérfanas.** Las 16 están
-en la lista blanca con su motivo. No hay ninguna unbekannte.
+**170 fuentes, 138 alcanzables desde un producto, 32 sin consumidor: 19 huérfanas
+y 13 que solo usan los tests del propio módulo.** Las 19 huérfanas están en la lista
+blanca con su motivo. No hay ninguna unbekannte.
+
+> Medición tras el prototipo de referencia de la familia de osciladores (2026-10-06):
+> un nuevo miembro (`OscReference.h`) y su bloque de prueba (`OscReferenceTests.inc`)
+> se añadieron a SynthCore para estandarizar cómo se escribe un miembro nuevo; como el
+> bloque se incluye desde el test propio del módulo, no sale como huérfano nuevo.
+
+> Los 117 / 101 / 16 de la primera medición (2026-09-28) ya no son el estado de hoy,
+> y conviene decir por qué, para que el número no se lea como un crecimiento del
+> abandono: a la lista blanca se han sumado entradas de trabajo POSTERIOR a este
+> documento —las de `Scope/`, que entró como subtree, y los dos arneses de `DspMath`—
+> y, de esta última pasada, una más de la **familia de filtros** (§3.5). Los totales
+> de arriba son la medición del 2026-10-06 (`python tools/audit_unconsumed_sources.py`).
 
 ### 3.1 `DspEffects` — la familia "motor de máquina" (5 ficheros)
 
@@ -98,12 +112,16 @@ vivo: tiene target `ABDShared::Segmented`, el probe **se compila**, y su propio
 `CMakeLists.txt` lo documenta como *"the native sibling of the shared Segmented
 component (ABDSharedAssets/…)"*. Falta el paso de que un producto lo enlace.
 
-### 3.5 Arranques de auditoría y tests propios (5)
+### 3.5 Arranques de auditoría y tests propios (6)
 
 `DspCore/DspMathAudit.cpp`, `DspCore/DspMathBitIdent.cpp` (arnas de medición de
-`DspMath`, fuera de CMake a propósito: se compilan a mano) y los tres tests
+`DspMath`, fuera de CMake a propósito: se compilan a mano) y los cuatro tests
 standalone del módulo (`DspCoreTests.cpp`, `DspEffectsTests.cpp`,
-`SynthCoreTests.cpp`), que los compila el CMake del propio módulo y ningún
+`SynthCoreTests.cpp` y `LutDSPTests.cpp`, este último desde el 2026-10-06 con el
+miembro LUT de la familia de filtros), que los compila el CMake del propio módulo
+y ningún producto. De la misma pasada es lo que el informe llama "solo usadas por
+los tests del propio módulo": las tres cabeceras de la familia en `DspCore/` y
+`LutDSP/LutFilter.h`, que hoy se alcanzan por esas raíces de test y por ningún
 producto. Los dos primeros están marcados `INERTE` a propósito: son pruebas de
 que las cifras de la cabecera de `DspMath` están medidas, no código de producto.
 

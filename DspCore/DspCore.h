@@ -2565,3 +2565,6 @@ private:
 #include "DspFilterFamily.h"
 #include "DspFilterTpt.h"
 #include "DspJunoHPF.h"
+#include "DspVAOnePole.h"
+#include "DspMoogLadder.h"
+#include "DspKorgMS20.h"
