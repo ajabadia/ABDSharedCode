@@ -42,9 +42,9 @@ namespace abd::dsp
 class DspSolinaEnsemble
 {
 public:
-    static constexpr int kNumTaps = 3;
+    static constexpr int kNumTaps       = 3;
     static constexpr float kBaseDelayMs = 8.0f;
-    static constexpr float kMaxModMs = 5.0f;
+    static constexpr float kMaxModMs    = 5.0f;
     // Buffer circular de 8192 muestras (cubre más de 40 ms a 192 kHz)
     static constexpr int kBufferSize = 8192;
     static constexpr int kBufferMask = kBufferSize - 1;
@@ -63,11 +63,11 @@ public:
 
     void reset() noexcept
     {
-        paramRate_ = 0.4f;
-        paramDepth_ = 0.5f;
+        paramRate_     = 0.4f;
+        paramDepth_    = 0.5f;
         paramFeedback_ = 0.3f;
-        paramSpread_ = 0.6f;
-        paramMix_ = 0.5f;
+        paramSpread_   = 0.6f;
+        paramMix_      = 0.5f;
 
         delayBufL_.fill(0.0f);
         delayBufR_.fill(0.0f);
@@ -111,12 +111,12 @@ public:
                  float* outL, float* outR,
                  int numSamples) noexcept
     {
-        const float spreadAngle = paramSpread_ * 3.14159265358979323846f;
-        const float depthMs = paramDepth_ * kMaxModMs;
+        const float spreadAngle      = paramSpread_ * 3.14159265358979323846f;
+        const float depthMs          = paramDepth_ * kMaxModMs;
         const float baseDelaySamples = kBaseDelayMs * 0.001f * static_cast<float>(sampleRate_);
-        const float maxModSamples = depthMs * 0.001f * static_cast<float>(sampleRate_);
-        constexpr float tapGains[3] = { 0.55f, 0.55f, 0.55f };
-        constexpr float normFactor = 1.0f / static_cast<float>(kNumTaps);
+        const float maxModSamples    = depthMs * 0.001f * static_cast<float>(sampleRate_);
+        constexpr float tapGains[3]  = {0.55f, 0.55f, 0.55f};
+        constexpr float normFactor   = 1.0f / static_cast<float>(kNumTaps);
 
         for (int s = 0; s < numSamples; ++s)
         {
@@ -137,7 +137,7 @@ public:
 
             for (int t = 0; t < kNumTaps; ++t)
             {
-                const float mod = std::sin(lfoPhase_[t]);
+                const float mod    = std::sin(lfoPhase_[t]);
                 float delaySamples = baseDelaySamples + mod * maxModSamples;
                 if (delaySamples < 1.0f)
                     delaySamples = 1.0f;
@@ -162,7 +162,7 @@ public:
             // 4. Escritura en el buffer circular
             delayBufL_[delayWPos_] = inputL;
             delayBufR_[delayWPos_] = inputR;
-            delayWPos_ = (delayWPos_ + 1) & kBufferMask;
+            delayWPos_             = (delayWPos_ + 1) & kBufferMask;
 
             // 5. Actualización de realimentación
             feedbackL_ = sumL;
@@ -178,7 +178,7 @@ private:
     void updateLFOIncrement() noexcept
     {
         const float rateHz = 0.2f + 7.8f * paramRate_;
-        lfoInc_ = static_cast<float>(6.28318530717958647692 * rateHz / sampleRate_);
+        lfoInc_            = static_cast<float>(6.28318530717958647692 * rateHz / sampleRate_);
     }
 
     static inline float hermite(float frac, float y0, float y1, float y2, float y3) noexcept
@@ -196,21 +196,21 @@ private:
         if (readPos < 0.0f)
             readPos += static_cast<float>(kBufferSize);
 
-        const int i0 = static_cast<int>(readPos) & kBufferMask;
+        const int i0     = static_cast<int>(readPos) & kBufferMask;
         const float frac = readPos - static_cast<float>(static_cast<int>(readPos));
-        const int i1 = (i0 + 1) & kBufferMask;
-        const int i2 = (i0 + 2) & kBufferMask;
-        const int i3 = (i0 + 3) & kBufferMask;
+        const int i1     = (i0 + 1) & kBufferMask;
+        const int i2     = (i0 + 2) & kBufferMask;
+        const int i3     = (i0 + 3) & kBufferMask;
 
         return hermite(frac, buf[i0], buf[i1], buf[i2], buf[i3]);
     }
 
-    double sampleRate_ = 44100.0;
-    float paramRate_ = 0.4f;
-    float paramDepth_ = 0.5f;
+    double sampleRate_   = 44100.0;
+    float paramRate_     = 0.4f;
+    float paramDepth_    = 0.5f;
     float paramFeedback_ = 0.3f;
-    float paramSpread_ = 0.6f;
-    float paramMix_ = 0.5f;
+    float paramSpread_   = 0.6f;
+    float paramMix_      = 0.5f;
 
     std::array<float, kBufferSize> delayBufL_{};
     std::array<float, kBufferSize> delayBufR_{};
@@ -219,9 +219,9 @@ private:
     float feedbackL_ = 0.0f;
     float feedbackR_ = 0.0f;
 
-    static constexpr float kPhaseOffsets[3] = { 0.0f, 2.0943951023931953f, 4.1887902047863905f };
-    float lfoPhase_[3] = { 0.0f, 2.0943951f, 4.1887902f };
-    float lfoInc_ = 0.0f;
+    static constexpr float kPhaseOffsets[3] = {0.0f, 2.0943951023931953f, 4.1887902047863905f};
+    float lfoPhase_[3]                      = {0.0f, 2.0943951f, 4.1887902f};
+    float lfoInc_                           = 0.0f;
 };
 
 } // namespace abd::dsp
