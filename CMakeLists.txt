@@ -299,6 +299,23 @@ if(ABDSHAREDCODE_BUILD_DSPEFFECTS_TESTS)
     )
     target_link_libraries(ABDShared_DspEffects_Tests PRIVATE ABDShared_DspEffects)
     target_compile_features(ABDShared_DspEffects_Tests PRIVATE cxx_std_20)
+
+    # WINDOWS DA POCO STACK POR DEFECTO Y ESTA BATERIA NO ENTRA, MEDIDO: el
+    # main() de DspEffectsTests.cpp es un solo cuerpo de ~500 lineas cuyos
+    # bloques de fase compilan en UN UNICO frame de 0x241b48 bytes (~2,4 MB)
+    # con g++ -O2. La reserva por defecto de Windows es 1 MB en MSVC y 2 MB
+    # en MinGW, y el proceso muere con 0xC00000FD (stack overflow) ANTES del
+    # primer check: la suite no se llegaba a ejecutar en ningun Windows, ni
+    # en local ni en CI, sin que se notara, porque nunca estaba en la puerta.
+    # En linux no hace falta (el stack principal crece hasta 8 MB), por eso
+    # esta opcion solo se aplica en WIN32 y no a los demas executables.
+    if(WIN32)
+        if(MSVC)
+            target_link_options(ABDShared_DspEffects_Tests PRIVATE /STACK:16777216)
+        else()
+            target_link_options(ABDShared_DspEffects_Tests PRIVATE "-Wl,--stack,16777216")
+        endif()
+    endif()
 endif()
 
 # --- LutDSP Module ---

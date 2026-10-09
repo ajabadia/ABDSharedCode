@@ -9,12 +9,17 @@ name: Shared code CI
 #
 # LO QUE ES PUERTA. Los siete trabajos bloquean, y los siete salen en verde.
 #
-# El septimo (`synthcore`) es el primero que EJECUTA C++ aqui: compila
-# ABDShared_SynthCore_Tests —la bateria de SynthCore, sin JUCE y sin GUI— y lo
-# corre en ubuntu (gcc/clang: el terreno donde esta bateria nunca se habia
-# ejecutado) y en windows (MSVC: el terreno del que viene). Su exit code es el
-# veredicto: mas de dos mil comprobaciones, y una sola en rojo dejan el
-# pipeline en rojo.
+# El septimo (`synthcore`) es el primero que EJECUTA C++ aqui: compila las
+# tres baterias sin JUCE ni GUI del proyecto —ABDShared_SynthCore_Tests,
+# ABDShared_DspCore_Tests y ABDShared_DspEffects_Tests— y las corre en ubuntu
+# (gcc/clang: el terreno donde nunca se habian ejecutado) y en windows (MSVC:
+# el terreno del que vienen). El exit code de cada binario es el veredicto:
+# mas de ocho mil comprobaciones en total, y una sola en rojo deja el pipeline
+# en rojo. Los tres, y no solo SynthCore, porque un error que solo revienta
+# con gcc (std::size sin <iterator>, rutas de include que MSVC resuelve y gcc
+# no) o que solo revienta al EJECUTARSE (un frame de main de 2,4 MB que
+# desborda la pila de Windows) no sale a la luz hasta que la puerta compila y
+# corre ese modulo en ambas plataformas.
 #
 # El audit merece una explicacion, porque sin ella su veredicto se lee mal. Compara
 # este repo contra una foto de la suite fijada por SHA, y en esa foto hay 55 fuentes
@@ -656,51 +661,66 @@ jobs:
 
   synthcore:
     # El primer trabajo de este repo que ejecuta C++ en vez de solo mirarlo.
-    # `ABDShared_SynthCore_Tests` es la bateria compartida: los motores de
-    # SynthCore (arpegiador, secuenciador de control, LFO y envolvente
-    # analogicos, drift, la familia de osciladores y el catalogo del S950) con
-    # mas de dos mil comprobaciones, en un binario sin JUCE y sin GUI.
+    # Las TRES baterias sin JUCE y sin GUI del proyecto en un solo trabajo:
+    # `ABDShared_SynthCore_Tests` (los motores de SynthCore: arpegiador,
+    # secuenciador de control, LFO y envolvente analogicos, drift, la familia
+    # de osciladores y el catalogo del S950), `ABDShared_DspCore_Tests` (el
+    # sustrato: buffers, MIDI, determinismo de semillas y el filtro
+    # resonante asertado con y sin su control de nivel) y
+    # `ABDShared_DspEffects_Tests` (el catalogo de 56 efectos y el contrato de
+    # politicas inyectadas). Entre los tres, mas de ocho mil comprobaciones.
     #
-    # El exit code del binario ES el veredicto. El paso de ejecucion no filtra
-    # ni captura nada: una sola comprobacion en rojo devuelve 1 y Actions corta
-    # el job, igual que cualquier fallo de compilacion de los pasos de arriba.
+    # El exit code de CADA binario ES el veredicto. El paso de ejecucion no
+    # filtra ni captura nada: una sola comprobacion en rojo devuelve 1 y
+    # Actions corta el job, igual que cualquier fallo de compilacion de los
+    # pasos de arriba. Si un binario no aparece pese a haber compilado, eso
+    # tambien es un error del job y se dice con ::error::.
     #
     # Dos piernas a proposito y con `fail-fast: false`, para que las dos
     # informen aunque una se caiga: en ubuntu se compila con gcc/clang, que es
-    # donde este codigo nunca se habia ejecutado, y en windows con MSVC, que es
-    # donde se escribe. Solo se pide UN target a cmake: los demas modulos del
-    # proyecto —AutoUpdater en especial, que enlaza juce_core/juce_events— no
-    # se tocan, porque sin JUCE en scope construirlos aqui seria un error, no
-    # una comprobacion.
+    # donde este codigo nunca se habia ejecutado (y donde salio el error de
+    # std::size sin <iterator> que reventaba Arpeggiator.cpp), y en windows
+    # con MSVC, que es donde se escribe. Se piden SOLO esos tres targets a
+    # cmake: los demas modulos del proyecto —AutoUpdater en especial, que
+    # enlaza juce_core/juce_events— no se tocan, porque sin JUCE en scope
+    # construirlos aqui seria un error, no una comprobacion.
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-    name: SynthCore (ABDShared_SynthCore_Tests, ${{ matrix.os }})
+    name: Motores (SynthCore + DspCore + DspEffects, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - name: Checkout ABDSharedCode
         uses: actions/checkout@v7
 
-      - name: Configurar CMake (solo SynthCore, sin JUCE)
+      - name: Configurar CMake (las tres baterias, sin JUCE)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DABDSHAREDCODE_BUILD_AUTOUPDATER=OFF
 
-      - name: Compilar ABDShared_SynthCore_Tests
-        run: cmake --build build --target ABDShared_SynthCore_Tests --config Release --parallel
+      - name: Compilar ABDShared_SynthCore_Tests, ABDShared_DspCore_Tests y ABDShared_DspEffects_Tests
+        run: cmake --build build --target ABDShared_SynthCore_Tests ABDShared_DspCore_Tests ABDShared_DspEffects_Tests --config Release --parallel
 
-      - name: Ejecutar la suite (el exit code es el veredicto)
+      - name: Ejecutar las tres suites (el exit code es el veredicto)
         shell: bash
         run: |
-          # El binario cae en la raiz de build/ con los generators de una sola
-          # configuracion (ubuntu) y en build/Release con los de varios
+          # Cada binario cae en la raiz de build/ con los generators de una
+          # sola configuracion (ubuntu) y en build/Release con los de varios
           # (Visual Studio, en windows). Se busca con -quit para no tuberia,
           # se comprueba que existe y se ejecuta tal cual: sin `| tee` ni
           # capturas que pudieran devolver el codigo de salida de otro.
-          bin=$(find build -maxdepth 2 -type f \( -name ABDShared_SynthCore_Tests -o -name ABDShared_SynthCore_Tests.exe \) -print -quit)
-          echo "binario: ${bin:-NO ENCONTRADO}"
-          if [ -z "$bin" ]; then
-            echo "::error::no se encontro ABDShared_SynthCore_Tests: la compilacion salio bien pero no dejo binario ejecutable"
-            exit 1
-          fi
-          "$bin"
+          # Se ejecutan LAS TRES aunque una falle, para que el log diga que
+          # esta rojo ademas de que algo esta rojo; el codigo de salida del
+          # job es 1 si cualquiera de las tres lo fue.
+          status=0
+          for target in ABDShared_SynthCore_Tests ABDShared_DspCore_Tests ABDShared_DspEffects_Tests; do
+            bin=$(find build -maxdepth 2 -type f \( -name "$target" -o -name "$target.exe" \) -print -quit)
+            echo "binario: ${bin:-NO ENCONTRADO}"
+            if [ -z "$bin" ]; then
+              echo "::error::no se encontro $target: la compilacion salio bien pero no dejo binario ejecutable"
+              status=1
+              continue
+            fi
+            "$bin" || status=1
+          done
+          exit $status
