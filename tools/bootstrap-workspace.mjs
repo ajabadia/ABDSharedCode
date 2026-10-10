@@ -174,7 +174,23 @@ function manifiesto (workspace, suite, paquetes, proyecto, permitirPuppeteer) {
     `  - ${miembro(workspace, resolve(workspace, proyecto))}`
   ];
 
-  const aprobaciones = ['allowBuilds:', '  esbuild: true', `  puppeteer: ${permitirPuppeteer}`];
+  // Las CUATRO filas, en el mismo orden alfabetico que la raiz de la suite: si
+  // el manifiesto generado nombra a menos paquetes que el versionado, los que
+  // faltan son "ignorados sin haber sido revisados" y pnpm 11+ vuelve a salir
+  // con 1. Medido en CI (webui-ci y mutation-bank) con solo esbuild+puppeteer:
+  //
+  //   Error: ERR_PNPM_IGNORED_BUILDS
+  //     Ignored build scripts: core-js@3.50.0, midi@2.0.0
+  //
+  // `core-js` llega por jspdf -> canvg y `midi` es devDependency de ABDEep: los
+  // dos van en `false`, igual que en pnpm-workspace.yaml de la raiz.
+  const aprobaciones = [
+    'allowBuilds:',
+    '  core-js: false',
+    '  esbuild: true',
+    '  midi: false',
+    `  puppeteer: ${permitirPuppeteer}`
+  ];
 
   return `packages:\n${entradas.join('\n')}\n\n${aprobaciones.join('\n')}\n`;
 }
