@@ -22,6 +22,8 @@ import type { ExportAdapter } from './ExportAdapter.ts';
 import type { HardwareLinkContract } from './HardwareLinkContract.ts';
 import { getMidiConfig as deriveMidiConfig, type MidiConfig } from './Models/index.ts';
 import { allModelContracts } from './Models/index.ts';
+export type { HARDWARE_QUEUE_CONFIGS } from './Models/index.ts';
+import { HARDWARE_QUEUE_CONFIGS } from './Models/index.ts';
 import { allImportAdapters, allExportAdapters, allHardwareLinks } from './Adapters/index.ts';
 
 export type DeploymentMode = 'standalone' | 'plugin';

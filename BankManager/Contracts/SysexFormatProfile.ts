@@ -24,6 +24,11 @@ export interface NormativeContractRow extends SysexFormatProfile {
   formatVersion: number;
 }
 
+/**
+ * Validates a SysEx format profile.
+ * @param profile - The profile to validate.
+ * @returns An array of error messages.
+ */
 export function validateSysexFormatProfile(profile: SysexFormatProfile): string[] {
   const errors: string[] = [];
   if (!profile.profileId) errors.push('profileId is required');
@@ -35,6 +40,13 @@ export function validateSysexFormatProfile(profile: SysexFormatProfile): string[
   return errors;
 }
 
+/**
+ * Creates a normative contract row from a model contract and a SysEx format profile.
+ * @param contract - The model contract.
+ * @param profile - The SysEx format profile.
+ * @returns The normative contract row.
+ * @throws An error if the profile is invalid or does not belong to the contract.
+ */
 export function createNormativeContractRow(contract: ModelContract, profile: SysexFormatProfile): NormativeContractRow {
   const errors = validateSysexFormatProfile(profile);
   if (errors.length > 0) throw new Error(`Invalid SysEx profile '${profile.profileId}': ${errors.join('; ')}`);

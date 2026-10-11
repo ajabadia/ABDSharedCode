@@ -128,7 +128,9 @@ export class KorgMs2000ExportAdapter extends BaseExportAdapter {
         // Legacy Prophecy export (model byte 0x5A). Delegate the byte-level
         // build to the contract, then retag the model byte for the legacy
         // MS2000-family wire form.
-        const msg = contract.buildPatchSysEx(p.rawData, i, opts.midiChannel & 0x0F);
+        // El canal va tal cual: el contrato lo acota a 1..16 en `korgChannelByte` y
+        // desplaza él. Enmascararlo aquí colapsaba el canal 16 en el 1 (16 & 0x0F = 0).
+        const msg = contract.buildPatchSysEx(p.rawData, i, opts.midiChannel);
         const legacy = new Uint8Array(msg);
         legacy[3] = 0x5A;
         msgs.push(legacy);
@@ -178,9 +180,11 @@ export class KorgMs2000HardwareLink extends BaseHardwareLink {
 
   buildBankDump(patches: PatchData[], channel: number): Uint8Array[] {
     const contract = getModelContract(this.modelId);
-    const { buildPatchSysEx } = contract ?? {};
-    if (!buildPatchSysEx) return [];
-    return patches.map((p, i) => buildPatchSysEx(p.rawData, i, channel));
+    if (!contract?.buildPatchSysEx) return [];
+    // Se llama como metodo del contrato, no desestructurado: `buildPatchSysEx` lee
+    // `this.modelId` (el byte de modelo y el tamano de programa del contrato), asi que
+    // invocarlo suelto lanzaba `Cannot read properties of undefined (reading 'modelId')`.
+    return patches.map((p, i) => contract.buildPatchSysEx!(p.rawData, i, channel));
   }
 
   buildDumpRequest(slot: number | 'all', channel: number): Uint8Array {

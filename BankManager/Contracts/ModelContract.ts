@@ -25,6 +25,67 @@ export interface ContractFileParse {
   warnings: string[];
 }
 
+// ─── Transport (dónde viven los presets y cómo viajan) ───
+// Ver DOCS/BANK_MANAGER_TRANSPORT_MODEL.md. Un modelo puede tener **dos**
+// extremos y un synth de software puede exponer **dos sistemas de presets** a la
+// vez; por eso es una declaración y no un booleano.
+
+/**
+ * Sistema de presets de un synth de software (decisión §7.1 de
+ * `DOCS/BANK_MANAGER_TRANSPORT_MODEL.md`):
+ *  - `'sysex'`  — habla el SysEx de la familia que emula, con el **mismo payload**
+ *                 que el contrato de ese hardware: un `.syx` del equipo físico
+ *                 entra y sale tal cual. Reservado a un synth que emita el patch
+ *                 data de esa familia **byte a byte**.
+ *  - `'native'` — su sistema propio: los bytes que guarda su motor, opacos para el
+ *                 Bank Manager (JSON en muchos casos, pero no por decreto). Es el
+ *                 único que puede llevar lo que la emulación no cubre: funciones
+ *                 nuevas que el SysEx original no expresa (en ABDMS2000, 30 de sus
+ *                 283 parámetros están marcados `sysex: false` — el vocoder entero,
+ *                 parte del mod sequencer… — y un preset en SysEx los
+ *                 pierde).
+ *
+ * Por eso `abd-sm002` **no** declara `sysex`: su memoria guarda un bloque propio de
+ * 384 B (v2) con su layout, mientras el patch MS2000 del contrato son 254 B con
+ * otro layout. Prometer `sysex` sería prometer una
+ * fidelidad binaria que no tiene.
+ *
+ * Un synth puede declarar los dos, y entonces **un preset pertenece a uno** de
+ * ellos: el sistema va con el banco (`bank.presetFormat`).
+ */
+export type PresetSystem = 'sysex' | 'native';
+
+/** Verbos que sabe hacer un extremo del transporte. */
+export interface TransportChannel {
+  /** Leer presets del destino. */
+  read?: boolean;
+  /** Escribir presets en el destino (a un slot). */
+  write?: boolean;
+  /** Aplicar sin escribir: buffer de edición / audición. */
+  audition?: boolean;
+}
+
+/** Extremo hardware: un equipo físico, por MIDI/SysEx. */
+export interface HardwareTransport extends TransportChannel {
+  /** Volcado por lotes (`buildBulkSysEx`). */
+  bulk?: boolean;
+  /** Petición de volcado (`buildDumpRequest`). */
+  dumpRequest?: boolean;
+}
+
+/** Extremo software: el synth que **hospeda** al Bank Manager, por el bridge. */
+export interface SoftwareTransport extends TransportChannel {
+  /** Sistemas de presets que expone (al menos uno). */
+  systems: PresetSystem[];
+  /** Guardar en la biblioteca el preset activo del synth (`preset.capture`). */
+  capture?: boolean;
+}
+
+export interface ModelTransport {
+  hardware?: HardwareTransport;
+  software?: SoftwareTransport;
+}
+
 export interface ModelContract {
   // ─── Identity ───
   modelId: string;              // 'casio-cz101', 'roland-juno106', 'korg-ms2000', 'behringer-deepmind12', 'yamaha-dx7'
@@ -43,7 +104,7 @@ export interface ModelContract {
   parseProgramAddress(address: string): number | null;
 
   // ─── Patch Data ───
-  patchDataSize: number;        // Bytes per patch (128 CZ, 18 Juno, 288 MS2000, 242 DM12)
+  patchDataSize: number;        // Bytes per patch (128 CZ, 18 Juno, 254 MS2000, 242 DM12)
   patchNameMaxLength: number;   // Name chars (0 CZ, 0 Juno, 12 MS2000, 16 DM12)
   extractPatchName?(data: Uint8Array): string;
 
@@ -57,8 +118,27 @@ export interface ModelContract {
   // ─── Nature ───
   /** True for a software-synth that shares a hardware family's patch format.
    *  Such a model is a local edit target (no physical MIDI port); dumps apply
-   *  to the emulated hardware but auto-detection/hardware routing is disabled. */
+   *  to the emulated hardware but auto-detection/hardware routing is disabled.
+   *
+   *  Lo lee `WebUI/src/core/transportCapabilities.js`: un softsynth **no se
+   *  auto-detecta por nombre de puerto** (no tiene `midiDetection`) y **no ofrece
+   *  `hardware` como único camino**: su lado de software sale de
+   *  `transport.software`. Declarar `isSoftsynth: true` sin `transport.software`
+   *  deja al Bank Manager sin destino propio, y el diagnóstico lo dice. */
   isSoftsynth?: boolean;
+
+  // ─── Transport ───
+  /**
+   * Extremos por los que viajan los presets de este modelo.
+   *
+   * **Opcional y compatible hacia atrás:** sin `transport`, `hardware` se deduce
+   * de las funciones implementadas (`buildDumpRequest` → leer, `buildPatchSysEx`
+   * → escribir, `buildBulkSysEx` → lote), que es el comportamiento histórico de
+   * los 14 contratos de hardware. Si se declara, **manda lo declarado**: así un
+   * contrato puede decir que soporta leer pero no escribir, o que su extremo de
+   * software solo tiene sistema `native`.
+   */
+  transport?: ModelTransport;
 
   // ─── SysEx Metadata ───
   sysexManufacturerId: number[]; // [0x44,0x00,0x00] Casio, [0x41] Roland, [0x42] Korg
@@ -108,6 +188,13 @@ export interface ModelContract {
   buildDumpRequest?(slot: number | 'all', channel: number): Uint8Array;
   /** Parse a dump response (bulk) into an array of { rawData, slot } */
   parseDumpResponse?(sysex: Uint8Array): { rawData: Uint8Array; slot: number }[];
+  /**
+   * Read the write acknowledgement (`0x23` Write Completed / `0x24` Write Error)
+   * that the destination sends back after storing — or failing to store — a patch
+   * dump. Returns null when the message is not an acknowledgement of this model,
+   * so a caller can tell "no answer yet" from "the device said no".
+   */
+  parseAcknowledgement?(sysex: Uint8Array): { ok: boolean } | null;
   /** Whether this model supports edit buffer (audition without overwrite) */
   supportsEditBuffer?: boolean;
   /** Minimum delay between SysEx messages (ms) */
@@ -199,6 +286,29 @@ export function validateModelContract(contract: ModelContract): { valid: boolean
   }
   if (!Number.isInteger(contract.formatVersion) || contract.formatVersion < 1) {
     errors.push('formatVersion must be positive integer');
+  }
+
+  // Transport declarado (opcional): cuando está, tiene que ser coherente.
+  const transport = contract.transport;
+  if (transport?.software) {
+    const systems = transport.software.systems;
+    if (!Array.isArray(systems) || systems.length === 0) {
+      errors.push('transport.software.systems must be a non-empty array');
+    } else {
+      for (const system of systems) {
+        if (system !== 'sysex' && system !== 'native') {
+          errors.push(`transport.software.systems has unknown system '${system}'`);
+        }
+      }
+      // El sistema 'sysex' declara que el synth habla el SysEx de su contrato de
+      // hardware: sin constructor/parseador, la declaración no se puede cumplir.
+      if (systems.includes('sysex') && ! contract.buildPatchSysEx && ! contract.parsePatchSysEx) {
+        errors.push("transport.software.systems declares 'sysex' but the contract cannot build or parse SysEx");
+      }
+    }
+    if (contract.isSoftsynth !== true) {
+      errors.push('transport.software requires isSoftsynth: true');
+    }
   }
 
   // Test round-trip addressing

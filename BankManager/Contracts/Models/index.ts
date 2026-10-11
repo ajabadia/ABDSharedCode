@@ -14,6 +14,8 @@ import { allBehringerPro800Contracts } from './behringer-pro800.ts';
 import { allYamahaContracts } from './yamaha-dx7.ts';
 import { allRolandAiraContracts } from './roland-aira.ts';
 import { HARDWARE_QUEUE_CONFIGS } from '../HardwareQueueConfigs.ts';
+export type { HARDWARE_QUEUE_CONFIGS } from '../HardwareQueueConfigs.ts';
+
 
 // Re-export individual contracts
 export * from './casio-cz.ts';

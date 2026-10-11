@@ -15,7 +15,7 @@ const CMD_DUMP = 0x02;
 const CMD_REQUEST = 0x01;
 const PACKED_SIZE = 278;
 const PROGRAMS_PER_BANK = 128;
-const CATEGORIES = ['Bass', 'Lead', 'Pad', 'FX', 'Keys', 'Perc', 'Synth', 'Other'];
+const CATEGORIES = ['Bass', 'Lead', 'Pad', 'Strings', 'Brass', 'FX', 'Keys', 'Other'];
 
 function isDeepMindMessage(message: Uint8Array): boolean {
   return message.length >= 13 &&
@@ -51,7 +51,7 @@ const behringerDm12Contract: ModelContract = {
   },
   categories: CATEGORIES,
   defaultCategory: 'Other',
-  compatibleModels: [],
+  compatibleModels: ['behringer-deepmind6', 'behringer-deepmind12d'],
   sysexManufacturerId: MANUFACTURER_ID,
   formatVersion: 1,
   sysexModelId: { offset: 4, values: [0x20] },

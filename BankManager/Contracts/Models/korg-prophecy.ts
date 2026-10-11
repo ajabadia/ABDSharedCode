@@ -18,6 +18,9 @@ import {
 import {
   packProphecy7to8, unpackProphecy8to7, splitSysexMessages
 } from '../SysEx/codec';
+// El byte de canal (`3n`) es el mismo que en el MS2000/microKORG: la cabecera de Korg
+// (`F0 42 3n`) es común a los tres, así que el punto único del byte está en un solo sitio.
+import { korgChannelByte } from './korg-ms2000.ts';
 
 const PROPHECY_BANK_CAPACITY = 128;
 const PROPHECY_BANKS_COUNT = 2;
@@ -32,7 +35,7 @@ const PROPHECY_BANK_A     = 0x10;
 const PROPHECY_BANK_B     = 0x11;
 const PROPHECY_SINGLE_ADDR = [0x01, 0x00];
 
-const CATEGORIES = ['Bass', 'Lead', 'Pad', 'FX', 'Keys', 'Perc', 'Synth', 'Other'];
+const CATEGORIES = ['Solo', 'Bass', 'Lead', 'Brass', 'Reed', 'Strings', 'Bell', 'Other'];
 const DEFAULT_CATEGORY = 'Other';
 const SYSEX_MANUFACTURER_ID = [0x42];
 const FORMAT_VERSION = 1;
@@ -110,6 +113,8 @@ export const korgProphecyContract: ModelContract = {
     defaultDeviceId: 0x41
   },
 
+  parameterSchemaKey: "korg_prophet_parameter_spec",
+
   supportsEditBuffer: false,
   interMessageDelayMs: 50,
   dumpTimeoutMs: 5000,
@@ -140,7 +145,7 @@ export const korgProphecyContract: ModelContract = {
     padded.set(data);
 
     const packed = packProphecy7to8(padded);
-    const hdr = [0xF0, 0x42, 0x30 | (channel & 0x0F), 0x41, PROPHECY_CMD_SINGLE, ...PROPHECY_SINGLE_ADDR];
+    const hdr = [0xF0, 0x42, korgChannelByte(channel), 0x41, PROPHECY_CMD_SINGLE, ...PROPHECY_SINGLE_ADDR];
     return new Uint8Array([...hdr, ...packed, 0xF7]);
   },
 
@@ -169,7 +174,7 @@ export const korgProphecyContract: ModelContract = {
       let off = 0;
       for (const p of list) { concat.set(p, off); off += p.length; }
       const packed = packProphecy7to8(concat);
-      const hdr = [0xF0, 0x42, 0x30 | (channel & 0x0F), 0x41, PROPHECY_CMD_BANK, getBankAddrByte(bank), 0x00, 0x00, 0x00];
+      const hdr = [0xF0, 0x42, korgChannelByte(channel), 0x41, PROPHECY_CMD_BANK, getBankAddrByte(bank), 0x00, 0x00, 0x00];
       messages.push(new Uint8Array([...hdr, ...packed, 0xF7]));
     }
     if (messages.length === 1) return messages[0];
@@ -252,12 +257,12 @@ export const korgProphecyContract: ModelContract = {
 
   buildDumpRequest(slot: number | 'all', channel: number): Uint8Array {
     const cmd = slot === 'all' ? PROPHECY_CMD_ALLREQ : PROPHECY_CMD_REQ;
-    return new Uint8Array([0xF0, 0x42, 0x30 | (channel & 0x0F), 0x41, cmd, 0xF7]);
+    return new Uint8Array([0xF0, 0x42, korgChannelByte(channel), 0x41, cmd, 0xF7]);
   },
 
   legacySysEx: {
     modelIdByte: 0x41,
-    buildDumpRequest: (ch) => new Uint8Array([0xF0, 0x42, 0x30 | (ch & 0x0F), 0x41, PROPHECY_CMD_REQ, 0xF7]),
+    buildDumpRequest: (ch) => new Uint8Array([0xF0, 0x42, korgChannelByte(ch), 0x41, PROPHECY_CMD_REQ, 0xF7]),
     validateSysEx: (bytes) => bytes.length >= 6 && bytes[0] === 0xF0 && bytes[1] === 0x42 && bytes[3] === 0x41
   }
 };

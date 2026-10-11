@@ -6,18 +6,17 @@ export { RolandJunoImportAdapter, RolandJunoExportAdapter, RolandJunoHardwareLin
 export { KorgMs2000ImportAdapter, KorgMs2000ExportAdapter, KorgMs2000HardwareLink } from './korgMs2000Adapter';
 export { YamahaDx7ImportAdapter, YamahaDx7ExportAdapter, YamahaDx7HardwareLink } from './yamahaDx7Adapter';
 export { CasioCzImportAdapter, CasioCzExportAdapter, CasioCzHardwareLink } from './casioCzAdapter';
-export { BehringerDm12ImportAdapter, BehringerDm12ExportAdapter } from './behringerDm12Adapter';
+export { BehringerDm12ImportAdapter, BehringerDm12ExportAdapter, BehringerDm12HardwareLink } from './behringerDm12Adapter';
 export { BehringerPro800ImportAdapter, BehringerPro800ExportAdapter, BehringerPro800HardwareLink } from './behringerPro800Adapter';
-export { BehringerDeepMind12HardwareLink } from './behringerDeepMindAdapter';
+export { BehringerDm12HardwareLink as BehringerDeepMind12HardwareLink } from './behringerDm12Adapter';
 export { RolandAiraImportAdapter, RolandAiraExportAdapter, RolandAiraHardwareLink } from './rolandAiraAdapter';
 
 import { RolandJunoImportAdapter, RolandJunoExportAdapter, RolandJunoHardwareLink } from './rolandJunoAdapter';
 import { KorgMs2000ImportAdapter, KorgMs2000ExportAdapter, KorgMs2000HardwareLink } from './korgMs2000Adapter';
 import { YamahaDx7ImportAdapter, YamahaDx7ExportAdapter, YamahaDx7HardwareLink } from './yamahaDx7Adapter';
 import { CasioCzImportAdapter, CasioCzExportAdapter, CasioCzHardwareLink } from './casioCzAdapter';
-import { BehringerDm12ImportAdapter, BehringerDm12ExportAdapter } from './behringerDm12Adapter';
+import { BehringerDm12ImportAdapter, BehringerDm12ExportAdapter, BehringerDm12HardwareLink } from './behringerDm12Adapter';
 import { BehringerPro800ImportAdapter, BehringerPro800ExportAdapter, BehringerPro800HardwareLink } from './behringerPro800Adapter';
-import { BehringerDeepMind12HardwareLink } from './behringerDeepMindAdapter';
 import { RolandAiraImportAdapter, RolandAiraExportAdapter, RolandAiraHardwareLink } from './rolandAiraAdapter';
 import type { ImportAdapter } from '../ImportAdapter';
 import type { ExportAdapter } from '../ExportAdapter';
@@ -49,7 +48,7 @@ export const allHardwareLinks: HardwareLinkContract[] = [
   new KorgMs2000HardwareLink(),
   new YamahaDx7HardwareLink(),
   new CasioCzHardwareLink(),
-  new BehringerDeepMind12HardwareLink(),
+  new BehringerDm12HardwareLink(),
   new BehringerPro800HardwareLink()
 ];
 

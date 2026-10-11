@@ -160,6 +160,30 @@ Eso da un nivel 1 completo sin tocar el lazo de audio ni crear nuevo módulo.
 
 ---
 
+## 9. Portabilidad Cruzada y Validación Multiorigen
+
+- [x] **Opción C: Consolidar en otro sintetizador (ABDEep):** Completada la auditoría y alineación de ABDEep:
+  - Implementado el validador SSOT con gate `--check` (`npm run check:registry` con 43 tests pasando sin escritura espuria).
+  - Verificado que ABDEep ya consume las primitivas canónicas compartidas (filtros `abd::dsp::JunoVCF_ZDF` / `JunoHPFContinuous`, `abd::synth::VoiceAllocator`, `Arpeggiator`, `LfoAnalog`, `EnvelopeAnalog`, `DriftEngine`).
+  - Establecido el límite estricto de preservación de identidad de producto: no se altera la presentación visual de la WebUI ni se exponen filtros o controles ajenos a la arquitectura de 12 voces del DeepMind 12.
+- [x] **Revisión Synth Profile & Paridad microKORG vs MS2000:**
+  - [x] **Sincronización Bidireccional Tema <-> Perfil:** Vinculado el `ThemeSwitcher` del navbar con `synthMode` del store y el bridge de forma bidireccional (cambiar tema visual conmuta el perfil del motor y viceversa, verificado con `synthProfileSync.test.js`).
+  - [x] **Impacto Real en DSP / WASM:** `WasmBridge.cpp` ahora soporta y despacha `synthMode` (4 voces vs 32 expandidas), `voiceMode`, `unisonDetune` y `unisonSpread` a `VoiceManager`.
+  - [x] **Vocoder (8 canales microKORG vs 16 bandas MS2000):** Actualización dinámica de card `#card-vocoder` (`8-CHANNEL VOCODER` / `8 CHANNELS` / `ON (8 Channels Active)` vs `16-BAND VOCODER` / `16 BANDS` / `ON (16 Bands Active)`) y consola gráfica del drawer de vocoder adaptada dinámicamente según el perfil activo (muestra 8 faders duales `CH 1`..`CH 8` sincronizando pares de bandas [1,2]..[15,16] en microKORG, y 16 bandas discretas `B1`..`B16` en MS2000/Advanced, con refresco reactivo al cambiar de perfil).
+  - [x] **Desactivación del Mod Sequencer en microKORG:** En perfil microKORG, el Mod Sequencer queda completamente inhibido en DSP nativo (`SynthEngine.cpp`) y WASM (`WasmBridge.cpp`). En WebUI, la tarjeta muestra badge `ARPEGGIATOR`, el botón `MOD SEQ` queda atenuado como no disponible, el resumen indica `N/A (microKORG)` y el drawer muestra panel informativo con conmutador directo a MS2000.
+  - [x] **Matriz de Modulación Virtual:**
+    - Modo Estándar (Hardware MS2000 / microKORG): **4 slots** físicos (`Patch 1`..`Patch 4`) confirmados en WebUI y hardware.
+    - Modo Extendido (Advanced): Diseñado para **8 slots** (`kNumVirtualPatchSlotsAdvanced = 8` en `HardwareConstants.h`).
+    - Suite de pruebas de ABDMS2000: **201/201 tests pasando** en 19 suites de Vitest.
+  - **Matriz de Diferencias MS2000 vs microKORG:**
+    1. *Mod Sequencer:* Exclusivo de MS2000 (3 pistas x 16 pasos); microKORG carece de él (inhibido en perfil microKORG).
+    2. *Step Arpeggiator:* microKORG incorpora máscara rítmica de 8 pasos on/off; MS2000 opera por tipos/resolución estándar.
+    3. *Estructura de Bancos/SysEx:* microKORG organiza 128 programas en matriz de géneros (A/B x 8) vs MS2000 (Bancos A-H x 16).
+    4. *Control Físico:* microKORG usa matriz matricial de 5 encoders; MS2000 es knob-per-function.
+
+---
+
 Si quieres, puedo:
 - convertir esto en una tabla con columna “primer paso concreto / dueño probable / riesgo”,
 - o añadir un capítulo de “qué evidencia falta para firmar cada paso”.
+

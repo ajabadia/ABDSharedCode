@@ -39,7 +39,7 @@ const PRO800_FORMAT_VERSIONS = {
 } as const;
 const PRO800_NAME_OFFSET = 0x96; // decoded byte offset of the patch name
 
-const CATEGORIES = ['Bass', 'Lead', 'Pad', 'FX', 'Keys', 'Perc', 'Synth', 'Other'];
+const CATEGORIES = ['Bass', 'Lead', 'Pad', 'Strings', 'Brass', 'FX', 'Poly', 'Other'];
 const DEFAULT_CATEGORY = 'Other';
 const SYSEX_MANUFACTURER_ID = [0x00, 0x20, 0x32];
 const FORMAT_VERSION = 1;

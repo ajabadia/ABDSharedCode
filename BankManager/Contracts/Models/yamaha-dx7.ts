@@ -28,7 +28,7 @@ const DX7_PATCH_NAME_MAX_LENGTH = 10;
 const DX7II_PATCH_DATA_SIZE = 155;
 const DX7II_PATCH_NAME_MAX_LENGTH = 10;
 
-const CATEGORIES = ['Bass', 'Lead', 'Pad', 'FX', 'Keys', 'Perc', 'Synth', 'Other'];
+const CATEGORIES = ['Piano', 'Brass', 'Strings', 'Bass', 'Lead', 'Guitar', 'Perc', 'Other'];
 const DEFAULT_CATEGORY = 'Other';
 const SYSEX_MANUFACTURER_ID = [0x43];
 const FORMAT_VERSION = 1;
@@ -625,9 +625,13 @@ export const yamahaDx7iiContract: ModelContract = {
   midiDetection: { portPattern: /dx.?7ii|dx7.?ii/i, displayName: 'DX7II' },
   parameterSchemaKey: 'yamaha-dx7ii',
   bankCapacity: 64,
-  programsPerBank: 64,
+  banksCount: 2,
+  programsPerBank: 32,
   patchDataSize: DX7II_PATCH_DATA_SIZE,
   patchNameMaxLength: DX7II_PATCH_NAME_MAX_LENGTH,
+  // DX7II no comparte formato de volcado con DX7 original (2 banks x 32 + VCED
+  // extendido); la compatibilidad inversa ya la declara el propio DX7.
+  compatibleModels: [],
 
   getProgramAddress(globalIndex: number): string {
     return `V${String(getDx7iiProgramNumber(globalIndex)).padStart(2, '0')}`;
