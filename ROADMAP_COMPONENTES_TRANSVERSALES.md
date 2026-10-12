@@ -76,41 +76,48 @@ Los sintetizadores de la suite (`ABDEep`, `ABDMS2000`, `ABDCZ101`, `ABDJUNiO601`
 
 ---
 
-## 3. Evolución Arquitectónica: Pantalla SysEx y su Integración con BankManager
+## 3. Evolución Arquitectónica: Diferenciación entre BankManager y Live SysEx Monitor
 
-### 🔍 Diagnóstico Histórico
-Durante las fases de ingeniería inversa y desarrollo inicial de cada sintetizador, se implementó una pantalla de visualización de bytes SysEx para monitorizar el comportamiento de los parámetros:
-* **`ABDJUNiO601`:** Implementó `JunoSysExDisplay` como un componente nativo de JUCE en C++ con fuentes monoespaciadas y resaltado de bytes en rojo.
-* **`ABDEep`:** Implementó `sysex_monitor.js` en el WebUI con contadores de tráfico NRPN y selección de bytes decodificados con `BYTE_MAP`.
-* **`ABDMS2000`:** Implementó pantallas de diagnóstico en sus drawers y modales.
+### 🔍 Clarificación de Roles y Funcionalidades
+Es fundamental no confundir dos herramientas con objetivos y momentos de uso radicalmente diferentes:
 
-**Problema actual:**
-1. Cada sintetizador lo hizo de una forma técnica distinta (fragmentación de código).
-2. Ocupa un protagonismo visual excesivo en el frontal del plugin, añadiendo ruido estético a un instrumento que en el hardware real no tenía una pantalla de bytes hexadecimales.
-
-### 💡 Nueva Estrategia: Reducción de Protagonismo y Convergencia en BankManager
-1. **Menos Protagonismo en la UI de Síntesis Principal:**
-   - La pantalla SysEx se retira del frontal del sintetizador.
-   - En el sintetizador pasa a ser un **cajón plegable secundario** (Drawer de Diagnóstico/MIDI) o una opción dentro del menú de herramientas técnicas, orientado únicamente a desarrolladores o usuarios avanzados.
-2. **Integración Natural dentro de `BankManager`:**
-   - El lugar natural donde el volcado SysEx tiene el 100% del sentido es **`BankManager`**:
-     - Al seleccionar un parche o volcado de banco, el usuario técnico puede abrir el **SysEx Inspector**.
-     - Permite inspeccionar la estructura interna del patch, ver qué bytes cambian al comparar dos parches (Diff visual), verificar checksums y exportar volcados limpios.
+| Característica | 📦 **BankManager (Preset SysEx Viewer)** | ⚡ **Live SysEx Inspector (Edit Buffer Monitor)** |
+|---|---|---|
+| **Objeto de análisis** | Presets estáticos archivados en librerías o volcados de banco completos (.syx). | **Edit Buffer activo en tiempo real** (el sonido que suena en este milisegundo). |
+| **Comportamiento** | Estático / Comparativo entre parches de catálogo. | **Dinámico y reactivo**: los bytes mutan al mover sliders, knobs o pulsadores. |
+| **Propósito de uso** | Organización de bancos, backup a hardware, bibliotecas de sonidos. | Depuración sonora, entender cómo codifica el hardware, ingeniería inversa y diseño de parches. |
+| **Acciones inmediatas** | Importar/Exportar banco completo, renombrar presets. | **Copiar código al portapapeles** (Hex/Raw), **Exportar .syx** del parche actual o **Guardar como nuevo preset**. |
+| **Ubicación en UI** | Vista / Modal completa de gestión de librería (`BankManager`). | **Ventana flotante separable / modal desacoplable** (como `ABDScope`). |
 
 ---
 
 ## 4. Nuevos Componentes Transversales Planificados
 
-### Componente 1: `SysExInspector` / `HexDumpViewer`
-* **Tipo:** Web Component / Módulo JS reutilizable en `@abdsynths/shared/components`.
-* **Responsabilidad:**
-  - Visualizador de cuadrícula hexadecimal formateada (16 columnas con direcciones offset `0000: 00 1F ...`).
-  - Comparador *Diff* entre dos buffers de bytes (resaltado en color de valores modificados).
-  - Hover/Tooltip contextual: al pasar el ratón por encima de un byte, muestra el nombre del parámetro según el `byteMap` del contrato de hardware.
-  - Botones rápidos: *Copy Hex*, *Export .syx*, *Validate Checksum*.
-* **Puntos de Integración:**
-  - Panel técnico dentro de `BankManager`.
-  - Drawer de diagnóstico en `ABDEep`, `ABDMS2000`, `ABDCZ101`, `ABDJUNiO601`.
+### Componente 1: `LiveSysExInspector` (Monitor Flotante del Edit Buffer)
+* **Tipo:** Utilidad Web transversal en `@abdsynths/shared/components` con arquitectura de montaje flotante (`FloatingMount`).
+* **Concepto de UX & Ergonomía:**
+  - **Cero intrusión en el frontal:** No ocupa espacio en la carátula vintage del sintetizador.
+  - **Ventana Flotante Desacoplable (Floating Window):** Hereda el patrón de `ABDScope` (`FloatingMount.js`). La ventana se puede arrastrar (drag & drop), redimensionar y mover a un lado de la pantalla (o segundo monitor), permitiendo al diseñador de sonido mover los knobs del sinte mientras ve en vivo cómo muta el flujo hexadecimal.
+  - **Invocación desde `nav_bar`:** Accesible como acción en el menú superior del sintetizador:
+    - `View ➔ Live SysEx Monitor` (o tecla de acceso rápido / atajo).
+    - Alternativamente accesible desde `Edit ➔ Inspect Current SysEx / Edit Buffer`.
+* **Funcionalidades Clave:**
+  1. **Reactividad en Tiempo Real (Live Mutation Highlights):**
+     - Al mover un slider de corte de filtro, resonancia o envolvente, la celda del byte correspondiente destella en color (ej. amarillo/verde fosforito durante 400 ms) antes de volver a su tono normal.
+     - Indicador del último parámetro modificado (ej. `[Offset 0x2A: VCF Cutoff] -> 0x7F (127)`).
+  2. **Portapapeles Instantáneo:**
+     - Botón `📋 Copy Hex` (formato limpio separado por espacios `F0 42 30 ... F7`).
+     - Botón `📋 Copy Array / C++` (para desarrolladores de DSP).
+  3. **Generación y Guardado de Presets:**
+     - Botón `💾 Export .syx`: Descarga directa o guardado en disco del parche activo en formato de volcado de hardware estándar.
+     - Botón `➕ Create New Preset`: Envía el Edit Buffer actual a la lista de presets de usuario (hasta que `BankManager` lo absorba por completo).
+  4. **Modo Diff Dinámico:**
+     - Botón `Freeze / A/B Compare`: Congela una foto del parche antes de editar y resalta en rojo/azul todos los bytes que difieren tras mover varios knobs.
+* **Integración en la Suite:**
+  - `ABDEep` (DeepMind 12/6 Edit Buffer & NRPN translator).
+  - `ABDMS2000` (MS2000 / microKORG 0x71 / 0x58 Edit Buffer).
+  - `ABDCZ101` (Casio CZ-101 64-byte Programmer Buffer).
+  - `ABDJUNiO601` (Juno-106 18-byte Voice Buffer).
 
 ### Componente 2: `PatchNavigationBar` (Cabecera Universal de Presets)
 * **Tipo:** Componente Web transversal en `@abdsynths/shared`.
