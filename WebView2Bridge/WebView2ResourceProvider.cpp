@@ -182,6 +182,43 @@ std::optional<juce::WebBrowserComponent::Resource> resolveSharedAssetFile(const 
     return juce::WebBrowserComponent::Resource{std::move(bytes), getMimeTypeForFilename(file.getFileName()).toStdString()};
 }
 
+std::optional<juce::WebBrowserComponent::Resource> resolveLocalDiskAsset(const juce::String& decodedPath,
+                                                                         const juce::File& baseDir)
+{
+    if (!baseDir.isDirectory())
+        return std::nullopt;
+
+    juce::File distDir = baseDir.getChildFile("dist");
+    if (distDir.isDirectory())
+    {
+        juce::File distFile = distDir.getChildFile(decodedPath.replace("/", "\\"));
+        if (distFile.existsAsFile())
+        {
+            juce::MemoryBlock mb;
+            if (distFile.loadFileAsData(mb))
+            {
+                std::vector<std::byte> data(static_cast<size_t>(mb.getSize()));
+                std::memcpy(data.data(), mb.getData(), static_cast<size_t>(mb.getSize()));
+                return juce::WebBrowserComponent::Resource{std::move(data), getMimeTypeForFilename(distFile.getFileName()).toStdString()};
+            }
+        }
+    }
+
+    juce::File file = baseDir.getChildFile(decodedPath.replace("/", "\\"));
+    if (file.existsAsFile())
+    {
+        juce::MemoryBlock mb;
+        if (file.loadFileAsData(mb))
+        {
+            std::vector<std::byte> data(static_cast<size_t>(mb.getSize()));
+            std::memcpy(data.data(), mb.getData(), static_cast<size_t>(mb.getSize()));
+            return juce::WebBrowserComponent::Resource{std::move(data), getMimeTypeForFilename(file.getFileName()).toStdString()};
+        }
+    }
+
+    return std::nullopt;
+}
+
 std::optional<juce::WebBrowserComponent::Resource> webView2ResourceProvider(const juce::String& url,
                                                                             const BinaryAssetsCatalog& catalog,
                                                                             const std::vector<juce::String>& sharedAssetPrefixes)

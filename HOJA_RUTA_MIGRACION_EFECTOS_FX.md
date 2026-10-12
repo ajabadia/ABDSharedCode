@@ -82,7 +82,7 @@
 | **16** | `RotarySpeaker` | **Leslie 122 Rotary Cabinet** | 🔒 Local en ABDEep | Simulación de trompeta de agudos (horn) y tambor de graves (rotor) con efecto Doppler y filtrado direccional. |
 | **17** | `ChorusD` | **Roland SDD-320 Dimension D (4 Botones)** | 🔒 Local en ABDEep | Modulación multi-fase fija sin barrido cíclico evidente. |
 | **36** | `RolandBBDChorus` | **Roland Juno-60 / Juno-106 BBD Chorus** | ✅ Migrado (`JunoBBD`) | MN3009 BBD físico con filtrado de reconstrucción, ruido de reloj y fuga estéreo modelada. |
-| **37** | `SolinaEnsemble` | **ARP / Eminent Solina String Ensemble** | 🔒 Local en ABDEep | Coro de 3 líneas de retardo desfasadas 120° a 0.6 Hz y 6 Hz (efecto ensemble icónico). |
+| **37** | `SolinaEnsemble` | **ARP / Eminent Solina String Ensemble / Korg MS2000** | ✅ Migrado (`DspSolinaEnsemble`) | Coro de 3 líneas a 120° con modo Dual LFO (0.5Hz + 6.0Hz) y matriz contrafase estéreo. Cero heap e interpolación cúbica Hermite. |
 | **38** | `RingModulator` | **IRCAM Diode Bridge / Maestro Ring Modulator** | 🎯 Listo en `DspEffects` (`RingMod`) | Oscilador tri-onda modulado por LFO y recorte de puente de diodos. |
 | **46** | `FrequencyShifter` | **Bode 1630 Frequency Shifter** | 🔒 Local en ABDEep | Red de Hilbert y cuadratura para desplazamiento armónico lineal (inarmónico). |
 

@@ -37,16 +37,34 @@ public:
     using ResourceProvider = std::function<std::optional<juce::WebBrowserComponent::Resource>(const juce::String&)>;
     using EventListener    = std::function<void(const juce::var&)>;
     using EventListeners   = std::map<juce::String, EventListener>;
+    using NativeFunction   = std::function<void(const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion)>;
+    using NativeFunctions  = std::map<juce::String, NativeFunction>;
 
     explicit JuceWebView2Component(ResourceProvider provider,
-                                   EventListeners extraListeners    = {},
-                                   const juce::String& initialTheme = "audiolab-light")
+                                   EventListeners extraListeners       = {},
+                                   const juce::String& initialTheme    = "audiolab-light",
+                                   NativeFunctions nativeFunctions     = {},
+                                   const juce::File& userDataFolder    = {},
+                                   const juce::String& initialUrl      = {})
         : webBrowser(buildOptions(std::move(provider), std::move(extraListeners),
+                                  std::move(nativeFunctions), userDataFolder,
                                   [this]() { onPageLoaded(); })),
-          currentTheme(initialTheme.toStdString())
+          currentTheme(initialTheme.toStdString()),
+          startUrl(initialUrl)
     {
         addAndMakeVisible(webBrowser);
-        reload();
+        reload(startUrl);
+    }
+
+    explicit JuceWebView2Component(juce::WebBrowserComponent::Options options,
+                                   const juce::String& initialTheme = "audiolab-light",
+                                   const juce::String& initialUrl   = {})
+        : webBrowser(std::move(options)),
+          currentTheme(initialTheme.toStdString()),
+          startUrl(initialUrl)
+    {
+        addAndMakeVisible(webBrowser);
+        reload(startUrl);
     }
 
     ~JuceWebView2Component() override = default;
@@ -82,13 +100,19 @@ public:
         juce::MessageManager::callAsync([this, js]() { webBrowser.evaluateJavascript(js); });
     }
 
-    /** @brief Reload the WebUI root, keeping the current theme as a query param. */
-    void reload()
+    /** @brief Reload the WebUI, keeping the current theme as a query param if using root URL. */
+    void reload(const juce::String& overrideUrl = {})
     {
-        juce::String rootUrl = juce::WebBrowserComponent::getResourceProviderRoot();
-        if (!currentTheme.empty())
+        juce::String rootUrl = overrideUrl.isNotEmpty() ? overrideUrl : juce::WebBrowserComponent::getResourceProviderRoot();
+        if (overrideUrl.isEmpty() && !currentTheme.empty())
             rootUrl += (rootUrl.containsChar('?') ? "&theme=" : "?theme=") + juce::String(currentTheme);
         webBrowser.goToURL(rootUrl);
+    }
+
+    /** @brief Thread-safe / visible emit of event to WebUI (native -> JS channel). */
+    void emitEventIfBrowserIsVisible(const juce::String& eventId, const juce::var& data)
+    {
+        webBrowser.emitEventIfBrowserIsVisible(eventId, data);
     }
 
     /** @brief Access the underlying WebBrowserComponent (e.g. for sizing, JS eval). */
@@ -108,10 +132,13 @@ protected:
 
     juce::WebBrowserComponent webBrowser;
     std::string currentTheme;
+    juce::String startUrl;
 
-private:
+public:
     static juce::WebBrowserComponent::Options buildOptions(ResourceProvider provider,
                                                            EventListeners extraListeners,
+                                                           NativeFunctions nativeFunctions,
+                                                           const juce::File& userDataFolder,
                                                            const std::function<void()>& onPageLoaded)
     {
         auto options = juce::WebBrowserComponent::Options{}
@@ -121,9 +148,28 @@ private:
                            .withEventListener("pageLoaded", [onPageLoaded](const juce::var&) {
                                if (onPageLoaded) onPageLoaded();
                            });
+
+        if (userDataFolder != juce::File{})
+        {
+            options = options.withWinWebView2Options(
+                juce::WebBrowserComponent::Options::WinWebView2()
+                    .withUserDataFolder(userDataFolder));
+        }
+
         for (const auto& [eventId, listener] : extraListeners)
             options = options.withEventListener(eventId, listener);
+
+        for (const auto& [funcName, func] : nativeFunctions)
+            options = options.withNativeFunction(funcName, func);
+
         return options;
+    }
+
+    static juce::WebBrowserComponent::Options buildOptions(ResourceProvider provider,
+                                                           EventListeners extraListeners,
+                                                           const std::function<void()>& onPageLoaded)
+    {
+        return buildOptions(std::move(provider), std::move(extraListeners), {}, {}, onPageLoaded);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(JuceWebView2Component)

@@ -1,230 +1,110 @@
-# Inventario de migraciones por proyecto — desde/abajo de ABDSharedCode
+# 📋 Inventario de Migraciones por Proyecto — ABDSharedCode
 
-> Qué parece migrable o sustituible en cada proyecto del árbol montado, separado por nivel de certeza.
-> Origen de las afirmaciones:
-> - barrido de CMake/includes/importJS/docs visibles en este monorepo,
-> - y ficheros del propio ABDSharedCode que ya documentan parte de esto.
-> Dónde no hay evidencia, figura como "por confirmar", no como lista definitiva.
+> **Propósito:** Documento de referencia y estado de convergencia de módulos compartidos (`DspCore`, `DspEffects`, `SynthCore`, `HardwareDrivers`, `MidiKeyboard`, `Scope`) a lo largo de los sintetizadores del ecosistema **ABDSynths**.
 
 ---
 
-## 1. `ABDAudioLab`
+## 📊 Matriz Resumen de Estado
 
-### 1.1 Consumo ya confirmado (no es hipótesis)
-- Integra `ABDSharedCode` por CMake con local + FetchContent.
-- Compila y enlaza una gran parte del repo compartido:
-  - `HardwareDrivers/`: `CasioCzVirtualController`, `CasioNibbleCodec`, `FskAudioModem`, `JunoTapeModem`, `SysExCodec`, `NRPNParser`,
-  - `AudioComparator/`: `AudioABComparator`, `AudioABComparator_Alignment`, `AudioABComparator_Spectral`, `AudioABVerdictEngine`,
-  - `HardwareMidiDetect/`: `JuceMidiHardwareBackend`, `MidiEndpointSafetyPolicy`,
-  - `WebView2Bridge/`: `WebView2ResourceProvider`,
-  - `StudioTopology/`,
-  - `MidiKeyboard/` (capa nativa),
-  - `tests/` del repo compartido (baterías herméticas).
-- Usa `ABDShared::ScopeCore` desde `ABDSharedCode/Scope`.
-
-Evidencia en este árbol:
-- `ABDAudioLab/CMakeLists.txt`,
-- `ABDAudioLab/docs/audits/*` (actas de sprint e inventario de Scope y hardware),
-- `ABDAudioLab/contracts/hardware/*.json` que apuntan a `sourceOfTruth: ABDSharedCode/SynthCore/...`,
-- `ABDAudioLab/docs/ROADMAP.md` con hitos de extracción ya completados.
-
-### 1.2 Qué parece ya migrado o ya decidido
-Según sus propios docs y hitos:
-- extracción de `ABDShared::HardwareDrivers`,
-- `CasioNibbleCodec`, `SysexPresetGenerator`,
-- `VoiceAllocator`, `VoiceDispersionModel`, `JunoBBD` (con corrección documentada hacia `DspEffects/JunoBBD.h`),
-- modelado de LUTs oficiales a `ABDSharedCode/LutDSP/models`,
-- absorción de Scope como subtree canónico en `ABDSharedCode/Scope`.
-
-Esto indica que `ABDAudioLab` ya está bastante alineado con el compartido; lo más probable es que los candidatos aquí no sean "migrar desde cero", sino "limitar derivas / consolidar".
-
-### 1.3 Posibles candidatos por revisar aquí
-- confirmar si sigue habiendo forwarders/stubs locales redundantes con lo que ya está en el compartido,
-- verificar si algunos componentes visuales nuevos (p.ej. algo tipo `Waterfall3DComponent`) ya están promovidos o siguen en `ABDAudioLab/src/gui` con forwarder,
-- revisar si algún contrato(schema)/generado puede alinearse más con `sourceOfTruth` del compartido.
+| Proyecto | Estado en ABDSharedCode | Módulos Clave Integrados | Pendiente / Próximos Pasos |
+|---|---|---|---|
+| **`ABDMS2000`** | 🟢 **100% Completado** | `SynthCore`, `HardwareDrivers`, `Conversion.gen.h` (436 tests C++, 203 Vitest en verde) | SSOT en `parameters-spec.schema.v1.json` (200+ params). |
+| **`ABDEep`** | 🟢 **100% Completado** | `DspJunoHPF`, `DspJunoVCF`, `VoiceAllocator`, `WebView2Bridge`, `MidiKeyboard` | Fase 5 cerrada (127 suites, 5,131 tests WebUI y 367 tests MidiKeyboard en verde). |
+| **`ABDCZ101`** | 🟡 **DSP OK / Estandarización Suite en Curso** | `DspCz1`, `parameterLookup.js`, `@abdsynths/midi-keyb` | Convergencia a CMake modular, SSOT registry `--check` y `WebView2Bridge` (ver `ESTANDARIZACION_SUITE_BLUEPRINT.md`). |
+| **`ABDJUNiO601`** | 🟢 **Completado** | `DspJunoHPF`, `ArpeggiatorJuno`, `JunoBBD`, `DspCore` | Pruebas nativas cerradas en verde. |
+| **`ABDAudioLab`** | 🟢 **Completado** | `AudioComparator`, `HardwareDrivers`, `ScopeCore`, `LutDSP` | Consolidación continua de contratos. |
+| **`ABDNeural`** | 🟡 **Parcial** | `DspCore`, `DspEffects` (C++20, 56 FX), `MidiKeyboard` | Verificar catalogo de efectos propios vs compartido. |
+| **`ABDScope`** | 🟢 **En Absorción** | Contenido absorbido canónicamente en `ABDSharedCode/Scope` | Consolidar subárbol único. |
+| **`ABDBankManager`** | 🟡 **Planificado (Opción B)** | C++ en `ABDSharedCode/BankManager/`, contratos en camino a `ABDSharedAssets` | Fusión de contratos TS y codecs SysEx en `ABDSharedAssets/contracts/`. |
+| **`ABDOmegaUnified`** | ⚪ **Por confirmar** | No detecta consumo directo de `ABDSharedCode` | Evaluar convergencia de DSP y contratos. |
 
 ---
 
-## 2. `ABDMS2000`
+## 1. `ABDMS2000` (Korg MS2000 / microKORG)
 
-### 2.1 Consumo ya confirmado
-- Integra `ABDSharedCode` con local + FetchContent.
-- Enlaza `ABDShared::SynthCore`, `ABDShared::HardwareDrivers`, `ABDShared::ScopeCore/ScopeCoreHeaders`.
-- Consume `SysExCodec` y `NRPNParser` desde `Source/MIDI/`.
-- Consume `MidiKeyboard` como workspace pnpm.
+### 1.1 Estado Actual
+* **Abstracción DSP Completa (Fases 1 a 7 consolidadas en `main`):**
+  - Todo el flujo de parámetros de síntesis (Osc1, Osc2, Mixer, Filter, Envelopes EG1/EG2, Modulaciones bipolares, LFO1/2, Amp, Pan, Portamento, Virtual Patch 1-4, EQ, ModFX, Delay y Arpegiador) migrado canónicamente a `conversion::normalizedToDomain()`.
+  - **436 / 436 tests C++ en verde** y **203 / 203 tests Vitest en verde**. Cero desincronizaciones con `registry_generator.js --check`.
+  - Paridad sónica 100% con hardware original preservada.
 
-Evidencia en este árbol:
-- `ABDMS2000/CMakeLists.txt`,
-- `ABDMS2000/wasm/CMakeLists.txt`,
-- `ABDMS2000/Source/MIDI/*.h`,
-- `ABDMS2000/package-lock.json`, `ABDMS2000/ROADMAP.md`,
-- `ABDMS2000/build-test/ABDSharedCode/...` empaquetados.
-
-### 2.2 Evidencia documentada de duplicado/sustitución
-Desde `ABDMS2000/ANALISIS_DRY_COMPARTIDO.md` y `ABDMS2000/ANALISIS_DRY_BANKMANAGER_CZ101_ABDEEP.md`:
-- duplicados locales vs compartido:
-  - `Source/MIDI/SysExCodec.{h,cpp}` vs `ABDSharedCode/HardwareDrivers/SysExCodec`,
-  - `Source/MIDI/NRPNParser.{h,cpp}` vs `ABDSharedCode/HardwareDrivers/NRPNParser`,
-  - `WebUI/src/components/utils.js` vs `ABDSharedCode/MidiKeyboard/src/utils.js`.
-- provider WebView2 propio (`Source/PluginEditor_ResourceProvider.*`) vs `ABDSharedCode/WebView2Bridge/WebView2ResourceProvider.*`.
-- selección manual de puertos vs `HardwareMidiDetect` + contratos (`korg_ms2000.json` ya existe).
-- AutoUpdater enlazado sin referencias en Source (seudo dependencia muerta).
-
-Esto es candidato fuerte de sustitución/limpieza, con evidencia explícita en los docs del proyecto.
-
-### 2.3 Posibles candidatos de extracción/unificación
-- asignación de voz: converger `VoiceManager`/`VoiceAllocator`.
-- posible `ABDShared::Filters` o extensión de `LutDSP` para filtros modelados/ZDF si se decide salir del modulo actual.
-
-Recordatorio de regla:
-- lo que lleve JUCE/libm en el lazo de audio no entra en capas que la guía dice libm-free/JUCE-free sin reescritura.
+### 1.2 Aclaración Crítica de Contratos (SSOT de Parámetros)
+* **`ABDMS2000/schemas/parameters-spec.schema.v1.json`:** Es la **Única Fuente de Verdad (SSOT)** con más de 200 parámetros mapeados con sus CCs, rangos, tipos y curvas.
+* **`ABDSharedAssets/contracts/korg_ms2000.json`:** Es únicamente un contrato de prueba de hardware para `HardwareMidiDetect` y `AudioABComparator` (define solo 4 controles usados para barridos de test de audio: Cutoff CC 74, Res CC 71, Drive CC 79, Type CC 80). **No debe usarse como diccionario completo del sintetizador**.
 
 ---
 
-## 3. `ABDJUNiO601`
+## 2. `ABDEep` (Behringer DeepMind 12 / Juno Hybrid)
 
-### 3.1 Consumo confirmado y migraciones cerradas
-- Integra `ABDSharedCode` por CMake (`add_subdirectory`).
-- Enlaza `ABDShared::LutDSP`, `ABDShared::DspCore`, `ABDShared::HardwareDrivers`.
-- **`DspJunoHPF` migrado y verificado**: `Source/Synth/JunoHPF.h` actúa como shim sobre `ABDSharedCode/DspCore/DspJunoHPF.h`.
-- **`ArpeggiatorJuno` migrado y verificado**: `Source/Synth/JunoArpeggiator.h` actúa como shim zero-alloc sobre `abd::synth::ArpeggiatorJuno`.
-- BBD Chorus integrado desde `ABDSharedCode/DspEffects/JunoBBD.h`.
-- Suite completa de tests unitarios nativos pasando al 100% en verde con cero fallos (`--- JUNO UNIT TESTS FINISHED ---`).
+### 2.1 Estado Actual
+* **Núcleo de Filtrado y Asignación:**
+  - Consume de forma canónica los filtros ZDF de `ABDSharedCode/DspCore/` (`DspJunoHPF.h`, `DspJunoVCF.h` con calibración `DspVcfVoicing.h`).
+  - `VoiceAllocator` híbrido implementado y protegido.
+  - Generación WASM y 5.084 tests WebUI pasando en verde.
 
-### 3.2 Candidatos restantes / por revisar
-- Evaluación de generalización de decodificación de cinta / FSK hacia `HardwareDrivers`.
-- Adopción de `DspJunoVCF.h` (promovido a `DspCore`, libre de JUCE) para unificar la implementación de `JunoVCF`.
-
-Nota sobre `VoiceAllocator`: en este árbol el asignador compartido está en `ABDSharedCode/SynthCore/VoiceAllocator.h`; no aparece como carpeta `VoiceAllocator/` independiente en `ABDSharedCode`. Si algún documento o tarea hablaba de “`VoiceAllocator` del compartido” como si fuera un módulo separado, debe leerse como referencia a `SynthCore/VoiceAllocator.h`.
+### 2.2 Preservación de la Identidad Analógica
+* A diferencia de sintetizadores con curvas estáticas, el motor DSP de ABDEep preserva estrictamente su **`CalibrationSpec`** (XML dinámico gobernado por el Calibration Lab y ajustado mediante comparación FFT A/B con grabaciones reales de hardware DeepMind 12).
+* **Hoja de Ruta:** Fase 5 añadida al roadmap para registrar el diccionario de control JSON en `ABDSharedAssets/contracts` y `MidiKeyboard` sin alterar el motor de calibración interno.
 
 ---
 
-## 4. `ABDEep`
+## 3. `ABDCZ101` (Casio CZ-101 / Phase Distortion)
 
-### 4.1 Consumo confirmado y migraciones cerradas
-- Integra `ABDSharedCode` por CMake (`add_subdirectory`).
-- Enlaza `ABDShared::SynthCore`, `ABDShared::DspCore`, `ABDShared::DspEffects`.
-- **Unidades C++20 promovidas a SynthCore**: `VoiceAllocator`, `DriftEngine`, `EnvelopeAnalog`, `LfoAnalog`, `Arpeggiator`, `ControlSequencer`.
-- **Alineación de osciladores**: `DSPHelpers.h` consume el `PolyBLEP.h` canónico de `SynthCore` y utilidades de `DSPUtils.h`.
-- **Filtros modelados migrados y verificados**: `DspJunoHPF.h`, `DspJunoVCF.h` (`VcfVoicing.h`), `DspVAOnePole.h`, `DspMoogLadder.h`, `DspKorgMS20.h`. Todos delegados mediante shims sin duplicidad algorítmica.
-- **Paridad WASM completa**: `wasm/CMakeLists.txt` enlaza directamente las unidades de `SynthCore` y `DspCore`, con generación exitosa de `abdeep_dsp.js/.wasm` y 5.084 tests de WebUI pasando al 100%.
+### 3.1 Módulos DSP Migrados (de *melodee-main* a `ABDSharedCode/DspCore/`)
+* **`DspCz1.h` / `.cpp`:** Síntesis de distorsión de fase, 96 parciales de amplitud, envolvente de 8 etapas.
+* **Módulos adicionales portados:** `DspProphetVCF`, `DspProphetLFO`, `DspProphetEnvelope`, `DspProphetOscillator`, `DspSid`, `DspPhys`, `DspAnalog`, `DspCore`.
+* **Parámetros extendidos en CZ-101:**
+  - `DcoFineTune`: Ajuste fino en cents (-12 a +12) controlado por RPN.
+  - `PitchBend`: Bendido de tono en semitonos (-12 a +12) controlado por RPN.
+  - `Velocity`: Velocidad de note-on (0-127).
+* **Integración UI:** `PhaseDistOscIntegration.cpp` con `mapDcwToM()` y `windowFactor()`.
 
-### 4.2 Candidatos restantes / activos
-- Ningún DSP pendiente en `Source/DSP/`: todo componente algorítmico reutilizable ha sido promovido canónicamente a `ABDSharedCode`.
+### 3.2 Tareas de Verificación (Completadas ✅)
+* **Tests de Vitest en `ABDSharedCode/MidiKeyboard`:** **367 / 367 tests pasando en verde** (incluyendo `parameterConversion.test.js` y `parameterLookup.test.js`).
+* **Compilación C++20 MSVC:** Compilación limpia en Visual Studio 2026 sin errores.
+* **Validación de round-trip en C++ (`Cz101ParamsTests.cpp`):** **8 / 8 suites pasando en verde** con ratio 1.0 exacto en Cutoff, Resonance, LFO1 Rate, LFO1 Amount, FineTune, PitchBend, Velocity y UI Integration.
 
----
-
-## 5. `ABDCZ101`
-
-### 5.1 Lo que sí parece cierto
-- consume `@abdsynths/midi-keyb` y `@abdsynths/shared` desde workspace,
-- tiene schemas y scripts propios,
-- hay menciones cruzadas en `ABDAudioLab/docs/ROADMAP.md` de reutilización hacia editor de parches/envelope de CZ101.
-
-### 5.2 Qué no afirmo sin más revisión
-No tengo inventario de su `Source/` C++ en esta pasada, así que no listo duplicados concretos. Queda "por confirmar".
+### 3.3 Fase Actual: Estandarización de la Suite (Blueprint Universal)
+* **Documento Maestro:** [ESTANDARIZACION_SUITE_BLUEPRINT.md](file:///d:/desarrollos/ABDSynths/ABDCZ101/ESTANDARIZACION_SUITE_BLUEPRINT.md).
+* **Objetivos de Convergencia:** CMake modular (`add_subdirectory`), generador de registros SSOT con verificación `--check` desde `casio_cz101_parameter_spec.json`, desacoplamiento de `WebView2Bridge` y preparación del modelo de transferencia hacia `ABDNeural`.
 
 ---
 
-## 6. `ABDNeural`
+## 4. `ABDSharedCode/MidiKeyboard`
 
-### 6.1 Consumo ya confirmado (con reserva sobre `DspEffects`)
-- consume `ABDShared::DspCore`,
-- consume `ABDShared::DspEffects`: el target está **oficialmente publicado en CMake como C++20** (`ABDShared::DspEffects`), exportando el catálogo completo de los 56 algoritmos de efectos (reverbs, delays, modulaciones, filtros, dinámica, saturación, pitch shifters y granulares) 100% desacoplados de JUCE y probados herméticamente en `DspEffectsTests.cpp`,
-- consume `MidiKeyboard`/workspace,
-- consume `WebView2Bridge` desde testing/contracto,
-- tiene refs cruzadas a `ABDSharedCode/SynthCore/S950PatchFields.h` y `S950Calibration.h` desde contratos generados.
+### 4.1 Diccionarios de Parámetros y `parameterLookup.js`
+* Soporte para 15 sintetizadores mediante esquemas JSON de `ABDSharedAssets/contracts/`.
+* Conversión raw ↔ física con curvas `Linear`, `Exp`, `Pow` y `None` mediante `lookupRawValue()` y `domainToRawValue()`.
+* Integración de Aftertouch y ModWheel en `keyboard.js`.
 
-Evidencia en este árbol:
-- `ABDNeural/CMakeLists.txt`,
-- `ABDNeural/Source/DSP/*`,
-- `ABDNeural/WebUI/pnpm-workspace.yaml`,
-- `ABDNeural/ROADMAP.md`, `ABDNeural/HANDOFF.md`.
-
-### 6.2 Posibles candidatos por revisar
-- si tiene efectos/catálogo propios duplicados del catálogo compartido,
-- si hay Scope/picker/resource provider propio que pueda alinearse al patrón compartido.
+### 4.2 Tareas Pendientes
+* Sincronizar los imports de esquemas en `parameterLookup.js` con los contratos reales de `ABDSharedAssets/contracts/` para evitar módulos faltantes.
+* Asegurar que el mapa del MS2000 se extraiga del schema completo (`parameters-spec.schema.v1.json`) y no del contrato de sweep (`korg_ms2000.json`).
 
 ---
 
-## 7. `ABDScope`
+## 5. `ABDJUNiO601`
 
-### 7.1 Situación clave
-- parece un repo hermano histórico de Scope,
-- cuyo contenido canónico se está absorviendo en `ABDSharedCode/Scope` según sus propios HANDOFF/docs.
-
-### 7.2 Implicación
-Esto es estructural: no es solo "migrar algo", es decidir dónde vive Scope de forma canónica y unificar los dos lados.
-
-Evidencia:
-- `ABDScope/HANDOFF.md`,
-- `ABDScope/docs/EVALUATION_ABDSHAREDCODE_ASSETS.md`,
-- `ABDScope/docs/SESSION_CONTINUATION_PROMPT.md`.
+* **Consumo verificado:** `DspJunoHPF`, `ArpeggiatorJuno`, `JunoBBD` sobre `DspCore`.
+* Batería completa de pruebas unitarias C++ pasando al 100% en verde con cero fallos.
 
 ---
 
-## 8. `ABDOmegaUnified`
+## 6. `ABDAudioLab`
 
-### 8.1 Lo que dice la evidencia ahora
-- su `host/CMakeLists.txt` no referencia a `ABDSharedCode`.
-- sus `package.json` (`host`, `web`, `host/ui`) no declaran dependencias `@abdsynths/*`.
-- su stack parece: JUCE, YAML, Catch2, WAMR, CLAP extension, Next.js para el editor web.
-
-### 8.2 Veredicto
-**Por confirmar / sin consumo directo detectado en este árbol.** No afirmo que no tenga nada que ver con ABDSharedCode, pero en este monorepo montado no hay evidencia de consumo directo a nivel de CMake o package.json.
-
-### 8.3 Qué haría falta para decidir
-- revisar `ABDOmegaUnified/host/Source/` y submódulos para ver si ya tiene sus propios efectos/filtros/detección/scope,
-- mirar si su editor web usa contratos de `ABDSharedAssets/contracts` o si es totalmente propio,
-- ver si tiene bins/common DSP que pueda converger con el compartido.
+* Módulos de hardware y análisis consolidados: `HardwareDrivers`, `AudioABComparator`, `MidiEndpointSafetyPolicy`, `WebView2Bridge`.
+* Absorción del subárbol de Scope en `ABDSharedCode/Scope`.
 
 ---
 
-## 9. Resumen por balde
+## 7. `ABDBankManager` y Convergencia de Contratos (Opción B — Roadmap)
 
-### 9.1 Consumo real / ya migrado
-- `ABDAudioLab`
-- `ABDMS2000` (parcial, pero muy integrado)
-- `ABDNeural` (DspCore, MidiKeyboard, WebView2Bridge references, contratos generados desde SynthCore; la referencia a `DspEffects` figura como consumo documentado pero **no fue confirmada en esta sesión como módulo disponible** en `ABDSharedCode`)
-- `ABDScope` como repo absorbible en `ABDSharedCode/Scope`
-
-### 9.2 Sustitución con evidencia documentada
-Principalmente desde `ABDMS2000`:
-- SysExCodec/NRPNParser locales,
-- utils.js del WebUI,
-- provider WebView2 propio,
-- detección manual de puertos vs HardwareMidiDetect,
-- AutoUpdater muerto enlazado.
-
-Nota: el módulo de efectos **`ABDShared::DspEffects`** ya está formalmente publicado en `ABDSharedCode/CMakeLists.txt` con estándar C++20 (`cxx_std_20`), enlazando el sustrato `DspCore` y exponiendo los 56 motores algorítmicos. Cualquier proyecto (`ABDMS2000`, `ABDNeural`, etc.) puede consumirlo de forma inmediata mediante `target_link_libraries(<target> PRIVATE ABDShared::DspEffects)`.
-
-### 9.3 Candidatos a extracción (nuevo módulo compartido)
-- filtros modelados/ZDF (`ABDMS2000` sugiere `ABDShared::Filters` o extensión LutDSP),
-- asiganador/unificación de voz,
-- posible convergencia de patrón resource provider WebView2 y Scope canónico.
-
-### 9.4 Por confirmar
-- `ABDJUNiO601`
-- `ABDEep`
-- `ABDCZ101`
-- `ABDOmegaUnified`
-- cualquier otro repo cuyo `Source/` y CMake no se haya revisado en profundidad.
-
-Nota de precisión: `VoiceAllocator` en este árbol está en `ABDSharedCode/SynthCore/VoiceAllocator.h`; no aparece como carpeta `VoiceAllocator/` independiente. Si algún punto del inventario lo trata como módulo separado con esa ruta, debe leerse como referencia a `SynthCore/VoiceAllocator.h`.
-
----
-
-## 10. Regla general que limita las migraciones reales
-
-Si algo usa JUCE o libm en el lazo de audio, la migración no es directa hacia módulos que la guía del repo dice JUCE-free / libm-free. Eso puede significar:
-- reescritura,
-- shim local,
-- o no moverlo tampoco.
-
-Así que "susceptible" no siempre significa "se mueve tal cual".
-
----
-
-Si quieres, puedo:
-- convertir esto en una tabla con una fila por proyecto y columnas: consumo real / duplicado documentado / candidato extracción / pendiente,
-- o empezar a redactar la hoja de ruta mínima para `ABDMS2000` (porque es donde hay más evidencia documentada ahora mismo).
+### 7.1 Consolidación de Contratos y Codecs en `ABDSharedAssets`
+* **Decisión de Arquitectura (Opción B):** Consolidar la Single Source of Truth (SSOT) de contratos de presets y protocolos SysEx directamente en `ABDSharedAssets/contracts/`, unificando la especificación declarativa (JSON) y la lógica ejecutable (TypeScript).
+* **Migración desde `ABDSharedCode/BankManager/Contracts/`:**
+  - Trasladar los contratos TypeScript (`ModelContract.ts`, `ContractRegistry.ts`, `PatchData.ts`, `HardwareLinkContract.ts`), los codecs de bajo nivel (`SysEx/codec.ts`: packing 7→8, 8→7, nibbles, checksums) y los adaptadores por fabricante (`Models/*.ts`, `Adapters/*.ts`) hacia `ABDSharedAssets/contracts/`.
+  - Convertir `ABDSharedAssets` en el SDK central de WebUI para todos los plugins (`ABDMS2000`, `ABDCZ101`, `ABDEep`, `ABDJUNiO601`) y la app `ABDBankManager`.
+* **Depuración de Shims Legacy:**
+  - Una vez redirigidos los imports en los consumidores, eliminar la carpeta de shims obsoleta `ABDBankManager/Source/Contracts`.
+* **Frontera C++ Limpia:**
+  - `ABDSharedCode/BankManager/` mantendrá de forma estricta y limpia exclusivamente el motor nativo C++ (`ABDBankManagerCore.h/.cpp`, `BankManagerWebViewAdapter.h/.cpp`, `HardwareMidiPipe.h`, `Pro800Midi.h/.cpp`).

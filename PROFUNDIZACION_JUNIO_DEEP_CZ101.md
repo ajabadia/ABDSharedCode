@@ -40,7 +40,7 @@ Esto ya está formalmente en el compartido y consumido activamente:
 - `ABDShared::SynthCore` (incluyendo `SynthCore/ArpeggiatorJuno.h` consumido vía shim zero-alloc en `Source/Synth/JunoArpeggiator.h`)
 - `ABDShared::LutDSP`
 - `ABDShared::HardwareDrivers`
-- `ABDShared::DspEffects` (`DspEffects/JunoBBD.h` como núcleo de coro BBD)
+- `ABDShared::DspEffects` — en este árbol `DspEffects/` está presente en `ABDSharedCode` con arquitectura de contenedor/catálogo/política (`FxEngine.h`, `FxSlot.h`, `FxRegistry.h`, `FxDefaultCatalogue.h`, `EffectPolicy.h`), varios efectos concretos (`JunoBBD.h`, `DspReverb.h`, `DspChorus.h`, `DspDelay.h`, `DspPhaser.h`, `DspSchroederReverb.h`, `DspMoodFilter.h`, `DspVocoder.h`, `DspSolinaEnsemble.h`, `ShelfFilter.h`, `RingMod.h`, `MultiHeadEcho.h`, `DspSaturation.h`, etc.), subcarpetas `adapters/`/`characters/`/`profiles/` y `DspEffectsTests.cpp`; eso es más que un núcleo mínimo, pero no equivale a un catálogo completo idéntico al de `ABDEep/Source/DSP/FX/` y este documento no ha verificado un `DspEffects/CMakeLists.txt` a ese nivel ni la publicación del target, por lo que lo correcto es leer `DspEffects` como “carpeta presente con efectos/catálogo/tests visibles y citada en CMake/docs”, no como “módulo de efectos entregado y consumible tal cual”. `JunoBBD.h` se usa desde ahí como núcleo de coro BBD.
 - Toda la suite nativa `JunoUnitTests` pasando al 100% en verde con cero fallos.
 
 ### 1.3 Sustituible por lo que hay allí / estado de convergencia
@@ -49,7 +49,7 @@ Esto ya está formalmente en el compartido y consumido activamente:
 - **Arpegiador Juno:** ✅ **Completado**: `JunoArpeggiator` migrado a `abd::synth::ArpeggiatorJuno` sin allocations en audio thread.
 - **Chorus BBD:** Núcleo delegado en `JunoBBD.h`.
 - **Tape echo y decodificación de cinta:** Parecen Juno-específicos, pero si hay lógica de FSK/modem/cinta más general, esa parte podría encajar en `HardwareDrivers`.
-- **Voice manager/allocator:** Coexiste con la semántica Juno; evaluable si converge con `SynthCore/VoiceAllocator.h`.
+- **Voice manager/allocator:** Coexiste con la semántica Juno; evaluable si converge con `SynthCore/VoiceAllocator.h`. En este árbol el asignador compartido está en `SynthCore/VoiceAllocator.h`, no como carpeta `VoiceAllocator/` separada.
 
 ### 1.4 Candidato a ir a ABDSharedCode
 
@@ -92,7 +92,7 @@ Esto parece que no sale del proyecto sin reescritura o without perder la marca J
 Esto está formalmente delegado al compartido y consumido activamente:
 - `ABDShared::SynthCore` (`VoiceAllocator`, `DriftEngine`, `EnvelopeAnalog`, `LfoAnalog`, `Arpeggiator`, `ControlSequencer`, `PolyBLEP.h` y `DSPUtils.h` alineados con osciladores).
 - `ABDShared::DspCore` (incluyendo `DspJunoHPF.h` unificado vía shim en `Source/DSP/JunoHPF.h`).
-- `ABDShared::DspEffects` (con paridad y regression tests pasando).
+- `ABDShared::DspEffects` — **en este árbol** `DspEffects/` está presente en `ABDSharedCode` con arquitectura de contenedor/catálogo/política (`FxEngine.h`, `FxSlot.h`, `FxRegistry.h`, `FxDefaultCatalogue.h`, `EffectPolicy.h`), varios efectos concretos (`JunoBBD.h`, `DspReverb.h`, `DspChorus.h`, `DspDelay.h`, `DspPhaser.h`, `DspSchroederReverb.h`, `DspMoodFilter.h`, `DspVocoder.h`, `DspSolinaEnsemble.h`, `ShelfFilter.h`, `RingMod.h`, `MultiHeadEcho.h`, `DspSaturation.h`, etc.), subcarpetas `adapters/`/`characters/`/`profiles/` y `DspEffectsTests.cpp`; eso es más que un núcleo mínimo, pero no equivale a un catálogo completo idéntico al de `ABDEep/Source/DSP/FX/` y este documento no ha verificado un `DspEffects/CMakeLists.txt` a ese nivel ni la publicación del target, por lo que lo correcto es leer `DspEffects` como “carpeta presente con efectos/catálogo/tests visibles y citada en CMake/docs”, no como “módulo de efectos entregado y consumible tal cual”. Los tests de paridad/regression mencionados se entienden como evidencia de comparación contra ese sustrato, no como certificado de que el catálogo esté completo.
 - Compilación y enlace WebAssembly (Emscripten) enlazando directamente las unidades de `SynthCore` (`abdeep_dsp.js/.wasm`).
 - `ABDSharedAssets/contracts/fx-effects.json` como fuente del contrato de efectos.
 - `@abdsynths/midi-keyb` y `@abdsynths/shared` como paquetes JS consumidos.
@@ -210,4 +210,4 @@ Esto sugiere que, más que mover “todo el synth”, lo más realista es mover 
 2. un inventario de “qué tiene cada uno en `Source/DSP/Effects` o `Source/DSP/Filters` que no parezca Juno/DeepMind/CZ-exclusive”.
 3. un repaso de si CZ101 o JUNiO601 tienen sus propias versiones de fitStage/keybed/overlay que ya existen en `@abdsynths/shared`.
 
-Si quieres, puedo ir a cualquiera de esos tres, pero con límite de no abrir todo el árbol de golpe.
+Nota de precisión sobre `DspEffects`: en este árbol `ABDSharedCode/DspEffects/` está presente como carpeta con efectos/catálogo/tests visibles, pero no se verificó un `DspEffects/CMakeLists.txt` a ese nivel ni la publicación del target; y `VoiceAllocator` está en `SynthCore/VoiceAllocator.h`, no como carpeta independiente. Cualquier uso futuro de esos nombres debe ajustarse a esas ubicaciones.

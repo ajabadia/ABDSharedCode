@@ -60,6 +60,13 @@ std::optional<juce::WebBrowserComponent::Resource> resolveEmbeddedAsset(const ju
 std::optional<juce::WebBrowserComponent::Resource> resolveSharedAssetFile(const juce::String& decodedPath);
 
 /**
+ * @brief Resolve a normalized, URL-decoded path against a directory on disk.
+ * @details Checks baseDir/dist/path first, then baseDir/path. Returns nullopt if not found.
+ */
+std::optional<juce::WebBrowserComponent::Resource> resolveLocalDiskAsset(const juce::String& decodedPath,
+                                                                         const juce::File& baseDir);
+
+/**
  * @brief Full resource provider pipeline: normalize -> embedded -> shared-assets fallback.
  * @param url               Raw URL requested by WebBrowserComponent.
  * @param catalog           The module's embedded binary asset catalog.

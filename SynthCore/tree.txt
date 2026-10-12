@@ -1,0 +1,72 @@
+ El volumen de la unidad D es 2tb
+ El n£mero de serie del volumen es: BA49-15DA
+
+ Directorio de D:\desarrollos\ABDSynths\ABDSharedCode\SynthCore
+
+10/10/2026  15:53    <DIR>          .
+10/10/2026  00:01    <DIR>          ..
+06/10/2026  00:55             3.521 ADSREnvelope.cpp
+06/10/2026  00:55             1.428 ADSREnvelope.h
+09/10/2026  18:32             6.835 Arpeggiator.cpp
+09/10/2026  23:46             8.366 Arpeggiator.h
+09/10/2026  23:46            10.081 ArpeggiatorJuno.h
+06/10/2026  00:55               927 AudioThreadSnapshot.h
+09/10/2026  23:46             3.985 ControlSequencer.cpp
+09/10/2026  23:46             2.993 ControlSequencer.h
+07/10/2026  13:39             6.394 CvToControl.cpp
+07/10/2026  13:00            11.035 CvToControl.h
+09/10/2026  23:46             5.416 DriftEngine.cpp
+09/10/2026  23:46             4.870 DriftEngine.h
+09/10/2026  09:27             4.486 DSPUtils.h
+09/10/2026  23:46             7.284 EnvelopeAnalog.cpp
+09/10/2026  23:46             4.100 EnvelopeAnalog.h
+06/10/2026  00:55             1.472 EnvelopeCurves.h
+06/10/2026  00:55             6.285 LFO.cpp
+06/10/2026  00:55             2.727 LFO.h
+09/10/2026  23:46             5.733 LfoAnalog.cpp
+09/10/2026  23:46             2.273 LfoAnalog.h
+06/10/2026  00:55            11.233 ModMatrix.h
+06/10/2026  23:28            10.664 OscHalfbandDecimator.h
+06/10/2026  23:02            13.037 OscillatorFamily.h
+06/10/2026  23:28            14.303 OscPolyBlep.h
+09/10/2026  23:46            11.462 OscReference.h
+06/10/2026  23:28            23.714 OscVcoCa72.cpp
+06/10/2026  23:34            21.330 OscVcoCa72.h
+06/10/2026  23:41             9.261 OscVcoCa72Profile.h
+09/10/2026  09:27               192 PolyBLEP.cpp
+09/10/2026  09:27             1.687 PolyBLEP.h
+06/10/2026  00:55             1.598 PortamentoGlide.cpp
+06/10/2026  00:55               808 PortamentoGlide.h
+06/10/2026  00:55            22.150 S950Calibration.h
+06/10/2026  00:55            12.129 S950CalibrationHarness.h
+06/10/2026  00:55            47.219 S950Disk.h
+06/10/2026  00:55            32.714 S950EnvelopeBench.h
+06/10/2026  00:55            24.965 S950PatchFields.h
+09/10/2026  23:47            36.808 SynthCoreTests.cpp
+09/10/2026  23:47    <DIR>          tests
+10/10/2026  15:53                 0 tree.txt
+06/10/2026  00:55            14.133 VoiceAllocator.h
+              40 archivos        409.618 bytes
+
+ Directorio de D:\desarrollos\ABDSynths\ABDSharedCode\SynthCore\tests
+
+09/10/2026  23:47    <DIR>          .
+10/10/2026  15:53    <DIR>          ..
+09/10/2026  23:47            17.908 ArpeggiatorTests.inc
+09/10/2026  23:47             9.565 ControlSequencerTests.inc
+09/10/2026  23:47             5.418 DriftEngineTests.inc
+09/10/2026  23:47             9.199 EnvelopeAnalogTests.inc
+09/10/2026  23:47            10.102 LFOAnalogTests.inc
+09/10/2026  18:32            18.524 ModMatrixTests.inc
+06/10/2026  23:28            30.849 OscillatorFamilyTests.inc
+09/10/2026  18:32             8.970 OscReferenceTests.inc
+09/10/2026  23:47            19.681 S950CalibrationRenderTests.inc
+09/10/2026  23:47            21.635 S950CalibrationTests.inc
+09/10/2026  23:47            41.194 S950DiskTests.inc
+09/10/2026  23:47            23.709 S950EnvelopeBenchTests.inc
+09/10/2026  23:47            22.727 S950PatchFieldsTests.inc
+              13 archivos        239.481 bytes
+
+     Total de archivos en la lista:
+              53 archivos        649.099 bytes
+               5 dirs  500.308.369.408 bytes libres

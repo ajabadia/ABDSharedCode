@@ -38,7 +38,9 @@ Evidencia:
 - `ABDMS2000/Source/DSP/*` tiene varios "sync artifact, not hand-maintained — edit ABDSharedCode/SynthCore instead".
 
 **Implicación:**
-Esto ya no es "migrar" **si** `ABDShared::DspCore` y `ABDShared::DspEffects` están disponibles como targets reales en `ABDSharedCode` en la versión que cada proyecto integra. En el árbol montado en esta sesión no apareció `DspEffects/` como carpeta presente, por lo que lo más seguro es tratar este punto como “evidencia de consumo documentado/centrado en CMake y docs” y no como certificado de que la superficie de efectos compartida está resuelta y lista para ser usada tal cual.
+Esto ya no es "migrar" **si** `ABDShared::DspCore` y `ABDShared::DspEffects` están disponibles como targets reales en `ABDSharedCode` en la versión que cada proyecto integra. En el árbol montado en esta sesión **sí apareció `DspEffects/` como carpeta presente** en `ABDSharedCode`, con una estructura visible de contenedor/catálogo/política (`FxEngine.h`, `FxSlot.h`, `FxRegistry.h`, `FxDefaultCatalogue.h`, `EffectPolicy.h`), varios efectos concretos (`JunoBBD.h`, `DspReverb.h`, `DspChorus.h`, `DspDelay.h`, `DspPhaser.h`, `DspSchroederReverb.h`, `DspMoodFilter.h`, `DspVocoder.h`, `DspSolinaEnsemble.h`, `ShelfFilter.h`, `RingMod.h`, `MultiHeadEcho.h`, `DspSaturation.h`, etc.), subcarpetas `adapters/`/`characters/`/`profiles/`, y `DspEffectsTests.cpp`.
+
+Esto es más que un núcleo mínimo, pero **no equivale a un catálogo completo idéntico al de `ABDEep/Source/DSP/FX/`**, y este barrido **no verificó un `DspEffects/CMakeLists.txt` a ese nivel ni la publicación del target**, por lo que lo más seguro es tratar este punto como “carpeta presente con contenido real y tests, más consumo documentado/centrado en CMake y docs”, no como certificado de que la superficie de efectos compartida esté resuelta y lista para ser usada tal cual.
 
 Si se confirma que el target existe y se puede consumir, el siguiente paso es:
 - evitar que surjan gemelos locales,
@@ -132,13 +134,15 @@ Esto parece candidato a **limpieza** más que a migración: o se consume con con
 
 ### C1. Dos `VoiceAllocator` / asignadores de voz
 Según `ABDMS2000/ANALISIS_DRY_COMPARTIDO.md` y `ABDMS2000/ANALISIS_DRY_BANKMANAGER_CZ101_ABDEEP.md`, hay:
-- `ABDSharedCode/LutDSP/VoiceAllocator.h`
+- `VoiceAllocator` del compartido, que en el árbol revisado ahora está en `ABDSharedCode/SynthCore/VoiceAllocator.h` (no como carpeta `VoiceAllocator/` separada),
 - `Source/Core/VoiceManager.{h,cpp}` en MS2000 (o semántica similar)
 
 Y ambos documentos hablan de **converger** en un único asignador compartido.
 
 **Qué se sugiere:**
-Si `VoiceManager` de MS2000 y `VoiceAllocator` del compartido hacen lo mismo, convenga unificar antes de crecer. Esto es una extracción/unificación, no una sustitución pura.
+Si `VoiceManager` de MS2000 y `VoiceAllocator` del compartido hacen lo mismo, convenga unificar antes de crecer. Esto es una extracción/unificación, no una sustitución pura. Cualquier referencia futura a `VoiceAllocator` del compartido debe leerse como `SynthCore/VoiceAllocator.h`, no como un módulo independiente con esa ruta.
+
+Nota de precisión: en este árbol `VoiceAllocator` no está en `LutDSP` ni como carpeta suelta; si algún punto del inventario lo citaba con esa ubicación, debe ajustarse a `SynthCore/VoiceAllocator.h`.
 
 ### C2. Sinatra WebUI de teclado / utils.js
 El informe de MS2000 pone `utils.js` del WebUI como idéntico al de `MidiKeyboard`.

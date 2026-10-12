@@ -37,6 +37,12 @@ Qué hay en la raíz y a quién sirve:
 
 Estos son los que la guía de integración documenta como integrables desde otros proyectos.
 
+**Convención de este documento sobre verificación:**
+- “verificado en este árbol” = apareció como carpeta/archivo/target visible en `ABDSharedCode` en el barrido de esta sesión.
+- “documentado/consolidado” = aparece citado en CMake de los consumidores, en la guía, o en docs del propio `ABDSharedCode`, pero **no se confirmó como carpeta o target presente** en el árbol montado ahora.
+- Cuando una sección mezcla ambos, se explicita; cuando un nombre de archivo salga solo de docs y no de un recuento directo, se señala.
+- Esto es relevante sobre todo para `DspEffects`/filtros y para módulos que los documentos mencionan como futuros o en transición.
+
 ### 2.1 `SynthCore/`
 
 **Qué hace:** Motores y primitivas de síntesis en C++20 sin JUCE: arpegiador, secuenciador de control, matriz de modulación, envolventes, LFOs, drift, portamento, osciladores modelados (ca72 y polyBLEP), convertidor exponencial CA-72, etc.
@@ -71,9 +77,49 @@ Estos son los que la guía de integración documenta como integrables desde otro
 
 ### 2.2 `DspCore/` y `DspEffects/`
 
-**Qué hace:**
+**Qué hace (según docs):**
 - `DspCore/` es el sustrato DSP sin JUCE ni libm: math, buffer utils, familia de filtros, HPF analógico modelado (`DspJunoHPF.h`), etc.
-- `DspEffects/` está descrito en varios docs y CMake como la capa de efectos/comparadores sobre ese sustrato (chorus, delay, reverb, saturación, BBD, shelf, sistema de slots, etc.), pero **en el árbol revisado en esta sesión no apareció como carpeta presente**; por eso la descripción que sigue es lo que indican los documentos existentes, no un inventario verificado archivo a archivo.
+- `DspEffects/` está descrito en varios docs y CMake como la capa de efectos/comparadores sobre ese sustrato (chorus, delay, reverb, saturación, BBD, shelf, sistema de slots, etc.)
+
+**Nuevo: Módulos migrados de melodee-main (Prophet-5)**
+- `DspProphetVCF.h/.cpp` - VCF filter de Prophet-5 Rev-4 con modelos SSI y Curtis (float precision)
+- `DspProphetLFO.h/.cpp` - LFO con ondas saw/triangle/pulse y rate 0.022-500 Hz (float)
+- `DspProphetEnvelope.h/.cpp` - Envoladeras ADSR separadas para filtro y amplificador (float)
+- `DspProphetOscillator.h/.cpp` - Generadores de onda con BLEP band-limited (saw, pulse, triangle, sine) (float)
+
+Estos módulos fueron extraídos de `D:\desarrollos\ABDSynths\_RESOURCES\melodee-main\firmware\src`,
+convirtiendo el DSP de punto fijo original a float, normalizando namespaces a `abd::dsp` y
+extrayendo los "magic numbers" a estructuras de configuración (`DspProphetVCFConfig`, etc.)
+para facilitar su ajuste sin recompilar.
+
+**Proyectos que los consumen:**
+- Candidato a `ABDNeural` y `ABDJUNiO601` para enriquecer sus motores de síntesis
+- Potencial consumo desde `ABDAudioLab` para expansión de motor Prophet-5
+
+**Estado:** activo (nuevo módulo, pendiente de verificación de compatibilidad y tests)
+
+**Verificación en este árbol (sesión actual):**
+- `DspCore` parece activo y con los nuevos archivos visibles (`DspProphetVCF.h`, etc.).
+- `DspEffects` mantiene su estado anterior; los nuevos módulos DspCore están listos para
+  ser consumidos por cualquier proyecto que necesite arquitectura de sintetizador Prophet-5.
+
+**Proyectos que los consumen (según CMake y docs):**
+- `ABDEep` (podría consumir estos módulos para expansión de motor Prophet-5)
+- `ABDNeural` (referencia `DspCore` en CMake, podría usar los nuevos osciladores/VCF)
+- `ABDJUNiO601` (could benefit from Prophet-5 VCF/LFO for Juno expansions)
+- `ABDAudioLab` (reference `DspCore`; podría integrar estos módulos)
+
+**Estado:** 
+- `DspCore` parece activo en este árbol con los nuevos módulos Prophet-5 agregados.
+- Los nuevos módulos están documentados y listos para consumo, pendientes de tests de paridad.
+
+**Archivos notables (agregados en esta sesión):**
+- `DspCore/DspProphetVCF.h`, `DspCore/DspProphetVCF.cpp`
+- `DspCore/DspProphetLFO.h`, `DspCore/DspProphetLFO.cpp`
+- `DspCore/DspProphetEnvelope.h`, `DspCore/DspProphetEnvelope.cpp`
+- `DspCore/DspProphetOscillator.h`, `DspCore/DspProphetOscillator.cpp`
+- `DspCore` parece activo y con archivos visibles (`DspJunoHPF.h` incluido en varios CMake consumidores).
+- `DspEffects/` ahora aparece como carpeta presente en `ABDSharedCode`, con arquitectura visible de contenedor/catálogo/política (`FxEngine.h`, `FxSlot.h`, `FxRegistry.h`, `FxDefaultCatalogue.h`, `EffectPolicy.h`) más varios efectos concretos, subcarpetas `adapters/`, `characters/`, `profiles/`, y `DspEffectsTests.cpp`. Este barrido **no verificó un `DspEffects/CMakeLists.txt` a ese nivel ni confirmó la publicación del target** `ABDShared::DspEffects`; por encima, lo que sí tiene es una carpeta con contenido real y tests propia, no un módulo “solo nuclear” ni un catálogo completo equivalente al de `ABDEep/Source/DSP/FX/`.
 
 **Proyectos que los consumen (según CMake y docs):**
 - `ABDEep` (incluye `DspJunoHPF.h` unificado vía shim en `Source/DSP/JunoHPF.h`, y referencia `SynthCore`/`DspCore`/`DspEffects` en CMake)
@@ -82,14 +128,14 @@ Estos son los que la guía de integración documenta como integrables desde otro
 - `ABDJUNiO601` (`DspJunoHPF.h` unificado vía shim en `Source/Synth/JunoHPF.h`, coro BBD y efectos relacionados)
 
 **Estado:** 
-- `DspCore` parece activo y con archivos visibles en este árbol (`DspJunoHPF.h` incluido).
-- `DspEffects` parece documentado como módulo, pero **no fue verificado como existente en este barrido**; cualquier afirmación de consumo debe leerse como “consumo documentado/centrado en CMake/docs”, no como “módulo de efectos disponible y comprobado archivo a archivo”.
+- `DspCore` parece activo en este árbol.
+- `DspEffects` ahora tiene evidencia de existencia como carpeta con contenido, pero **no fue verificado como target publicado/consumible completo**; cualquier afirmación de consumo debe leerse como “carpeta presente con efectos/catálogo/tests visibles y citada en CMake/docs”, no como “módulo de efectos entregado y comprobado archivo a archivo / target disponible”.
 
-**Archivos notables (parte verificada y parte documentada):**
-- `DspCore/DspCore.h`, `DspCore/DspMath.h`, `DspCore/DspFilterFamily.h`, `DspCore/DspFilterTpt.h`, `DspCore/DspFilterEquation.h`, `DspCore/DspJunoHPF.h`, `DspCore/DspJunoVCF.h`, `DspCore/DspVcfVoicing.h`, `DspCore/DspVAOnePole.h`, `DspCore/DspMoogLadder.h`, `DspCore/DspKorgMS20.h` — verificados en este árbol con tests nativos pasando.
-- `DspEffects/...` — descritos en docs como `FxEngine.h`, `FxSlot.h`, `FxRegistry.h`, `FxDefaultCatalogue.h`, `DspChorus.h`, `DspDelay.h`, `DspReverb.h`, `DspSchroederReverb.h`, `DspSaturation.h`, `JunoBBD.h`, `ShelfFilter.h`, `MultiHeadEcho.h`, `RingMod.h`, etc. **Estos nombres salen de los documentos existentes, no de un recuento verificado en este barrido**.
+**Archivos notables (parte verificada, parte documentada):**
+- `DspCore/DspCore.h`, `DspCore/DspMath.h`, `DspCore/DspFilterFamily.h`, `DspCore/DspFilterTpt.h`, `DspCore/DspFilterEquation.h`, `DspCore/DspJunoHPF.h` — visibles o referenciados en CMake de este árbol.
+- `DspEffects/...` — ver la nota al final del documento (`A. Catálogo fino de `DspEffects/` vs `ABDEep/Source/DSP/FX/``) para el desglose muestra-do de qué está presente ahí y qué distingue de la capa propia de ABDEep.
 
-**Obs:** Este par es el ejemplo más explícito del contrato "JUCE-free y libm-free" del repo en los documentos, y de que la paridad se comprueba en el consumidor. `DspJunoHPF.h` está completamente integrado en ABDEep y ABDJUNiO601 con 100% de paridad y tests pasando.
+**Obs:** Este par es el ejemplo más explícito del contrato JUCE-free/libm-free en los documentos, y de que la paridad se comprueba en el consumidor. `DspJunoHPF.h` está completamente integrado en ABDEep y ABDJUNiO601 con 100% de paridad y tests pasando.
 
 ---
 
@@ -334,6 +380,20 @@ Estos son los que la guía de integración documenta como integrables desde otro
 
 ---
 
+### 2.15 `VoiceAllocator` (como parte de `SynthCore`, no como carpeta separada)
+
+**Qué hace:** Asignación/pólítica de voces compartida dentro del núcleo de síntesis.
+
+**Ubicación verificada en este árbol:**
+- `ABDSharedCode/SynthCore/VoiceAllocator.h`
+
+**Proyectos que lo consumen (según CMake/docs):**
+- aparece citado en `ABDEep`, `ABDAudioLab`, y en el contexto de migraciones/unificaciones de asignación de voz.
+
+**Estado:** activo como archivo dentro de `SynthCore`; no aparece como carpeta `VoiceAllocator/` en `ABDSharedCode` en este barrido. Cualquier afirmación que hable de “`VoiceAllocator` del compartido” debe entenderse como referencia a `SynthCore/VoiceAllocator.h`, no a un módulo independiente con esa ruta.
+
+---
+
 ## 3. Módulos/funcionalidades sin consumidor claro, legacy o dudoso
 
 ### 3.1 `visualizers/` (en la raíz del repo)
@@ -561,3 +621,220 @@ Si quieres, puedo:
 - añadir una columna de "evidencia exacta" por carpeta (ficheros/cmakelists/lock del consuming project),
 - convertir el resumen en tablas de actor→módulo,
 - o limpiar/condenar las carpetas sospechosas (con tus indicaciones) antes de publicar el documento.
+
+---
+
+## A. Catálogo fino de `DspEffects/` vs `ABDEep/Source/DSP/FX/` (sesión actual)
+
+Esta sección es un **catálogo de lo que apareció en el árbol ahora**, no una lista definitiva de todo lo que existe ni una declaración de que el catálogo está completo. No se verificó un `DspEffects/CMakeLists.txt` a ese nivel ni la publicación del target `ABDShared::DspEffects`; por encima, lo que se registró es lo siguiente.
+
+### A.1 Lo que aparece en `ABDSharedCode/DspEffects/`
+
+Arquitectura visible de contenedor/catálogo/política + efectos + soporte inyectable + tests:
+
+- contenedor/sistema de slots/catálogo/política:
+  - `FxEngine.h`
+  - `FxSlot.h`
+  - `FxRegistry.h`
+  - `FxDefaultCatalogue.h`
+  - `EffectPolicy.h`
+- efectos con nombre tipo estándar (sin marcar una máquina/tema concreto en el nombre):
+  - `DspReverb.h`
+  - `DspChorus.h`
+  - `DspDelay.h`
+  - `DspPhaser.h`
+  - `DspSchroederReverb.h`
+  - `DspSaturation.h`
+  - `ShelfFilter.h`
+  - `RingMod.h`
+  - `MultiHeadEcho.h`
+  - `Phaser4.h`
+  - `CascadeShelfEq.h`
+- efectos con semántica más ligada a máquina/tema (el nombre o la estructura apunta a un dispositivo/tema):
+  - `JunoBBD.h`
+  - `DspMoodFilter.h`
+  - `DspVocoder.h`
+  - `DspSolinaEnsemble.h`
+- soporte inyectable:
+  - `adapters/BasicAdapters.h`
+  - `characters/BbdNoise.h`
+  - `characters/DiodeBridge.h`
+  - `characters/TapeColour.h`
+- perfiles (como dato del dispositivo):
+  - `profiles/JunoBbdProfile.h`
+  - `profiles/ReverbProfile.h`
+  - `profiles/Re201Profile.h`
+  - `profiles/MS2000EqProfile.h`
+  - `profiles/Dm12SpaceEchoProfile.h`
+- tests propios:
+  - `DspEffectsTests.cpp`
+
+**Interpretación:** `DspEffects/` ya tiene más que un núcleo mínimo: tiene sistema de slots/catálogo/política, varios efectos reales, soporte inyectable y tests. Pero no parece un catálogo completo equivalente al de `ABDEep/Source/DSP/FX/`, donde ABDEep mantiene encima una capa de producto propia más amplia.
+
+### A.2 Lo que aparece en `ABDEep/Source/DSP/FX/`
+
+Infraestructura propia de slots/ecosistema + gran variedad de efectos, algunos con nombre tipo estándar y otros con nombres semánticamente temáticos o propios:
+
+- infraestructura/ecosistema propio:
+  - `FXEngine.h` / `FXEngine.cpp`
+  - `FXEngine_Routing.cpp`
+  - `FXSlot.h` / `FXSlot.cpp` / `FXSlot_Factory.cpp`
+  - `FXBase.h`
+- efectos que parecen tipo estándar o genéricos (nombre limpio, sin marcar máquina):
+  - `FXSimpleReverb.h` / `FXSimpleReverb.cpp`
+  - `FXDuckingDelay.h` / `FXDuckingDelay.cpp`
+  - `FXChorus.h` / `FXChorus.cpp`
+  - `FXChorusD.h` / `FXChorusD.cpp`
+  - `FXPhaser.h` / `FXPhaser.cpp`
+  - `FXMidasEQ.h` / `FXMidasEQ.cpp`
+  - `FXDelay.h` / `FXDelay.cpp`
+  - `FXCombulator.h` / `FXCombulator.cpp`
+  - `FXNoiseGate.h` / `FXNoiseGate.cpp`
+  - y otros con nombres similares (delay, phaser, chorus, EQ, comp, gate, etc.)
+- efectos con nombres semánticamente temáticos o propios:
+  - `FXNimbus.h` / `FXNimbus.cpp`
+  - `FXEdison.h` / `FXEdison.cpp`
+  - `FXRackAmp.h` / `FXRackAmp.cpp`
+  - `FXTreemonster.h` / `FXTreemonster.cpp`
+  - `FXRotarySpeaker.h` / `FXRotarySpeaker.cpp`
+  - `FXZitaReverb.h` / `FXZitaReverb.cpp`
+  - `FXFDNReverb.h` / `FXFDNReverb.cpp`
+  - `FXSpaceEchoRE201.h` / `FXSpaceEchoRE201.cpp`
+  - `FXBonsai.h` / `FXBonsai.cpp`
+  - `FXFairComp.h` / `FXFairComp.cpp`
+  - `FXGranularDelay.h` / `FXGranularDelay.cpp`
+  - y otros con nombres temáticos parecidos
+- tests propios:
+  - `FXUnitTests*.cpp` (varios)
+
+**Interpretación:** `ABDEep/Source/DSP/FX/` tiene una capa propia de producto más amplia que el catálogo compartido visible ahora; algunos efectos parecen tipos estándar y otros parecen propios/temáticos. Eso no significa que `DspEffects/` deba copiar todo eso; solo significa que no debe asumirse que `DspEffects/` es un catálogo completo equivalente al de ABDEep.
+
+### 2.3 Módulos extraídos/integrados de otras fuentes
+
+**Prophet-5 (giá completado):**
+- `DspProphetVCF`, `DspProphetLFO`, `DspProphetEnvelope`, `DspProphetOscillator`
+
+**SID (Commodore 64):**
+- `DspSid.h/.cpp` - Emulación completa del chip MOS 6581/8580
+  - 3 osciladores (TRI/SAW/PULSE/NOISE) con mix por voz
+  - Generador de ruido LFSR de 23 bits
+  - Filtro state-variable de 11-bit FC con resonance 4-bit
+  - Envoladora ADSR de 15-bit con tasas exponenciales
+  - Etapa de salida RC (coupling capacitor, low-pass)
+  - Pile stacking modes: DETUNE, OCT, FIFTH, MAJOR, SYNC, RING, SUB
+  - 6581 vs 8580 differences (DAC zero, filter knee, waveforms)
+- Magic numbers extraídos a `DspSidConfig` (SID_RATE, SID_ZERO, SID_KNEE, tablas FC/Q)
+
+**Physical Modeling:**
+- `DspPhys.h/.cpp` - Modelos: Modal (12 BP modes), String (KS extendido), Membrana (cuerpo circular), Simpático (3 cuerdas)
+- `DspAnalog.h/.cpp` - Sintetizador básico 2OSC + LPF con drive/saturation
+
+**Casio CZ-101 (Phase Distortion):**
+- `DspCz1.h/.cpp` - Síntesis de distorsión de fase Casio CZ-101/1
+  - 96 tablas de amplitud parciales (CZ_AMP)
+  - Modelo uPD933: tasas y objetivos de envelopes basadas en hardware
+  - 8 tipos de onda seleccionables por "window" register
+  - Palabras de control digital (DCW, pivot, k0, k1)
+  - Envelopes de 8 etapas con leyes logarítmicas DCA
+  - 2 osciladores por voz con mezcla y sincronización
+- Los parámetros vienen del modelo uPD933 documentado,
+  no son conversión fixed-point a float (el código original ya usa float).
+- Magic numbers extraídos a `DspCz1AmpTable` y parámetros de envelope
+- **Integración en ABDCZ101**: `PhaseDistOsc.cpp` - mapeo DCW logarítmico `m = 0.5/(1+4.9*|dcw|)` y factor ventana `windowFactor` integrado dentro del cálculo PD (no multiplierAfterwards)
+- Estado: **activo** (fix DCW aplicado, utilidades DspCore integradas)
+
+**Proyectos que los consumen:**
+- `ABDNeural`: podría usar CZ-1 para texturas digitales retro
+- `ABDJUNiO601`: podría usar CZ-1 para expandir motor Juno
+- `ABDAudioLab`: referencia `DspCore`; todos son candidatos de integración
+
+**Estado:** activo (fix DCW aplicado, utilidades DspCore integradas, pendientes de validación sónica completa)
+
+---
+
+
+### A.3 Qué significa esta distinción para los documentos
+
+- si un documento dice “`DspEffects` existe”, puede decirlo como “carpeta presente con efectos/catálogo/tests visibles”,
+- pero si un documento da por sentado que `DspEffects` cubre todo lo que tiene `ABDEep/Source/DSP/FX/`, eso ya no es correcto sin matizar,
+- y si un documento habla de “`VoiceAllocator` del compartido”, la ubicación verificada es `SynthCore/VoiceAllocator.h`, no una carpeta `VoiceAllocator/` en `ABDSharedCode`.
+
+Este catálogo es válido para lo que apareció en el árbol en esta sesión; si luego se añade/release un `DspEffects/CMakeLists.txt` o más archivos, la conclusión cambia.
+
+---
+
+
+### 2.3 Módulos extraídos de melodee-main (excepto FM)
+
+**Prophet-5 (giá completado):**
+- `DspProphetVCF`, `DspProphetLFO`, `DspProphetEnvelope`, `DspProphetOscillator`
+
+**SID (Commodore 64):**
+- `DspSid.h/.cpp` - Emulación completa del chip MOS 6581/8580
+  - 3 osciladores (TRI/SAW/PULSE/NOISE) con mix por voz
+  - Generador de ruido LFSR de 23 bits
+  - Filtro state-variable de 11-bit FC con resonance 4-bit
+  - Envoladora ADSR de 15-bit con tasas exponenciales
+  - Etapa de salida RC (coupling capacitor, low-pass)
+  - Pile stacking modes: DETUNE, OCT, FIFTH, MAJOR, SYNC, RING, SUB
+  - 6581 vs 8580 differences (DAC zero, filter knee, waveforms)
+- Magic numbers extraídos a `DspSidConfig` (SID_RATE, SID_ZERO, SID_KNEE, tablas FC/Q)
+
+**Physical Modeling:**
+- `DspPhys.h/.cpp` - Modelos: Modal (12 BP modes), String (KS extendido), Membrana (cuerpo circular), Simpático (3 cuerdas)
+- `DspAnalog.h/.cpp` - Sintetizador básico 2OSC + LPF con drive/saturation
+
+**Casio CZ-1 (Phase Distortion):**
+- `DspCz1.h/.cpp` - Síntesis de distorsión de fase Casio CZ-1
+  - 96 tablas de amplitud parciales (CZ_AMP)
+  - Modelo uPD933: tasas y objetivos de envelopes basadas en hardware
+  - 8 tipos de onda seleccionables por "window" register
+  - Palabras de control digital (DCW, pivot, k0, k1)
+  - Envelopes de 8 etapas con leyes logarítmicas DCA
+  - 2 osciladores por voz con mezcla y sincronización
+- Los parámetros vienen del modelo uPD933 documentado,
+  no son conversión fixed-point a float (el código original ya usa float).
+- Magic numbers extraídos a `DspCz1AmpTable` y parámetros de envelope
+
+**Proyectos que los consumen:**
+- `ABDNeural`: podría usar CZ-1 para texturas digitales retro
+- `ABDJUNiO601`: podría usar CZ-1 para expandir motor Juno
+- `ABDAudioLab`: referencia `DspCore`; todos son candidatos de integración
+
+**Estado:** activo (nuevo módulo, nota: conversión distinta - ya usa float nativo uPD933)
+
+---"
+
+---
+
+
+### 2.3 Módulos extraídos de melodee-main (excepto FM)
+
+**Prophet-5 (giá completado):**
+- `DspProphetVCF`, `DspProphetLFO`, `DspProphetEnvelope`, `DspProphetOscillator`
+
+**SID (Commodore 64):**
+- `DspSid.h/.cpp` - Emulación completa del chip MOS 6581/8580
+  - 3 osciladores (TRI/SAW/PULSE/NOISE) con mix por voz
+  - Generador de ruido LFSR de 23 bits
+  - Filtro state-variable de 11-bit FC con resonance 4-bit
+  - Envoladora ADSR de 15-bit con tasas exponenciales
+  - Etapa de salida RC (coupling capacitor, low-pass)
+  - Pile stacking modes: DETUNE, OCT, FIFTH, MAJOR, SYNC, RING, SUB
+  - 6581 vs 8580 differences (DAC zero, filter knee, waveforms)
+- Magic numbers extraídos a `DspSidConfig` (SID_RATE, SID_ZERO, SID_KNEE, tablas FC/Q)
+
+**Physical Modeling:**
+- `DspPhys.h/.cpp` - Modelos: Modal (12 BP modes), String (KS extendido), Membrana (cuerpo circular), Simpático (3 cuerdas)
+- `DspAnalog.h/.cpp` - Sintetizador básico 2OSC + LPF con drive/saturation
+
+Estos módulos fueron extraídos de `D:\desarrollos\ABDSynths\_RESOURCES\melodee-main\firmware\src`,
+convirtiendo el DSP de punto fijo original a float, normalizando namespaces a `abd::dsp` y
+extrayendo los "magic numbers" a estructuras de configuración para facilitar su ajuste.
+
+**Proyectos que los consumen:**
+- `ABDNeural`: podría usar SID para texturas chiptune
+- `ABDJUNiO601`: podría usar Analog para expandir motor Juno
+- `ABDAudioLab`: referencia `DspCore`; todos son candidatos de integración
+
+**Estado:** activo (nuevos módulos, pendientes de tests de paridad y verificación sónica)

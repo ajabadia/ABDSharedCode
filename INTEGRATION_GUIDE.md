@@ -3008,3 +3008,159 @@ El ecosistema ABDSynths adopta una **Arquitectura en Tres Niveles** para unifica
 3. **Nivel 2: Aplicaciones Consumidoras**:
    - **ABDAudioLab**: Carga dinámica mediante `core::HardwareContractRegistry` para calibración y perfilado acústico.
    - **ABDBankManager**: Sincronización e hidratación declarativa de `ModelContract`s mediante `npm run sync-contracts` (`scripts/sync_contracts.mjs`).
+
+---
+
+## A. Nota complementaria: catálogo fino de `DspEffects/` vs `ABDEep/Source/DSP/FX/` (sesión actual)
+
+Esta nota es complementaria al mapa de funcionalidades (`000_MODULE_CONSUMERS_MAP.md`) y no sustituye a él. Es un catálogo de lo que apareció en el árbol ahora, no una lista definitiva de todo lo que existe ni una declaración de que el catálogo está completo. No se verificó un `DspEffects/CMakeLists.txt` a ese nivel ni la publicación del target `ABDShared::DspEffects`; por encima, lo que se registró es lo siguiente.
+
+### A.1 Lo que aparece en `ABDSharedCode/DspEffects/`
+
+Arquitectura visible de contenedor/catálogo/política + efectos + soporte inyectable + tests:
+
+- contenedor/sistema de slots/catálogo/política:
+  - `FxEngine.h`
+  - `FxSlot.h`
+  - `FxRegistry.h`
+  - `FxDefaultCatalogue.h`
+  - `EffectPolicy.h`
+- efectos con nombre tipo estándar (sin marcar una máquina/tema concreto en el nombre):
+  - `DspReverb.h`
+  - `DspChorus.h`
+  - `DspDelay.h`
+  - `DspPhaser.h`
+  - `DspSchroederReverb.h`
+  - `DspSaturation.h`
+  - `ShelfFilter.h`
+  - `RingMod.h`
+  - `MultiHeadEcho.h`
+  - `Phaser4.h`
+  - `CascadeShelfEq.h`
+- efectos con semántica más ligada a máquina/tema (el nombre o la estructura apunta a un dispositivo/tema):
+  - `JunoBBD.h`
+  - `DspMoodFilter.h`
+  - `DspVocoder.h`
+  - `DspSolinaEnsemble.h`
+- soporte inyectable:
+  - `adapters/BasicAdapters.h`
+  - `characters/BbdNoise.h`
+  - `characters/DiodeBridge.h`
+  - `characters/TapeColour.h`
+- perfiles (como dato del dispositivo):
+  - `profiles/JunoBbdProfile.h`
+  - `profiles/ReverbProfile.h`
+  - `profiles/Re201Profile.h`
+  - `profiles/MS2000EqProfile.h`
+  - `profiles/Dm12SpaceEchoProfile.h`
+- tests propios:
+  - `DspEffectsTests.cpp`
+
+**Interpretación:** `DspEffects/` ya tiene más que un núcleo mínimo: tiene sistema de slots/catálogo/política, varios efectos reales, soporte inyectable y tests. Pero no parece un catálogo completo equivalente al de `ABDEep/Source/DSP/FX/`, donde ABDEep mantiene encima una capa de producto propia más amplia.
+
+### A.2 Lo que aparece en `ABDEep/Source/DSP/FX/`
+
+Infraestructura propia de slots/ecosistema + gran variedad de efectos, algunos con nombre tipo estándar y otros con nombres semánticamente temáticos o propios:
+
+- infraestructura/ecosistema propio:
+  - `FXEngine.h` / `FXEngine.cpp`
+  - `FXEngine_Routing.cpp`
+  - `FXSlot.h` / `FXSlot.cpp` / `FXSlot_Factory.cpp`
+  - `FXBase.h`
+- efectos que parecen tipo estándar o genéricos (nombre limpio, sin marcar máquina):
+  - `FXSimpleReverb.h` / `FXSimpleReverb.cpp`
+  - `FXDuckingDelay.h` / `FXDuckingDelay.cpp`
+  - `FXChorus.h` / `FXChorus.cpp`
+  - `FXChorusD.h` / `FXChorusD.cpp`
+  - `FXPhaser.h` / `FXPhaser.cpp`
+  - `FXMidasEQ.h` / `FXMidasEQ.cpp`
+  - `FXDelay.h` / `FXDelay.cpp`
+  - `FXCombulator.h` / `FXCombulator.cpp`
+  - `FXNoiseGate.h` / `FXNoiseGate.cpp`
+  - y otros con nombres similares (delay, phaser, chorus, EQ, comp, gate, etc.)
+- efectos con nombres semánticamente temáticos o propios:
+  - `FXNimbus.h` / `FXNimbus.cpp`
+  - `FXEdison.h` / `FXEdison.cpp`
+  - `FXRackAmp.h` / `FXRackAmp.cpp`
+  - `FXTreemonster.h` / `FXTreemonster.cpp`
+  - `FXRotarySpeaker.h` / `FXRotarySpeaker.cpp`
+  - `FXZitaReverb.h` / `FXZitaReverb.cpp`
+  - `FXFDNReverb.h` / `FXFDNReverb.cpp`
+  - `FXSpaceEchoRE201.h` / `FXSpaceEchoRE201.cpp`
+  - `FXBonsai.h` / `FXBonsai.cpp`
+  - `FXFairComp.h` / `FXFairComp.cpp`
+  - `FXGranularDelay.h` / `FXGranularDelay.cpp`
+  - y otros con nombres temáticos parecidos
+- tests propios:
+  - `FXUnitTests*.cpp` (varios)
+
+**Interpretación:** `ABDEep/Source/DSP/FX/` tiene una capa propia de producto más amplia que el catálogo compartido visible ahora; algunos efectos parecen tipos estándar y otros parecen propios/temáticos. Eso no significa que `DspEffects/` deba copiar todo eso; solo significa que no debe asumirse que `DspEffects/` es un catálogo completo equivalente al de ABDEep.
+
+### A.3 Qué significa esta distinción para los documentos
+
+- si un documento dice “`DspEffects` existe”, puede decirlo como “carpeta presente con efectos/catálogo/tests visibles”,
+- pero si un documento da por sentado que `DspEffects` cubre todo lo que tiene `ABDEep/Source/DSP/FX/`, eso ya no es correcto sin matizar,
+- y si un documento habla de “`VoiceAllocator` del compartido”, la ubicación verificada es `SynthCore/VoiceAllocator.h`, no una carpeta `VoiceAllocator/` en `ABDSharedCode`.
+
+Esta nota es válida para lo que apareció en el árbol en esta sesión; si luego se añade/release un `DspEffects/CMakeLists.txt` o más archivos, la conclusión cambia.
+
+---
+
+## Módulo: WebView2Bridge (Puente Nativo JUCE ↔ WebUI)
+
+Proporciona la infraestructura canónica de comunicación IPC y provisión de recursos locales para interfaces WebUI en plugins JUCE (WebView2 en Windows, WebKit en macOS/Linux).
+
+### Archivos Clave
+- `WebView2Bridge/JuceWebView2Component.h`: Envoltorio de `juce::WebBrowserComponent` con aceleración por hardware, callbacks de inicialización segura y control de foco.
+- `WebView2Bridge/WebView2ResourceProvider.h / .cpp`: Proveedor de recursos embebidos que intercepta esquemas virtuales (`synth://`) sirviendo los binarios de `WebUIAssets` desde memoria sin tocar disco.
+
+### Principios de Integración
+1. **Desacoplamiento Estricto del Hilo de Audio:** La comunicación desde WebUI a C++ actualiza el APVTS en el Message Thread (`setValueNotifyingHost`). Nunca se bloquea ni se usa `MessageManagerLock` en `processBlock()`.
+2. **Triple Modo de Ejecución:**
+   - **Plugin Nativo:** Servido vía `WebUIAssets` binarios por `WebView2ResourceProvider`.
+   - **WASM Autónomo:** Procesamiento directo en el navegador vía Emscripten / AudioWorklet.
+   - **Desarrollo Web / Diagnóstico:** Servidor local (`vite WebUI`) con fallback a Web MIDI API.
+
+---
+
+## Módulo: Generador de Parámetros SSOT (Contract-Driven Parameter Spec)
+
+Estandariza la sincronización sin drift (*Zero-Drift Pipeline*) entre los contratos declarativos JSON, el host nativo en C++ y el frontend WebUI.
+
+### Flujo de Datos
+```
+ABDSharedAssets/contracts/<synth>_parameter_spec.json  (Única Fuente de Verdad)
+                       │
+                       ▼
+         Scripts/registry_generator.js
+         ├── --check (Validación CI/CD)
+         ▼
+ ┌──────────────────────────────────────┬─────────────────────────────────────┐
+ │ C++ Host (APVTS)                     │ WebUI / Frontend                    │
+ │ ├── Source/State/ParameterRegistry.gen.h ├── WebUI/src/contracts/registry.gen.js
+ │ └── Source/State/ParameterRegistry.gen.cpp└── schemas/parameter-registry.data.json
+ └──────────────────────────────────────┴─────────────────────────────────────┘
+```
+
+### Regla del Flag `--check`
+El comando `node Scripts/registry_generator.js --check` compara los artefactos en disco contra lo que generaría en memoria. Si detecta desincronización, sale con código `1`. Se integra en `package.json` como `"check:registry"`.
+
+---
+
+## Módulos Transversales: Componentes UI y Ecosistema Compartido
+
+### 1. `@abdsynths/midi-keyb` (`MidiKeyboard`)
+Teclado interactivo universal y banda de controladores:
+- **Texturas visuales:** Acabado de teclas marfil envejecido y diseño analógico.
+- **Ruedas filmstrip fotográficas:** Pitch Bend (retorno automático a centro) y Modulation Wheel (amortiguación inercial).
+- **Control de expresión:** Selector de octavas (-2 a +2), soporte multitáctil, Velocity y Aftertouch (canal y polifónico).
+- **Lookup de dominios (`parameterLookup.js`):** Traduce valores brutos MIDI (CC 0-127) a unidades físicas reales (`Hz`, `s`, `cents`, `semitonos`) usando los contratos JSON de `ABDSharedAssets/contracts/`.
+
+### 2. `@abdsynths/shared` (`fitStage.js` & Design Tokens)
+- **Escalado Responsivo (`fitStage.js`):** Mantiene la relación de aspecto del sintetizador fija dentro de cualquier tamaño de ventana del DAW o navegador, calculando transformaciones CSS matriciales sin distorsión ni scrollbars.
+- **Trampa de Foco (`createOverlayFocus`):** Gestión accesible de diálogos modales y menús emergentes.
+- **Tokens CSS y Estilos de `ABDSharedAssets`:**
+  - Variables CSS normalizadas para toda la suite (`--bg-surface`, `--accent-color`, etc.).
+  - Widgets interactivos consistentes: `.synth-knob`, `.btn-toggle`, selectores y badges de diagnóstico (`.cal-badge-dsp`, `.cal-badge-module`).
+  - Prohibido el uso de frameworks CSS externos (Tailwind, Bootstrap); se exige Vanilla CSS estructurado.
+

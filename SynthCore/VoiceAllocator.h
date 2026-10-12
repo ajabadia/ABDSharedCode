@@ -349,6 +349,43 @@ public:
     }
 
 private:
+    /** \brief Actualizar cache de voces libres después de cambios de estado.
+     *  \brief Llámese después de allocateNoteOn/allocateNoteOff/markSlotReleased.
+     *  \realTimeSafe Safe from audio thread; called from control thread. */
+    void updateFreeVoiceCache() noexcept {
+        freeVoiceCache.fill(false);
+        for (size_t i = 0; i < MaxVoices; ++i) {
+            freeVoiceCache[i] = !voices[i].active;
+        }
+    }
+
+    /** \brief Obtener índice de voz libre desde el cache.
+     *  \return Índice de voz libre, o MaxVoices si ninguna disponible.
+     *  \realTimeSafe Safe for audio thread (read-only cache access). */
+    size_t getFreeVoiceFromCache() const noexcept {
+        for (size_t i = 0; i < MaxVoices; ++i) {
+            if (freeVoiceCache[i]) return i;
+        }
+        return MaxVoices;
+    }
+
+    /** \brief Verificar si hay voces libres disponibles.
+     *  \return true if there is at least one free voice.
+     *  \realTimeSafe Safe for audio thread (read-only cache access). */
+    bool hasFreeVoice() const noexcept {
+        return getFreeVoiceFromCache() < MaxVoices;
+    }
+
+    /** \brief Obtener número aproximado de voces libres.
+     *  \return Count of free voices (based on cache, may be slightly stale).
+     *  \realTimeSafe Safe for audio thread (read-only cache access). */
+    int getFreeVoiceCount() const noexcept {
+        int count = 0;
+        for (size_t i = 0; i < MaxVoices; ++i) {
+            if (freeVoiceCache[i]) ++count;
+        }
+        return count;
+    }
     /**
      * @brief Internal-state ladder. incomingNote < 0 disables repeated-note
      *        protection (legacy entry points); with Ms2000Ladder it is enabled.
@@ -394,6 +431,7 @@ private:
     }
 
     std::array<VoiceState, MaxVoices> voices;
+    std::array<bool, MaxVoices> freeVoiceCache; ///< Cache: true = voice i is free
     PolyMode mode             = PolyMode::Poly1;
     StealPolicy policy        = StealPolicy::LegacyTimestamp;
     size_t roundRobinIndex    = 0;
