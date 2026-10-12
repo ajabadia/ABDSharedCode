@@ -4,6 +4,7 @@
  */
 
 #include "DspCz101Filter.h"
+#include "DspCz1.h"
 #include <cmath>
 #include <algorithm>
 
@@ -163,19 +164,19 @@ float Cz101FilterProcess(float input, const Cz101FilterParams& params, Cz101Filt
  * Conversores Wire <-> Domain compartidos
  * ================================================================================================ */
 float Cz101FilterWireToCutoffHz(int raw) {
-    return abd::dsp::wireToDomain(Cz101ParameterMeta::Cutoff, raw);
+    return abd::dsp::wireToDomain(Cz101ParameterMeta::Cutoff(), raw);
 }
 
 int Cz101FilterDomainToWireCutoffHz(float hz) {
-    return abd::dsp::domainToWire(Cz101ParameterMeta::Cutoff, hz);
+    return abd::dsp::domainToWire(Cz101ParameterMeta::Cutoff(), hz);
 }
 
 float Cz101FilterWireToResonance(int raw) {
-    return abd::dsp::wireToDomain(Cz101ParameterMeta::Resonance, raw);
+    return abd::dsp::wireToDomain(Cz101ParameterMeta::Resonance(), raw);
 }
 
 int Cz101FilterDomainToWireResonance(float q) {
-    return abd::dsp::domainToWire(Cz101ParameterMeta::Resonance, q);
+    return abd::dsp::domainToWire(Cz101ParameterMeta::Resonance(), q);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,3 +268,5 @@ bool ParseCzSysExMessage(const uint8_t* sysexBytes, size_t lengthSize, CzPatchDa
     
     return false;
 }
+
+} // namespace abd::dsp
