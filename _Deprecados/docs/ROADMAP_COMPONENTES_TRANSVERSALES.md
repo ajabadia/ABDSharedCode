@@ -97,37 +97,66 @@ Es fundamental no confundir dos herramientas con objetivos y momentos de uso rad
 * **Tipo:** Utilidad Web transversal en `@abdsynths/shared/components` con arquitectura de montaje flotante (`FloatingMount`).
 * **Concepto de UX & Ergonomía:**
   - **Cero intrusión en el frontal:** No ocupa espacio en la carátula vintage del sintetizador.
-  - **Ventana Flotante Desacoplable (Floating Window):** Hereda el patrón de `ABDScope` (`FloatingMount.js`). La ventana se puede arrastrar (drag & drop), redimensionar y mover a un lado de la pantalla (o segundo monitor), permitiendo al diseñador de sonido mover los knobs del sinte mientras ve en vivo cómo muta el flujo hexadecimal.
+  - **Ventana Flotante Desacoplable (Floating Window):** Hereda el patrón de `ABDScope` (`FloatingMount.js`). La ventana se puede arrastrar (drag & drop con control de límites en viewport), redimensionar, minimizar y mover libremente, permitiendo al diseñador de sonido mover los knobs del sinte mientras ve en vivo cómo muta el flujo hexadecimal sin tapar los controles críticos.
   - **Invocación desde `nav_bar`:** Accesible como acción en el menú superior del sintetizador:
-    - `View ➔ Live SysEx Monitor` (o tecla de acceso rápido / atajo).
-    - Alternativamente accesible desde `Edit ➔ Inspect Current SysEx / Edit Buffer`.
+    - `View ➔ Live SysEx Inspector...` (o atajo de teclado `Ctrl+I`, y cierre rápido con tecla `Escape`).
+    - Alternativamente accesible haciendo clic en el cuadro de visor SysEx del sinte.
+* **Interface Pública Formal del Componente:**
+  ```javascript
+  const inspector = createLiveSysExInspector({
+    title: 'CZ-101 Live SysEx Inspector',
+    floating: true,
+    bytesPerRow: 16,
+    initialBuffer: currentSysExBytes,
+    onOpen: () => {},
+    onClose: () => {},
+    onExport: (blob, filename) => {}
+  });
+
+  // Métodos de control:
+  inspector.show();                     // Abre y enfoca
+  inspector.hide();                     // Oculta sin destruir estado ni buffers
+  inspector.toggle();                   // Alterna visibilidad
+  inspector.isOpen();                   // Boolean indicando visibilidad
+  inspector.updateBuffer(newBytes);     // Reactividad en vivo con pulso de mutación
+  inspector.setBuffer(newBytes);        // Alias de updateBuffer
+  inspector.getBuffer();                // Uint8Array del buffer actual
+  inspector.destroy();                  // Desmontaje y limpieza completa de listeners
+  ```
 * **Funcionalidades Clave:**
   1. **Reactividad en Tiempo Real (Live Mutation Highlights):**
-     - Al mover un slider de corte de filtro, resonancia o envolvente, la celda del byte correspondiente destella en color (ej. amarillo/verde fosforito durante 400 ms) antes de volver a su tono normal.
-     - Indicador del último parámetro modificado (ej. `[Offset 0x2A: VCF Cutoff] -> 0x7F (127)`).
+     - Al mover un slider de corte de filtro, resonancia o envolvente, la celda del byte correspondiente destella en verde neón (`sysex-pulse` a 800 ms) antes de volver a su tono normal.
+     - Indicador del último parámetro modificado y estado de conexión en vivo con LED animado.
   2. **Portapapeles Instantáneo:**
      - Botón `📋 Copy Hex` (formato limpio separado por espacios `F0 42 30 ... F7`).
      - Botón `📋 Copy Array / C++` (para desarrolladores de DSP).
   3. **Generación y Guardado de Presets:**
      - Botón `💾 Export .syx`: Descarga directa o guardado en disco del parche activo en formato de volcado de hardware estándar.
-     - Botón `➕ Create New Preset`: Envía el Edit Buffer actual a la lista de presets de usuario (hasta que `BankManager` lo absorba por completo).
   4. **Modo Diff Dinámico:**
-     - Botón `Freeze / A/B Compare`: Congela una foto del parche antes de editar y resalta en rojo/azul todos los bytes que difieren tras mover varios knobs.
+     - Botón `Snap A` y `Diff A/B`: Congela una instantánea de referencia antes de editar y resalta en ámbar todos los bytes que difieren tras mover los parámetros con contador `Δ N B`.
 * **Integración en la Suite:**
+  - `ABDCZ101` (Casio CZ-101 265-byte Sound Data Dump) — ✅ Integrado y sincronizado.
   - `ABDEep` (DeepMind 12/6 Edit Buffer & NRPN translator).
   - `ABDMS2000` (MS2000 / microKORG 0x71 / 0x58 Edit Buffer).
-  - `ABDCZ101` (Casio CZ-101 64-byte Programmer Buffer).
   - `ABDJUNiO601` (Juno-106 18-byte Voice Buffer).
 
-### Componente 2: `PatchNavigationBar` (Cabecera Universal de Presets)
-* **Tipo:** Componente Web transversal en `@abdsynths/shared`.
+### Componente 2: `SynthNavBar` y `PatchNavigationBar` (Navegación Superior y Cabecera de Presets)
+* **Tipo:** Componente Web transversal en `@abdsynths/shared/components/synthNavBar.js` y estilos en `navbar.css`.
 * **Responsabilidad:**
-  - Barra superior compacta con:
-    - Botones `< Prev` y `Next >` para navegar por el banco activo.
-    - Display editable con el nombre del preset actual.
-    - Selector rápido de categorías (Bass, Lead, Pad, Strings, Brass, FX, User).
-    - Botón `Save / Store` con diálogo de confirmación rápido.
-    - Acceso directo para invocar el modal completo de `BankManager`.
+  - Paridad 1:1 con la jerarquía de menús nativos JUCE (`File`, `Edit`, `Mode`, `View`, `Help`).
+  - Soporte declarativo de submenús anidados (`▸`), checks reactivos (`✓`) y badges de atajos (`<kbd>`).
+  - Navegación desktop/DAW con scrubbing de ratón al deslizar entre menús.
+  - Ranuras modulares (`centerSlot` para preset actual/categoría y `rightSlot` para pánico MIDI, selector de modo y badges).
+  - Cableado automático con `AboutDialog` para las acciones `Help ➔ About...` y `Help ➔ Check for Updates...`.
+
+### Componente 2b: `AboutDialog` (Diálogo Universal "About..." con AutoUpdater)
+* **Tipo:** Componente Web transversal en `@abdsynths/shared/components/aboutDialog.js` y estilos en `about-dialog.css`.
+* **Responsabilidad:**
+  - Identidad visual completa del sintetizador (nombre, subtítulo, descripción, build date/number).
+  - Sección interactiva de comprobación y notificación de actualizaciones de firmware/motor DSP.
+  - Comunicación bidireccional reactiva con `ABDShared::AutoUpdater` (eventos `checkForUpdates`, `getUpdateStatus`, `openBrowserUrl`, `updateCheckResult`).
+  - Fallback automático para modo Web/WASM consultando la API pública de GitHub Releases.
+  - Contrato de accesibilidad y foco completo (`overlayFocus.js`, Escape key, trap focus e `inert`).
 
 ### Componente 3: `LcdDisplay` (Pantalla Virtual de Hardware)
 * **Tipo:** Módulo C++ (`ABDSharedCode/LcdDisplay/LcdDisplay.h`) y réplica visual Web en `@abdsynths/shared`.
@@ -151,24 +180,21 @@ Es fundamental no confundir dos herramientas con objetivos y momentos de uso rad
 
 ## 5. Matriz de Adopción por Sintetizador
 
-| Sintetizador | `Scope` (ABDScope) | `AutoUpdater` | `BankManager` | `LiveSysExInspector` | `PatchNavBar` | `LcdDisplay` | `ModMatrixGrid` |
+| Sintetizador | `Scope` (ABDScope) | `AutoUpdater` | `BankManager` | `LiveSysExInspector` | `SynthNavBar` | `AboutDialog` | `ModMatrixGrid` |
 |---|---|---|---|---|---|---|---|
-| **`ABDMS2000`** | 🟡 Migrar a ABDScope | 📋 Planificado | ✅ Integrado | 📋 Extraer a Floating Mount | 📋 Estandarizar | 🟡 En LcdMenu | ✅ 4/8 Slots |
-| **`ABDEep`** | 🟡 Migrar a ABDScope | 📋 Planificado | 🟡 En unificación | 🟡 Desacoplar a Floating Mount | 📋 Estandarizar | 🟡 En Programmer | ✅ 8 Slots |
-| **`ABDCZ101`** | 📋 Fase 4 | 📋 Planificado | 🟡 En unificación | 📋 Implementar Floating Mount | 📋 Estandarizar | 📋 Emular 2x16 | 📋 Modo Moderno |
-| **`ABDJUNiO601`** | 📋 Planificado | 📋 Planificado | 🟡 En unificación | 📋 Migrar C++ a Floating Web | 📋 Estandarizar | ❌ No aplica | ❌ No aplica |
-| **`ABDNeural`** | 📋 Planificado | 📋 Planificado | 📋 Planificado | 📋 Integrar Floating Mount | 📋 Estandarizar | 📋 Display OLED | 📋 Matriz Completa |
+| **`ABDMS2000`** | 🟡 Migrar a ABDScope | 📋 Planificado | ✅ Integrado | 📋 Extraer a Floating Mount | 📋 Migrar a SynthNavBar | 📋 Integrar compartido | ✅ 4/8 Slots |
+| **`ABDEep`** | 🟡 Migrar a ABDScope | 📋 Planificado | 🟡 En unificación | 🟡 Migrar a componente compartido | 📋 Migrar a SynthNavBar | 📋 Integrar compartido | ✅ 8 Slots |
+| **`ABDCZ101`** | 📋 Fase 4 | ✅ Piloto Integrado | 🟡 En unificación | ✅ Integrado (FloatingMount & Edit Buffer) | ✅ Implementado (Paridad JUCE) | ✅ Integrado con AutoUpdater | 📋 Modo Moderno |
+| **`ABDJUNiO601`** | 📋 Planificado | 📋 Planificado | 🟡 En unificación | 📋 Migrar C++ a Floating Web | 📋 Planificado | 📋 Planificado | ❌ No aplica |
+| **`ABDNeural`** | 📋 Planificado | 📋 Planificado | 📋 Planificado | 📋 Integrar Floating Mount | 📋 Planificado | 📋 Planificado | 📋 Matriz Completa |
 
 ---
 
-## 6. Siguientes Pasos de Implementación Recomendados
+## 6. Siguientes Pasos de Implementación
 
-1. **Prioridad 1 — Estandarización de `ABDCZ101` (Fase 0):**
-   - Ejecutar la regeneración contract-driven de `registry.generated.json` desde `casio_cz101_parameter_spec.json`.
-   - Validar paridad con `registry_generator.js --check` y suites de Vitest.
-2. **Prioridad 2 — Módulo Transversal `LiveSysExInspector` en `ABDSharedAssets` / `ABDSharedCode`:**
-   - Crear el componente desacoplable con `FloatingMount` (arrastrable, con redimensión, minimizado y botón de cierre).
-   - Conectar con eventos de puente `bridge.on('editBufferChanged', (bytes, changedIdx) => ...)`.
-   - Incorporar acciones de: Copiar Hex / Copiar Array, Exportar archivo `.syx` al vuelo y Añadir a Presets.
-3. **Prioridad 3 — Reemplazo Universal de Osciloscopios por `ABDScope`:**
-   - Sustituir los scopes estáticos o decorativos de `ABDEep` y `ABDMS2000` por el componente oficial `ABDScope`.
+1. **Prioridad 1 — Estandarización de `ABDCZ101` (Fase 0):** ✅ COMPLETADA (SSOT contract-driven con `--check`, CMake modular con `ABDSharedCode`, tests C++ y WebUI al 100%).
+2. **Prioridad 2 — Módulo Transversal `LiveSysExInspector`:** ✅ COMPLETADO (Creado en `ABDSharedAssets/components/LiveSysExInspector.js` con `@keyframes sysex-pulse`, Diff A/B, exportación `.syx`, e integrado en `ABDCZ101` vía `View ➔ Live SysEx Inspector...` / `Ctrl+I`).
+3. **Prioridad 3 — Piloto de `AutoUpdater` en `ABDCZ101`:** ✅ COMPLETADO (Integrado `ABDShared::AutoUpdater` en C++, menú `Help ➔ Check for Updates...`, bindings WebView2 y sección reactiva en diálogo `About...`).
+4. **Prioridad 4 — Componentes Transversales `AboutDialog` y `SynthNavBar`:** ✅ COMPLETADO (Creados en `ABDSharedAssets/components/` con tests Vitest al 100%, estilos dedicados en `styles/components/` y exportación en el barrel principal).
+5. **Prioridad 5 — Reemplazo Universal de Osciloscopios por `ABDScope`:** Sustituir los scopes locales de `ABDEep`, `ABDMS2000` y `ABDCZ101` por el componente oficial flotante.
+6. **Prioridad 6 — Despliegue de `SynthNavBar`, `AboutDialog` y `LiveSysExInspector` en `ABDEep` y `ABDMS2000`:** Sustituir barras y modales locales por los nuevos componentes compartidos.

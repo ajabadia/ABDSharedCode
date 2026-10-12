@@ -78,3 +78,11 @@ Thumbs.db
 # antes de tocarla. Es la vuelta atras, no un fichero del repo: sin esto, un
 # `git add tools/` a lo bruto se la lleva al commit.
 tools/audit-baseline.json.antes
+
+# Scratch and migration artifacts
+.commit-msg-integrity*.txt
+CMakeLists.patch
+dictionary_*.json
+extract_params.ps1
+notes/
+ts_audit.py

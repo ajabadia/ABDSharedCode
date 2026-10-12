@@ -1,8 +1,16 @@
-# ABDSharedCode
+# ABDSharedCode [ARCHIVADO / DEPRECATED]
 
-Librería de código compartido entre proyectos ABDSynths.
+> [!WARNING]
+> **REPOSITORIO OBSOLETO / ARCHIVADO (DEPRECATED)**
+> Este repositorio ha sido consolidado de forma definitiva en el nuevo repositorio universal canónico:
+> 👉 **[ABDShared](https://github.com/ajabadia/ABDShared.git)** (cuadrante `Code/`)
+> 
+> Todo el código C++ compartido (`DspCore`, `SynthCore`, `DspEffects`, `LutDSP`, `AutoUpdater`, `Scope`, `BankManager`, `HardwareDrivers`, `WebView2Bridge`), sus suites de pruebas unitarias y su integración CMake viven ahora en `ABDShared/Code/`.
+> **No realizar nuevos desarrollos ni commits en este repositorio.**
 
-Repositorio: https://github.com/ajabadia/ABDSharedCode.git
+Librería de código compartido entre proyectos ABDSynths (histórica).
+
+Repositorio canónico sustituto: https://github.com/ajabadia/ABDShared.git
 
 ## Módulos disponibles
 

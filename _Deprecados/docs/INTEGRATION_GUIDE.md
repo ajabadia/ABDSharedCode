@@ -222,9 +222,59 @@ autoUpdater = std::make_unique<ABDShared::AutoUpdater>(
 
 autoUpdater->setUpdateCallback(
     [](const ABDShared::AutoUpdater::UpdateInfo& info, bool manual) {
-        // Mostrar diálogo al usuario
+        // Notificar al WebUI o mostrar diálogo al usuario
     });
 ```
+
+#### 4. Integración con WebView2 y WebUI (`AboutDialog` / `SynthNavBar`)
+
+En plugins híbridos con frontend WebUI (WebView2 en Windows, WKWebView en macOS), `AutoUpdater` se expone al bridge JS registrando funciones nativas y emitiendo eventos:
+
+```cpp
+// En PluginEditor.cpp o adaptador de WebView2:
+
+// 1. Exponer métodos invocables desde JS:
+webView->addCustomMethod("checkForUpdates", [this](const juce::var&) {
+    if (processor.autoUpdater)
+        processor.autoUpdater->checkForUpdates(true); // Verificación manual
+    return juce::var();
+});
+
+webView->addCustomMethod("getUpdateStatus", [this](const juce::var&) {
+    juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+    if (processor.autoUpdater)
+    {
+        auto info = processor.autoUpdater->getLastUpdateInfo();
+        obj->setProperty("currentVersion", processor.autoUpdater->getCurrentVersion());
+        obj->setProperty("latestVersion", info.version.isNotEmpty() ? info.version : processor.autoUpdater->getCurrentVersion());
+        obj->setProperty("isUpdateAvailable", processor.autoUpdater->isUpdateAvailable());
+        obj->setProperty("downloadUrl", info.downloadUrl);
+    }
+    return juce::var(obj.get());
+});
+
+webView->addCustomMethod("openBrowserUrl", [](const juce::var& args) {
+    if (args.isArray() && args.size() > 0)
+        juce::URL(args[0].toString()).launchInDefaultBrowser();
+    return juce::var();
+});
+
+// 2. Escuchar resultado y notificar al frontend:
+processor.autoUpdater->setUpdateCallback([this](const ABDShared::AutoUpdater::UpdateInfo& info, bool) {
+    juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+    obj->setProperty("currentVersion", processor.autoUpdater->getCurrentVersion());
+    obj->setProperty("latestVersion", info.version.isNotEmpty() ? info.version : processor.autoUpdater->getCurrentVersion());
+    obj->setProperty("isUpdateAvailable", processor.autoUpdater->isUpdateAvailable());
+    obj->setProperty("downloadUrl", info.downloadUrl);
+    
+    // Dispara el evento reactivo en el frontend JS:
+    webView->emitEventIfPresent("updateCheckResult", juce::var(obj.get()));
+});
+```
+
+En el frontend WebUI, se consumen automáticamente los componentes transversales de `@abdsynths/shared`:
+* **[`AboutDialog`](file:///d:/desarrollos/ABDSynths/ABDSharedAssets/components/aboutDialog.js)**: Escucha `updateCheckResult`, invoca `checkForUpdates()` y `openBrowserUrl()`.
+* **[`SynthNavBar`](file:///d:/desarrollos/ABDSynths/ABDSharedAssets/components/synthNavBar.js)**: Trae preconfiguradas las acciones `Help ➔ About...` y `Help ➔ Check for Updates...` auto-conectadas con `AboutDialog`.
 
 ---
 
