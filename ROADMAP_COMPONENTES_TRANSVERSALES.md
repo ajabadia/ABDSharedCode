@@ -151,10 +151,24 @@ Es fundamental no confundir dos herramientas con objetivos y momentos de uso rad
 
 ## 5. Matriz de Adopción por Sintetizador
 
-| Sintetizador | `Scope` (ABDScope) | `AutoUpdater` | `BankManager` | `SysExInspector` | `PatchNavBar` | `LcdDisplay` | `ModMatrixGrid` |
+| Sintetizador | `Scope` (ABDScope) | `AutoUpdater` | `BankManager` | `LiveSysExInspector` | `PatchNavBar` | `LcdDisplay` | `ModMatrixGrid` |
 |---|---|---|---|---|---|---|---|
-| **`ABDMS2000`** | 🟡 Migrar a ABDScope | 📋 Planificado | ✅ Integrado | 📋 Mover a BankMgr | 📋 Estandarizar | 🟡 En LcdMenu | ✅ 4/8 Slots |
-| **`ABDEep`** | 🟡 Migrar a ABDScope | 📋 Planificado | 🟡 En unificación | 📋 Mover a BankMgr | 📋 Estandarizar | 🟡 En Programmer | ✅ 8 Slots |
-| **`ABDCZ101`** | 📋 Fase 4 | 📋 Planificado | 🟡 En unificación | 📋 Integrar en BankMgr | 📋 Estandarizar | 📋 Emular 2x16 | 📋 Modo Moderno |
-| **`ABDJUNiO601`** | 📋 Planificado | 📋 Planificado | 🟡 En unificación | 📋 Mover a BankMgr | 📋 Estandarizar | ❌ No aplica | ❌ No aplica |
-| **`ABDNeural`** | 📋 Planificado | 📋 Planificado | 📋 Planificado | 📋 Integrar en BankMgr | 📋 Estandarizar | 📋 Display OLED | 📋 Matriz Completa |
+| **`ABDMS2000`** | 🟡 Migrar a ABDScope | 📋 Planificado | ✅ Integrado | 📋 Extraer a Floating Mount | 📋 Estandarizar | 🟡 En LcdMenu | ✅ 4/8 Slots |
+| **`ABDEep`** | 🟡 Migrar a ABDScope | 📋 Planificado | 🟡 En unificación | 🟡 Desacoplar a Floating Mount | 📋 Estandarizar | 🟡 En Programmer | ✅ 8 Slots |
+| **`ABDCZ101`** | 📋 Fase 4 | 📋 Planificado | 🟡 En unificación | 📋 Implementar Floating Mount | 📋 Estandarizar | 📋 Emular 2x16 | 📋 Modo Moderno |
+| **`ABDJUNiO601`** | 📋 Planificado | 📋 Planificado | 🟡 En unificación | 📋 Migrar C++ a Floating Web | 📋 Estandarizar | ❌ No aplica | ❌ No aplica |
+| **`ABDNeural`** | 📋 Planificado | 📋 Planificado | 📋 Planificado | 📋 Integrar Floating Mount | 📋 Estandarizar | 📋 Display OLED | 📋 Matriz Completa |
+
+---
+
+## 6. Siguientes Pasos de Implementación Recomendados
+
+1. **Prioridad 1 — Estandarización de `ABDCZ101` (Fase 0):**
+   - Ejecutar la regeneración contract-driven de `registry.generated.json` desde `casio_cz101_parameter_spec.json`.
+   - Validar paridad con `registry_generator.js --check` y suites de Vitest.
+2. **Prioridad 2 — Módulo Transversal `LiveSysExInspector` en `ABDSharedAssets` / `ABDSharedCode`:**
+   - Crear el componente desacoplable con `FloatingMount` (arrastrable, con redimensión, minimizado y botón de cierre).
+   - Conectar con eventos de puente `bridge.on('editBufferChanged', (bytes, changedIdx) => ...)`.
+   - Incorporar acciones de: Copiar Hex / Copiar Array, Exportar archivo `.syx` al vuelo y Añadir a Presets.
+3. **Prioridad 3 — Reemplazo Universal de Osciloscopios por `ABDScope`:**
+   - Sustituir los scopes estáticos o decorativos de `ABDEep` y `ABDMS2000` por el componente oficial `ABDScope`.
