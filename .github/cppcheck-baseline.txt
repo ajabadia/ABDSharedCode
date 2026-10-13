@@ -1,0 +1,77 @@
+# Baseline cppcheck de ABDSharedCode — generado midiendo HEAD (8691a82) con el
+# comando exacto de la CI (cppcheck 2.21). Alcance: los 17 dirs de C++ del repo,
+# con `-i Scope/build` para saltear artefactos trackeados; sin exclusiones
+# --suppress (no hay generados ni estampados, barrido hecho el 2026-10-13). Firma:
+# severidad|archivo|mensaje (sin linea, paths con /). El gate solo bloquea
+# hallazgos que NO esten aqui.
+error|DspCore/DspCz1.cpp|Shifting 32-bit value by 32 bits is undefined behaviour
+error|DspCore/DspMathBitIdent.cpp|printf format string requires 1 parameter but only 0 are given.
+error|DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.diagrama
+error|DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.esperado
+error|DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.insercion
+error|DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.routing
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspCz1.cpp|Shifting 32-bit value by 32 bits is undefined behaviour
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspMathBitIdent.cpp|printf format string requires 1 parameter but only 0 are given.
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.diagrama
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.esperado
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.insercion
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspEffects/DspEffectsTests.cpp|Uninitialized struct member: c.routing
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/CvToControl.cpp|No pair for character ("). Can't process file. File is either invalid or unicode, which is currently not supported.
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/tests/S950DiskTests.inc|Array 'n[5]' accessed at index 9, which is out of bounds.
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/tests/test_HardwareMidiDetectorIdentityState.cpp|syntax error
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/tests/test_JuceMidiHardwareBackendStrictOpen.cpp|syntax error
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/tests/test_MidiEndpointSafetyPolicy.cpp|syntax error
+error|MidiKeyboard/node_modules/@abdsynths/shared/Code/tests/test_MidiEndpointSafetyPolicyWiring.cpp|syntax error
+error|SynthCore/CvToControl.cpp|No pair for character ("). Can't process file. File is either invalid or unicode, which is currently not supported.
+error|SynthCore/tests/S950DiskTests.inc|Array 'n[5]' accessed at index 9, which is out of bounds.
+error|tests/test_HardwareMidiDetectorIdentityState.cpp|syntax error
+error|tests/test_JuceMidiHardwareBackendStrictOpen.cpp|syntax error
+error|tests/test_MidiEndpointSafetyPolicy.cpp|syntax error
+error|tests/test_MidiEndpointSafetyPolicyWiring.cpp|syntax error
+warning|AutoUpdater/AutoUpdater.cpp|Return value of function log() is not used.
+warning|DspCore/DspCoreTests.cpp|Passing value -1.0f to log2() leads to implementation-defined result.
+warning|DspCore/DspCoreTests.cpp|Passing value 0.0f to log2() leads to implementation-defined result.
+warning|DspCore/DspPhys.h|Member variable 'DelayLine::buf_' has no initializer.
+warning|DspCore/DspPhys.h|Member variable 'DspPhysSympVoiceState::buzz_' is not initialized in the constructor.
+warning|DspCore/DspProphetVCF.h|Member variable 'Stage::hip' has no initializer.
+warning|DspCore/DspProphetVCF.h|Member variable 'Stage::lp' has no initializer.
+warning|DspCore/DspProphetVCF.h|Member variable 'Stage::prev_in' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_drive' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_fc_g' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_knee' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_rate' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_res_k' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_xhp_a' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_xlp_a' has no initializer.
+warning|DspCore/DspSid.h|Member variable 'DspSidConfig::sid_zero' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/AutoUpdater/AutoUpdater.cpp|Return value of function log() is not used.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspCoreTests.cpp|Passing value -1.0f to log2() leads to implementation-defined result.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspCoreTests.cpp|Passing value 0.0f to log2() leads to implementation-defined result.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspPhys.h|Member variable 'DelayLine::buf_' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspPhys.h|Member variable 'DspPhysSympVoiceState::buzz_' is not initialized in the constructor.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspProphetVCF.h|Member variable 'Stage::hip' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspProphetVCF.h|Member variable 'Stage::lp' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspProphetVCF.h|Member variable 'Stage::prev_in' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_drive' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_fc_g' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_knee' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_rate' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_res_k' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_xhp_a' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_xlp_a' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/DspCore/DspSid.h|Member variable 'DspSidConfig::sid_zero' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/StudioTopology/StudioTopologyController.h|Member variable 'TopologyContext::deviceManager' has no initializer.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/Arpeggiator.h|Member variable 'Arpeggiator::pending' is not initialized in the constructor.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/Arpeggiator.h|Member variable 'Arpeggiator::sounding' is not initialized in the constructor.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/VoiceAllocator.h|Member variable 'VoiceAllocator < 2 >::freeVoiceCache' is not initialized in the constructor.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/VoiceAllocator.h|Member variable 'VoiceAllocator < 3 >::freeVoiceCache' is not initialized in the constructor.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/VoiceAllocator.h|Member variable 'VoiceAllocator < 4 >::freeVoiceCache' is not initialized in the constructor.
+warning|MidiKeyboard/node_modules/@abdsynths/shared/Code/SynthCore/tests/S950DiskTests.inc|Either the condition 'e' is redundant or there is possible null pointer dereference: e.
+warning|Scope/Source/Core/TriggerDetector.h|Invalid std::log2() argument nr 1. The value is 0 but the valid values are '4.94066e-324:'.
+warning|StudioTopology/StudioTopologyController.h|Member variable 'TopologyContext::deviceManager' has no initializer.
+warning|SynthCore/Arpeggiator.h|Member variable 'Arpeggiator::pending' is not initialized in the constructor.
+warning|SynthCore/Arpeggiator.h|Member variable 'Arpeggiator::sounding' is not initialized in the constructor.
+warning|SynthCore/VoiceAllocator.h|Member variable 'VoiceAllocator < 2 >::freeVoiceCache' is not initialized in the constructor.
+warning|SynthCore/VoiceAllocator.h|Member variable 'VoiceAllocator < 3 >::freeVoiceCache' is not initialized in the constructor.
+warning|SynthCore/VoiceAllocator.h|Member variable 'VoiceAllocator < 4 >::freeVoiceCache' is not initialized in the constructor.
+warning|SynthCore/tests/S950DiskTests.inc|Either the condition 'e' is redundant or there is possible null pointer dereference: e.

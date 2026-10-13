@@ -724,3 +724,75 @@ jobs:
             "$bin" || status=1
           done
           exit $status
+
+  # ---------------------------------------------------------------------------
+  # cppcheck CON BASELINE — bloqueante. Deja entrar solo hallazgos NUEVOS:
+  # .github/cppcheck-baseline.txt guarda la firma de la deuda medida — severidad|
+  # archivo|mensaje, SIN numero de linea y con '/' de separador —, generada midiendo
+  # HEAD con ESTE mismo comando y cppcheck 2.21. Bloquean tres cosas: hallazgos
+  # fuera de la baseline, la ausencia de la propia baseline, y que la comprobacion
+  # no llegue a medirse. El `2>&1` no es opcional: cppcheck escribe los hallazgos
+  # en stderr, y medir sin el siempre cuenta 0.
+# ALCANCE: los 17 dirs de C++ del repo (AudioComparator..visualizers); `-i Scope/build`
+# salta artefactos de build trackeados (29 ficheros generados de CMake/JUCE). Sin
+# exclusiones --suppress: no hay generados ni estampados bajo esos dirs (barrido hecho
+# el 2026-10-13).
+  cppcheck:
+    name: cppcheck (bloqueante, baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Static analysis (cppcheck) - bloqueante (baseline)
+      run: |
+        sudo apt-get update -qq && sudo apt-get install -y -qq cppcheck
+        cppcheck --version
+        baseline=.github/cppcheck-baseline.txt
+        if [ ! -f "$baseline" ]; then
+          echo "::error title=cppcheck::no existe $baseline: sin baseline no se puede separar deuda de regresion."
+          exit 1
+        fi
+        # Tolerancia CRLF: si la baseline se commiteo con finales Windows,
+        # grep -f no casaria nada y TODO pareceria hallazgo nuevo.
+        bl=$(mktemp)
+        tr -d '\r' < "$baseline" > "$bl"
+        set +e
+        salida=$(cppcheck --enable=warning,performance,portability --std=c++20 --suppress=missingIncludeSystem -i Scope/build --template='{severity}|{file}|{line}|{message}' AudioComparator AutoUpdater BankManager DspCore DspEffects HardwareDrivers HardwareMidiDetect LcdDisplay LutDSP MidiKeyboard Scope Segmented StudioTopology SynthCore WebView2Bridge tests visualizers 2>&1)
+        codigo=$?
+        set -e
+        if [ -z "$salida" ]; then
+          echo "::error title=cppcheck::cppcheck no ha producido ni una linea (codigo $codigo): la comprobacion no llego a medirse."
+          exit 1
+        fi
+        tmp=$(mktemp)
+        printf '%s\n' "$salida" > "$tmp"
+        actuales=$(python3 - "$tmp" <<'PY'
+        import re, sys
+        out = set()
+        pat = re.compile(r"^(warning|performance|portability|error)\|([^|]+)\|[^|]+\|(.*)$")
+        for ln in open(sys.argv[1], encoding="utf-8", errors="replace"):
+            m = pat.match(ln.rstrip("\n"))
+            if m:
+                out.add(m.group(1) + "|" + m.group(2).replace("\\", "/") + "|" + m.group(3))
+        print("\n".join(sorted(out)))
+        PY
+        )
+        rm -f "$tmp"
+        nuevos=$(printf '%s\n' "$actuales" | grep -vxF -f "$bl" || true)
+        if [ -n "$nuevos" ]; then
+          printf '%s\n' "$nuevos" | sed -n '1,30p'
+          n=$(printf '%s\n' "$nuevos" | grep -c . || true)
+          echo "::error title=cppcheck::${n} hallazgos NUEVOS fuera de la baseline: regresion. Arreglo: atacarlos; solo si es deuda aceptada deliberadamente, anadir su firma a $baseline en el MISMO PR."
+          exit 1
+        fi
+        af=$(mktemp)
+        printf '%s\n' "$actuales" > "$af"
+        obsoletas=$(grep -v '^#' "$bl" | grep -vxF -f "$af" | grep -c . || true)
+        rm -f "$af"
+        if [ "$obsoletas" -gt 0 ]; then
+          echo "::notice title=cppcheck::${obsoletas} firmas de la baseline ya no aparecen: deuda pagada — prune $baseline."
+        fi
+        echo "::notice title=cppcheck::sin hallazgos nuevos ($(grep -cv '^#' "$bl") firmas baseladas, ${obsoletas} obsoletas)."
+        rm -f "$bl"
+        exit 0
